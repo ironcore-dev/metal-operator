@@ -6,8 +6,11 @@
 package v1alpha1
 
 import (
+	apiv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	internal "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/internal"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	types "k8s.io/apimachinery/pkg/types"
+	managedfields "k8s.io/apimachinery/pkg/util/managedfields"
 	v1 "k8s.io/client-go/applyconfigurations/meta/v1"
 )
 
@@ -24,13 +27,52 @@ type BMCUserSetApplyConfiguration struct {
 
 // BMCUserSet constructs a declarative configuration of the BMCUserSet type for use with
 // apply.
-func BMCUserSet(name, namespace string) *BMCUserSetApplyConfiguration {
+func BMCUserSet(name string) *BMCUserSetApplyConfiguration {
 	b := &BMCUserSetApplyConfiguration{}
 	b.WithName(name)
-	b.WithNamespace(namespace)
 	b.WithKind("BMCUserSet")
 	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
 	return b
+}
+
+// ExtractBMCUserSetFrom extracts the applied configuration owned by fieldManager from
+// bMCUserSet for the specified subresource. Pass an empty string for subresource to extract
+// the main resource. Common subresources include "status", "scale", etc.
+// bMCUserSet must be a unmodified BMCUserSet API object that was retrieved from the Kubernetes API.
+// ExtractBMCUserSetFrom provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCUserSetFrom(bMCUserSet *apiv1alpha1.BMCUserSet, fieldManager string, subresource string) (*BMCUserSetApplyConfiguration, error) {
+	b := &BMCUserSetApplyConfiguration{}
+	err := managedfields.ExtractInto(bMCUserSet, internal.Parser().Type("com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSet"), fieldManager, b, subresource)
+	if err != nil {
+		return nil, err
+	}
+	b.WithName(bMCUserSet.Name)
+
+	b.WithKind("BMCUserSet")
+	b.WithAPIVersion("metal.ironcore.dev/v1alpha1")
+	return b, nil
+}
+
+// ExtractBMCUserSet extracts the applied configuration owned by fieldManager from
+// bMCUserSet. If no managedFields are found in bMCUserSet for fieldManager, a
+// BMCUserSetApplyConfiguration is returned with only the Name, Namespace (if applicable),
+// APIVersion and Kind populated. It is possible that no managed fields were found for because other
+// field managers have taken ownership of all the fields previously owned by fieldManager, or because
+// the fieldManager never owned fields any fields.
+// bMCUserSet must be a unmodified BMCUserSet API object that was retrieved from the Kubernetes API.
+// ExtractBMCUserSet provides a way to perform a extract/modify-in-place/apply workflow.
+// Note that an extracted apply configuration will contain fewer fields than what the fieldManager previously
+// applied if another fieldManager has updated or force applied any of the previously applied fields.
+func ExtractBMCUserSet(bMCUserSet *apiv1alpha1.BMCUserSet, fieldManager string) (*BMCUserSetApplyConfiguration, error) {
+	return ExtractBMCUserSetFrom(bMCUserSet, fieldManager, "")
+}
+
+// ExtractBMCUserSetStatus extracts the applied configuration owned by fieldManager from
+// bMCUserSet for the status subresource.
+func ExtractBMCUserSetStatus(bMCUserSet *apiv1alpha1.BMCUserSet, fieldManager string) (*BMCUserSetApplyConfiguration, error) {
+	return ExtractBMCUserSetFrom(bMCUserSet, fieldManager, "status")
 }
 
 func (b BMCUserSetApplyConfiguration) IsApplyConfiguration() {}

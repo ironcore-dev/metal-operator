@@ -611,6 +611,42 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSet
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSetSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSetStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSetSpec
+  map:
+    fields:
+    - name: bmcSelector
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
+    - name: bmcUserTemplate
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserTemplate
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSetStatus
+  map:
+    fields:
+    - name: availableBMCUsers
+      type:
+        scalar: numeric
+    - name: fullyLabeledBMCs
+      type:
+        scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSpec
   map:
     fields:
@@ -647,6 +683,24 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: passwordExpiration
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserTemplate
+  map:
+    fields:
+    - name: bmcSecretRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
+    - name: description
+      type:
+        scalar: string
+    - name: roleID
+      type:
+        scalar: string
+    - name: rotationPeriod
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
+    - name: userName
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersion
   map:
     fields:

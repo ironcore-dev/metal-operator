@@ -256,9 +256,6 @@ var _ = Describe("BMCUser Controller", func() {
 				BMCUserTemplate: metalv1alpha1.BMCUserTemplate{
 					UserName: "admin-user",
 					RoleID:   "Administrator",
-					BMCSecretRef: &v1.LocalObjectReference{
-						Name: bmcSecret.Name,
-					},
 					RotationPeriod: &metav1.Duration{
 						Duration: 1 * time.Second,
 					},

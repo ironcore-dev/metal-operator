@@ -25,6 +25,14 @@ var _ = Describe("BMCUserSet Controller", func() {
 	)
 
 	AfterEach(func(ctx SpecContext) {
+		// Explicitly delete any Servers left over by BMC reconciliation so that
+		// EnsureCleanState's ServerList wait converges. The reclaim policy
+		// finalizer added in #925 otherwise keeps Servers around too long.
+		serverList := &metalv1alpha1.ServerList{}
+		Expect(k8sClient.List(ctx, serverList)).To(Succeed())
+		for i := range serverList.Items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, &serverList.Items[i]))).To(Succeed())
+		}
 		EnsureCleanState()
 	})
 

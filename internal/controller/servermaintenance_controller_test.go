@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -436,7 +437,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting high-priority maintenance")
 		Expect(k8sClient.Delete(ctx, highPriorityMaintenance)).To(Succeed())
 		// check that the high-priority maintenance is deleted before checking the low-priority maintenance
-		Eventually(Get(highPriorityMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(highPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
 			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
@@ -446,6 +447,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting low-priority maintenance")
 		Expect(k8sClient.Delete(ctx, lowPriorityMaintenance)).To(Succeed())
+		Eventually(Get(lowPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
@@ -528,7 +530,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting set-priority maintenance")
 		Expect(k8sClient.Delete(ctx, setPriorityMaintenance)).To(Succeed())
-		Eventually(Get(setPriorityMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(setPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Approving lowPriorityMaintenance on the ServerClaim")
 		Eventually(Update(serverClaim, func() {
@@ -540,6 +542,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting unset-priority maintenance")
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
+		Eventually(Get(unsetPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
@@ -565,13 +568,13 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting the Server before deleting the ServerMaintenance")
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Eventually(Get(server)).ShouldNot(Succeed())
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Deleting the ServerMaintenance")
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Ensuring the ServerMaintenance is fully deleted despite the Server being gone")
-		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("should not allow an Enforced maintenance to steal the ref from an already-active maintenance", func(ctx SpecContext) {
@@ -693,6 +696,51 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Ensuring the ServerMaintenance is deleted immediately without cleanup side-effects")
-		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should set the LocatorLED on maintenance start and turn it off when maintenance ends", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating a ServerMaintenance with LocatorLED Lit")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-led",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-led-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:  &corev1.LocalObjectReference{Name: server.Name},
+				Policy:     metalv1alpha1.ServerMaintenancePolicyEnforced,
+				LocatorLED: metalv1alpha1.LitIndicatorLED,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Checking the ServerMaintenance transitions to InMaintenance")
+		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+
+		By("Checking that the server LocatorLED is set to Lit")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.IndicatorLED", metalv1alpha1.LitIndicatorLED),
+		))
+
+		By("Deleting the ServerMaintenance to end maintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Checking that the server LocatorLED is cleared to Off")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.IndicatorLED", metalv1alpha1.OffIndicatorLED),
+		))
+
+		By("Waiting for ServerMaintenance to be fully removed")
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

@@ -449,7 +449,7 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 	}
 	log.V(1).Info("Ensured initial boot configuration is deleted")
 
-	if err := r.ensureIndicatorLED(ctx, server); err != nil {
+	if err := r.ensureIndicatorLED(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 
@@ -538,7 +538,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 
-	if err := r.ensureIndicatorLED(ctx, server); err != nil {
+	if err := r.ensureIndicatorLED(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
 	}
 	log.V(1).Info("Reconciled reserved state")
@@ -1164,9 +1164,16 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }
 
-func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, server *metalv1alpha1.Server) error {
-	// TODO: implement
-	return nil
+func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+	if server.Spec.IndicatorLED == "" {
+		return nil
+	}
+	desired := schemas.IndicatorLED(server.Spec.IndicatorLED)   //nolint:staticcheck
+	current := schemas.IndicatorLED(server.Status.IndicatorLED) //nolint:staticcheck
+	if desired == current {
+		return nil
+	}
+	return bmcClient.SetIndicatorLED(ctx, server.Spec.SystemURI, desired)
 }
 
 func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.Context, server *metalv1alpha1.Server) error {

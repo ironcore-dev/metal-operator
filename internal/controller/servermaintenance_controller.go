@@ -257,7 +257,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 	log.V(1).Info("Applied ServerBootConfiguration for Server")
 
 	if config == nil {
-		if err := r.setAndPatchServerPowerState(ctx, server, maintenance); err != nil {
+		if err := r.setAndPatchServerState(ctx, server, maintenance); err != nil {
 			return ctrl.Result{}, err
 		}
 		log.V(1).Info("Patched server power state", "Server", server.Name, "Power", maintenance.Spec.ServerPower)
@@ -278,7 +278,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 
 	if config.Status.State == metalv1alpha1.ServerBootConfigurationStateReady {
 		log.V(1).Info("Server maintenance boot configuration is ready", "Server", server.Name)
-		if err := r.setAndPatchServerPowerState(ctx, server, maintenance); err != nil {
+		if err := r.setAndPatchServerState(ctx, server, maintenance); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -320,9 +320,12 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 	return config, nil
 }
 
-func (r *ServerMaintenanceReconciler) setAndPatchServerPowerState(ctx context.Context, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
+func (r *ServerMaintenanceReconciler) setAndPatchServerState(ctx context.Context, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
 	serverBase := server.DeepCopy()
 	server.Spec.Power = maintenance.Spec.ServerPower
+	if maintenance.Spec.LocatorLED != "" {
+		server.Spec.IndicatorLED = maintenance.Spec.LocatorLED
+	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 
@@ -391,6 +394,15 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, maintenance *
 	}
 
 	if ref := server.Spec.ServerMaintenanceRef; ref != nil && ref.Name == maintenance.Name && ref.Namespace == maintenance.Namespace {
+		if maintenance.Spec.LocatorLED != "" {
+			serverBase := server.DeepCopy()
+			server.Spec.IndicatorLED = metalv1alpha1.OffIndicatorLED
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil && !apierrors.IsNotFound(err) {
+				return fmt.Errorf("failed to clear LocatorLED on Server: %w", err)
+			}
+			log.V(1).Info("Cleared LocatorLED on Server", "Server", server.Name)
+		}
+
 		if err := r.removeMaintenanceRefFromServer(ctx, server); err != nil {
 			return fmt.Errorf("failed to remove ServerMaintenance ref from Server: %w", err)
 		}

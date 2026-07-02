@@ -45,6 +45,11 @@ type ServerMaintenanceSpec struct {
 	// +optional
 	ServerPower Power `json:"serverPower,omitempty"`
 
+	// LocatorLED specifies the desired state of the server's locator LED during maintenance.
+	// When maintenance ends, the locator LED is turned off.
+	// +optional
+	LocatorLED IndicatorLED `json:"locatorLED,omitempty"`
+
 	// Priority determines ordering when multiple ServerMaintenance resources target the same server.
 	// Higher values are processed first. If priorities are equal, older resources are processed first.
 	// If omitted, priority is treated as 0.

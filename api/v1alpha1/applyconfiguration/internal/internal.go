@@ -1176,6 +1176,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
   map:
     fields:
+    - name: locatorLED
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
     - name: policy
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy

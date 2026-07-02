@@ -6,8 +6,8 @@
 package v1alpha1
 
 import (
-	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // BMCUserSpecApplyConfiguration represents a declarative configuration of the BMCUserSpec type for use
@@ -15,20 +15,9 @@ import (
 //
 // BMCUserSpec defines the desired state of BMCUser.
 type BMCUserSpecApplyConfiguration struct {
-	// UserName is the username of the BMC user.
-	UserName *string `json:"userName,omitempty"`
-	// RoleID is the ID of the role to assign to the user.
-	RoleID *string `json:"roleID,omitempty"`
-	// Description is a description for the BMC user.
-	Description *string `json:"description,omitempty"`
-	// RotationPeriod defines how often the password should be rotated.
-	// If not set, the password will not be rotated.
-	RotationPeriod *v1.Duration `json:"rotationPeriod,omitempty"`
-	// BMCSecretRef references the BMCSecret containing the credentials for this user.
-	// If not set, the operator will generate a secure password based on BMC manufacturer requirements.
-	BMCSecretRef *corev1.LocalObjectReference `json:"bmcSecretRef,omitempty"`
+	BMCUserTemplateApplyConfiguration `json:",inline"`
 	// BMCRef references the BMC this user should be created on.
-	BMCRef *corev1.LocalObjectReference `json:"bmcRef,omitempty"`
+	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 }
 
 // BMCUserSpecApplyConfiguration constructs a declarative configuration of the BMCUserSpec type for use with
@@ -41,7 +30,7 @@ func BMCUserSpec() *BMCUserSpecApplyConfiguration {
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UserName field is set to the value of the last call.
 func (b *BMCUserSpecApplyConfiguration) WithUserName(value string) *BMCUserSpecApplyConfiguration {
-	b.UserName = &value
+	b.BMCUserTemplateApplyConfiguration.UserName = &value
 	return b
 }
 
@@ -49,7 +38,7 @@ func (b *BMCUserSpecApplyConfiguration) WithUserName(value string) *BMCUserSpecA
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RoleID field is set to the value of the last call.
 func (b *BMCUserSpecApplyConfiguration) WithRoleID(value string) *BMCUserSpecApplyConfiguration {
-	b.RoleID = &value
+	b.BMCUserTemplateApplyConfiguration.RoleID = &value
 	return b
 }
 
@@ -57,30 +46,30 @@ func (b *BMCUserSpecApplyConfiguration) WithRoleID(value string) *BMCUserSpecApp
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the Description field is set to the value of the last call.
 func (b *BMCUserSpecApplyConfiguration) WithDescription(value string) *BMCUserSpecApplyConfiguration {
-	b.Description = &value
+	b.BMCUserTemplateApplyConfiguration.Description = &value
 	return b
 }
 
 // WithRotationPeriod sets the RotationPeriod field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the RotationPeriod field is set to the value of the last call.
-func (b *BMCUserSpecApplyConfiguration) WithRotationPeriod(value v1.Duration) *BMCUserSpecApplyConfiguration {
-	b.RotationPeriod = &value
+func (b *BMCUserSpecApplyConfiguration) WithRotationPeriod(value metav1.Duration) *BMCUserSpecApplyConfiguration {
+	b.BMCUserTemplateApplyConfiguration.RotationPeriod = &value
 	return b
 }
 
 // WithBMCSecretRef sets the BMCSecretRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the BMCSecretRef field is set to the value of the last call.
-func (b *BMCUserSpecApplyConfiguration) WithBMCSecretRef(value corev1.LocalObjectReference) *BMCUserSpecApplyConfiguration {
-	b.BMCSecretRef = &value
+func (b *BMCUserSpecApplyConfiguration) WithBMCSecretRef(value v1.LocalObjectReference) *BMCUserSpecApplyConfiguration {
+	b.BMCUserTemplateApplyConfiguration.BMCSecretRef = &value
 	return b
 }
 
 // WithBMCRef sets the BMCRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the BMCRef field is set to the value of the last call.
-func (b *BMCUserSpecApplyConfiguration) WithBMCRef(value corev1.LocalObjectReference) *BMCUserSpecApplyConfiguration {
+func (b *BMCUserSpecApplyConfiguration) WithBMCRef(value v1.LocalObjectReference) *BMCUserSpecApplyConfiguration {
 	b.BMCRef = &value
 	return b
 }

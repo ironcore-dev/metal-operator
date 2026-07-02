@@ -75,10 +75,18 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCUser"):
 		return &apiv1alpha1.BMCUserApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserSet"):
+		return &apiv1alpha1.BMCUserSetApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserSetSpec"):
+		return &apiv1alpha1.BMCUserSetSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserSetStatus"):
+		return &apiv1alpha1.BMCUserSetStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserSpec"):
 		return &apiv1alpha1.BMCUserSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserStatus"):
 		return &apiv1alpha1.BMCUserStatusApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserTemplate"):
+		return &apiv1alpha1.BMCUserTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersion"):
 		return &apiv1alpha1.BMCVersionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersionSet"):

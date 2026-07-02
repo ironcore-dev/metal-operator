@@ -336,6 +336,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		Expect((&BMCUserSetReconciler{
+			Client: k8sManager.GetClient(),
+			Scheme: k8sManager.GetScheme(),
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
 		Expect((&ServerReadinessRuleReconciler{
 			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())

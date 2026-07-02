@@ -32,8 +32,15 @@ const (
 	ComponentTypeBIOS ComponentType = "BIOS"
 )
 
-// BMC defines an interface for interacting with a Baseboard Management Controller.
-type BMC interface {
+// The BMC interface is intentionally split into smaller, capability-focused
+// interfaces below. Each consumer should accept the narrowest combination of
+// interfaces it actually uses, following the "accept interfaces, return
+// structs" idiom and io.Reader-style interface segregation. BMC itself is
+// retained as the union of all capabilities for callers (such as the BMC
+// factory) that need to hand out a fully-featured client.
+
+// PowerController manages the power state of a system.
+type PowerController interface {
 	// PowerOn powers on the system.
 	PowerOn(ctx context.Context, systemURI string) error
 
@@ -46,6 +53,12 @@ type BMC interface {
 	// Reset performs a reset on the system.
 	Reset(ctx context.Context, systemURI string, resetType schemas.ResetType) error
 
+	// WaitForServerPowerState waits for the server to reach the specified power state.
+	WaitForServerPowerState(ctx context.Context, systemURI string, powerState schemas.PowerState) error
+}
+
+// BootController manages boot overrides and boot order for a system.
+type BootController interface {
 	// SetBootOverride configures the system to network-boot on its next
 	// power-on, bypassing the persistent boot order. If persistent is false
 	// the override applies to a single boot only; if true it applies to every
@@ -57,26 +70,32 @@ type BMC interface {
 	// is currently set.
 	ClearBootOverride(ctx context.Context, systemURI string) error
 
+	// GetBootOrder retrieves the boot order for the system.
+	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
+
+	// SetBootOrder sets the boot order for the system.
+	SetBootOrder(ctx context.Context, systemURI string, order []string) error
+}
+
+// SystemInspector reads inventory information from the managed systems.
+type SystemInspector interface {
+	// GetSystems returns the managed systems.
+	GetSystems(ctx context.Context) ([]Server, error)
+
 	// GetSystemInfo retrieves information about the system.
 	GetSystemInfo(ctx context.Context, systemURI string) (SystemInfo, error)
 
-	// Logout closes the BMC client connection by logging out
-	Logout()
+	// GetProcessors retrieves processor information for the system.
+	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
 
-	// GetSystems returns the managed systems
-	GetSystems(ctx context.Context) ([]Server, error)
+	// GetStorages retrieves storage information for the system.
+	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
+}
 
-	// GetManager returns the manager
-	GetManager(UUID string) (*schemas.Manager, error)
-
-	// DiscoverManager returns the first manager that exposes graphical console capabilities.
-	DiscoverManager(ctx context.Context) (*schemas.Manager, error)
-
-	// ResetManager performs a reset on the Manager.
-	ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error
-
-	// GetBootOrder retrieves the boot order for the system.
-	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
+// BIOSManager reads and updates BIOS attributes on a system.
+type BIOSManager interface {
+	// GetBiosVersion retrieves the BIOS version for the system.
+	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
 
 	// GetBiosAttributeValues retrieves BIOS attribute values for the system.
 	GetBiosAttributeValues(ctx context.Context, systemURI string, attributes []string) (schemas.SettingsAttributes, error)
@@ -84,47 +103,38 @@ type BMC interface {
 	// GetBiosPendingAttributeValues retrieves pending BIOS attribute values for the system.
 	GetBiosPendingAttributeValues(ctx context.Context, systemURI string) (schemas.SettingsAttributes, error)
 
+	// SetBiosAttributesOnReset sets BIOS attributes on the system and applies them on the next reset.
+	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes schemas.SettingsAttributes) (err error)
+
+	// CheckBiosAttributes checks if the BIOS attributes are valid and returns whether a reset is required.
+	CheckBiosAttributes(attrs schemas.SettingsAttributes) (reset bool, err error)
+}
+
+// BMCSettingsManager reads and updates BMC attributes (manager settings).
+type BMCSettingsManager interface {
+	// GetBMCVersion retrieves the BMC version for the system.
+	GetBMCVersion(ctx context.Context, UUID string) (string, error)
+
 	// GetBMCAttributeValues retrieves BMC attribute values for the system.
 	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
 	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result schemas.SettingsAttributes, err error)
 
-	// CheckBiosAttributes checks if the BIOS attributes are valid and returns whether a reset is required.
-	CheckBiosAttributes(attrs schemas.SettingsAttributes) (reset bool, err error)
-
-	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
-	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)
-
-	// SetBiosAttributesOnReset sets BIOS attributes on the system and applies them on the next reset.
-	SetBiosAttributesOnReset(ctx context.Context, systemURI string, attributes schemas.SettingsAttributes) (err error)
-
 	// SetBMCAttributesImmediately sets BMC attributes on the system and applies them immediately.
 	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (err error)
 
-	// GetBiosVersion retrieves the BIOS version for the system.
-	GetBiosVersion(ctx context.Context, systemURI string) (string, error)
+	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
+	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)
+}
 
-	// GetBMCVersion retrieves the BMC version for the system.
-	GetBMCVersion(ctx context.Context, UUID string) (string, error)
-
-	// SetBootOrder sets the boot order for the system.
-	SetBootOrder(ctx context.Context, systemURI string, order []string) error
-
-	// GetStorages retrieves storage information for the system.
-	GetStorages(ctx context.Context, systemURI string) ([]Storage, error)
-
-	// GetProcessors retrieves processor information for the system.
-	GetProcessors(ctx context.Context, systemURI string) ([]Processor, error)
-
+// FirmwareUpdater drives BIOS and BMC firmware upgrades.
+type FirmwareUpdater interface {
 	// UpgradeBiosVersion upgrades the BIOS version for the system.
 	UpgradeBiosVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error)
 
 	// GetBiosUpgradeTask retrieves the task for the BIOS upgrade.
 	GetBiosUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
-
-	// WaitForServerPowerState waits for the server to reach the specified power state.
-	WaitForServerPowerState(ctx context.Context, systemURI string, powerState schemas.PowerState) error
 
 	// UpgradeBMCVersion upgrades the BMC version for the system.
 	UpgradeBMCVersion(ctx context.Context, manufacturer string, parameters *schemas.UpdateServiceSimpleUpdateParameters) (string, bool, error)
@@ -132,12 +142,25 @@ type BMC interface {
 	// GetBMCUpgradeTask retrieves the task for the BMC upgrade.
 	GetBMCUpgradeTask(ctx context.Context, manufacturer string, taskURI string) (*schemas.Task, error)
 
-	// CreateEventSubscription creates an event subscription for the manager.
-	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
+	// for the given component type.
+	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
+}
 
-	// DeleteEventSubscription deletes an event subscription for the manager.
-	DeleteEventSubscription(ctx context.Context, uri string) error
+// ManagerController interacts with the BMC's own Manager resource.
+type ManagerController interface {
+	// GetManager returns the manager.
+	GetManager(UUID string) (*schemas.Manager, error)
 
+	// DiscoverManager returns the first manager that exposes graphical console capabilities.
+	DiscoverManager(ctx context.Context) (*schemas.Manager, error)
+
+	// ResetManager performs a reset on the Manager.
+	ResetManager(ctx context.Context, UUID string, resetType schemas.ResetType) error
+}
+
+// AccountManager manages BMC user accounts.
+type AccountManager interface {
 	// CreateOrUpdateAccount creates or updates a BMC user account.
 	CreateOrUpdateAccount(ctx context.Context, userName, role, password string, enabled bool) error
 
@@ -149,11 +172,64 @@ type BMC interface {
 
 	// GetAccountService retrieves the account service.
 	GetAccountService() (*schemas.AccountService, error)
-
-	// CheckBMCPendingComponentUpgrade checks if there are pending/staged firmware upgrades
-	// for the given component type.
-	CheckBMCPendingComponentUpgrade(ctx context.Context, componentType ComponentType) (bool, error)
 }
+
+// EventSubscriber manages Redfish event subscriptions on the BMC.
+type EventSubscriber interface {
+	// CreateEventSubscription creates an event subscription for the manager.
+	CreateEventSubscription(ctx context.Context, destination string, eventType schemas.EventFormatType, protocol schemas.DeliveryRetryPolicy) (string, error)
+
+	// DeleteEventSubscription deletes an event subscription for the manager.
+	DeleteEventSubscription(ctx context.Context, uri string) error
+}
+
+// BMC is the union of every capability a Redfish BMC client may offer. It
+// exists so that constructors can return a single fully-featured value;
+// individual consumers should depend on the narrower capability interfaces
+// above whenever possible.
+type BMC interface {
+	PowerController
+	BootController
+	SystemInspector
+	BIOSManager
+	BMCSettingsManager
+	FirmwareUpdater
+	ManagerController
+	AccountManager
+	EventSubscriber
+
+	// Logout closes the BMC client connection by logging out.
+	Logout()
+}
+
+// VendorFactory wraps a *RedfishBaseBMC in a vendor-specific implementation.
+// External packages can supply their own factories via Options.AdditionalVendors
+// to extend the BMC client with new manufacturers, or to override a built-in,
+// without modifying this package.
+type VendorFactory func(base *RedfishBaseBMC) BMC
+
+// DefaultVendors returns the built-in vendor factories for Dell, HPE, Lenovo
+// and Supermicro. Callers can copy and extend this map, or build their own
+// from scratch, and pass the extras through Options.AdditionalVendors.
+func DefaultVendors() map[Manufacturer]VendorFactory {
+	return map[Manufacturer]VendorFactory{
+		ManufacturerDell:       func(b *RedfishBaseBMC) BMC { return &DellRedfishBMC{RedfishBaseBMC: b} },
+		ManufacturerHPE:        func(b *RedfishBaseBMC) BMC { return &HPERedfishBMC{RedfishBaseBMC: b} },
+		ManufacturerLenovo:     func(b *RedfishBaseBMC) BMC { return &LenovoRedfishBMC{RedfishBaseBMC: b} },
+		ManufacturerSupermicro: func(b *RedfishBaseBMC) BMC { return &SupermicroRedfishBMC{RedfishBaseBMC: b} },
+	}
+}
+
+// Compile-time guarantees that every built-in implementation continues to
+// satisfy the full BMC union. New vendor structs added to this package should
+// extend this list so regressions surface at build time, not on first call.
+var (
+	_ BMC = (*RedfishBaseBMC)(nil)
+	_ BMC = (*DellRedfishBMC)(nil)
+	_ BMC = (*HPERedfishBMC)(nil)
+	_ BMC = (*LenovoRedfishBMC)(nil)
+	_ BMC = (*SupermicroRedfishBMC)(nil)
+)
 
 type Entity struct {
 	// ID uniquely identifies the resource.

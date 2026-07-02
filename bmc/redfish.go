@@ -27,8 +27,9 @@ import (
 )
 
 // RedfishBaseBMC implements all standard Redfish BMC methods.
-// Vendor-specific structs embed this and override methods as needed.
-var _ BMC = (*RedfishBaseBMC)(nil)
+// Vendor-specific structs embed this and override methods as needed. The
+// compile-time assertion that *RedfishBaseBMC satisfies BMC lives in bmc.go
+// alongside the per-vendor assertions.
 
 const (
 	// DefaultResourcePollingInterval is the default interval for polling resources.
@@ -55,6 +56,14 @@ type Options struct {
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
 	PowerPollingTimeout     time.Duration
+
+	// AdditionalVendors maps a manufacturer string (as reported by Redfish)
+	// to a factory that wraps the base Redfish client in a vendor-specific
+	// implementation. Entries are merged on top of DefaultVendors() by
+	// NewRedfishBMCClient, so callers only need to supply the extra OEMs
+	// they want to add. Existing built-in manufacturers can be overridden
+	// by registering the same key.
+	AdditionalVendors map[Manufacturer]VendorFactory
 }
 
 // RedfishBaseBMC is the base implementation of the BMC interface for Redfish.
@@ -112,9 +121,11 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 }
 
 // NewRedfishBMCClient creates a vendor-specific BMC client by connecting to the
-// Redfish endpoint, detecting the manufacturer, and returning the appropriate
-// vendor-specific struct. The returned BMC interface implementation will have
-// vendor-specific method overrides where needed.
+// Redfish endpoint, detecting the manufacturer, and dispatching through the
+// vendor registry. DefaultVendors() is used as the base and merged with any
+// entries in options.AdditionalVendors (which may override built-ins). If no
+// factory matches the detected manufacturer, the base Redfish implementation
+// is returned.
 func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	base, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
@@ -129,18 +140,45 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	}
 	base.manufacturer = manufacturer
 
-	switch Manufacturer(manufacturer) {
-	case ManufacturerDell:
-		return &DellRedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerHPE:
-		return &HPERedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerLenovo:
-		return &LenovoRedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerSupermicro:
-		return &SupermicroRedfishBMC{RedfishBaseBMC: base}, nil
-	default:
-		return base, nil
+	vendors := DefaultVendors()
+	for k, v := range options.AdditionalVendors {
+		if v == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", k)
+		}
+		vendors[k] = v
 	}
+	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
+		if factory == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", manufacturer)
+		}
+		client := factory(base)
+		if client == nil {
+			return nil, fmt.Errorf("vendor factory for manufacturer %q returned nil", manufacturer)
+		}
+		return client, nil
+	}
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("No vendor factory registered for manufacturer, using base Redfish implementation", "manufacturer", manufacturer)
+	return base, nil
+}
+
+// Client returns the underlying gofish API client. External vendor
+// implementations that embed *RedfishBaseBMC use this to perform OEM-specific
+// HTTP requests without re-establishing the connection.
+func (r *RedfishBaseBMC) Client() *gofish.APIClient {
+	return r.client
+}
+
+// Options returns the options the client was constructed with.
+func (r *RedfishBaseBMC) Options() Options {
+	return r.options
+}
+
+// Manufacturer returns the manufacturer detected during connect, or the empty
+// string when detection failed (for example because no Systems were exposed
+// during endpoint discovery).
+func (r *RedfishBaseBMC) Manufacturer() Manufacturer {
+	return Manufacturer(r.manufacturer)
 }
 
 // Logout closes the BMC client connection by logging out

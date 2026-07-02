@@ -22,12 +22,12 @@ spec:
     - name: PXE
       priority: 1
       device: Network
-  BIOS:
-    - version: "1.0.3"
-      settings:
-        BootMode: UEFI
-        Virtualization: Enabled
+  biosSettingsRef:
+    name: my-server-bios
 ```
+
+BIOS configuration is expressed as a separate [`BIOSSettings`](biossettings.md) resource
+referenced from `spec.biosSettingsRef`, rather than inline on the `Server`.
 
 ## Usage
 
@@ -146,29 +146,27 @@ spec:
     - name: PXE
       priority: 1
       device: Network
-  BIOS:
-    - version: "1.0.3"
-      settings:
-        BootMode: UEFI
-        HyperThreading: Enabled
+  biosSettingsRef:
+    name: server-with-bmc-ref-bios
 ```
 
-Inline Configuration: Use the `bmc` field to provide direct BMC access details.
+Inline Configuration: Use the `bmc` field to provide direct BMC access details on the
+`Server` itself, without a separate `BMC` or `Endpoint` resource. The `bmcSecretRef` still
+points to a [`BMCSecret`](bmcsecrets.md) that carries the credentials.
 
 ```yaml
-apiVersion: v1alpha1
-kind: BMC
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
 metadata:
-  name: my-bmc
+  name: server-with-inline-bmc
 spec:
-  endpointRef:
-    name: my-bmc-endpoint
-  bmcSecretRef:
-    name: my-bmc-secret
-  protocol:
-    name: Redfish
-    port: 8000
-  consoleProtocol:
-    name: SSH
-    port: 22
+  systemUUID: "123e4567-e89b-12d3-a456-426614174000"
+  power: "On"
+  bmc:
+    protocol:
+      name: Redfish
+      port: 8000
+    address: "192.168.100.10"
+    bmcSecretRef:
+      name: my-bmc-secret
 ```

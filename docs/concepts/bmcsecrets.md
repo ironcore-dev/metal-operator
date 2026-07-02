@@ -10,7 +10,7 @@ interact with BMCs.
 An example of how to define an `BMCSecret` resource:
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: metal.ironcore.dev/v1alpha1
 kind: BMCSecret
 metadata:
   name: my-bmc-secret

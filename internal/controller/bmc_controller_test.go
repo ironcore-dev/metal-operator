@@ -337,6 +337,82 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Delete(ctx, dnsRecord)).To(Succeed())
 	})
 
+	It("should recreate event subscriptions when they are deleted externally on the BMC", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{
+				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
+				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a BMC resource")
+		bmcObj := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-bmc-",
+			},
+			Spec: metalv1alpha1.BMCSpec{
+				Endpoint: &metalv1alpha1.InlineEndpoint{
+					IP:         metalv1alpha1.MustParseIP(MockServerIP),
+					MACAddress: "23:11:8A:33:CF:EA",
+				},
+				Protocol: metalv1alpha1.Protocol{
+					Name: metalv1alpha1.ProtocolRedfishLocal,
+					Port: MockServerPort,
+				},
+				BMCSecretRef: v1.LocalObjectReference{
+					Name: bmcSecret.Name,
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcObj)).To(Succeed())
+
+		By("Waiting for initial subscriptions to be established")
+		Eventually(Object(bmcObj)).Should(SatisfyAll(
+			HaveField("Status.MetricsReportSubscriptionLink", Not(BeEmpty())),
+			HaveField("Status.EventsSubscriptionLink", Not(BeEmpty())),
+		))
+		initialMetricsLink := bmcObj.Status.MetricsReportSubscriptionLink
+		initialEventsLink := bmcObj.Status.EventsSubscriptionLink
+
+		// Delete only the metrics subscription. The events subscription (/6) remains in
+		// the mock server's collection, so the next POST will assign ID 7 (not 5), giving
+		// us a verifiably different link after recreation.
+		By("Simulating external deletion of the metrics subscription on the BMC")
+		mockServers[0].DeleteSubscription(initialMetricsLink)
+
+		By("Triggering a reconcile by annotating the BMC object")
+		Eventually(Update(bmcObj, func() {
+			if bmcObj.Annotations == nil {
+				bmcObj.Annotations = map[string]string{}
+			}
+			bmcObj.Annotations["metal.ironcore.dev/reconcile-trigger"] = time.Now().Format(time.RFC3339Nano)
+		})).Should(Succeed())
+
+		By("Expecting the stale metrics subscription to be detected and recreated with a new link")
+		Eventually(Object(bmcObj)).Should(SatisfyAll(
+			HaveField("Status.MetricsReportSubscriptionLink", Not(BeEmpty())),
+			HaveField("Status.MetricsReportSubscriptionLink", Not(Equal(initialMetricsLink))),
+			HaveField("Status.EventsSubscriptionLink", Equal(initialEventsLink)),
+		))
+
+		By("Cleaning up")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
+			},
+		}
+		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Eventually(Get(bmcObj)).Should(Satisfy(apierrors.IsNotFound))
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
 })
 
 var _ = Describe("BMC Validation", func() {

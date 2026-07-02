@@ -1299,6 +1299,61 @@ func (s *MockServer) ResetAccounts() {
 	s.accounts = loadAccountsFromEmbedded()
 }
 
+// DeleteSubscription removes the subscription at uri from the mock server's state.
+// Use this in tests to simulate a subscription being deleted externally on the BMC
+// (e.g., by a firmware reset or admin action) so the controller's stale-link recovery
+// path can be exercised.
+func (s *MockServer) DeleteSubscription(uri string) {
+	filePath := resolvePath(uri)
+	// Compute the collection key from the parent Redfish URL (not the file path).
+	// resolvePath on the file path gives "data/.../5/index.json" whose path.Dir is
+	// "data/.../5" — the wrong key. The collection is stored under the key produced
+	// by resolvePath of the parent URL, e.g. "data/EventService/Subscriptions/index.json".
+	collectionKey := resolvePath(path.Dir(uri))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.overrides, filePath)
+
+	// Remove the member from the collection override (or load from embedded and update).
+	cached, hasOverride := s.overrides[collectionKey]
+	var col Collection
+	if hasOverride {
+		// (1) If the cached value is not a Collection, bail rather than silently
+		// overwriting it with an empty Collection.
+		c, ok := cached.(Collection)
+		if !ok {
+			s.log.Error(nil, "Cached value for collection key is not a Collection, skipping member removal", "collectionKey", collectionKey)
+			return
+		}
+		col = c
+	} else {
+		// (2) Propagate ReadFile/Unmarshal errors rather than silently using an
+		// empty Collection.
+		data, err := dataFS.ReadFile(collectionKey)
+		if err != nil {
+			s.log.Error(err, "Failed to read embedded collection data", "collectionKey", collectionKey)
+			return
+		}
+		if err := json.Unmarshal(data, &col); err != nil {
+			s.log.Error(err, "Failed to parse embedded collection data", "collectionKey", collectionKey)
+			return
+		}
+	}
+	newMembers := make([]Member, 0, len(col.Members))
+	for _, m := range col.Members {
+		if m.OdataID != uri {
+			newMembers = append(newMembers, m)
+		}
+	}
+	col.Members = newMembers
+	// (3) Reaching here guarantees col was validly loaded (invalid cases already
+	// returned above), so persist unconditionally. An empty Members slice is
+	// valid when the last subscription is deleted.
+	s.overrides[collectionKey] = col
+}
+
 // Start starts the mock server and stops on ctx cancellation.
 func (s *MockServer) Start(ctx context.Context) error {
 	if s.handler == nil {

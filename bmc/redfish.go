@@ -1220,14 +1220,38 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
-func (r *RedfishBaseBMC) DeleteEventSubscription(_ context.Context, uri string) error {
-	service := r.client.GetService()
-	ev, err := service.EventService()
+func (r *RedfishBaseBMC) getEventService() (*schemas.EventService, error) {
+	ev, err := r.client.GetService().EventService()
 	if err != nil {
-		return fmt.Errorf("failed to get event service: %w", err)
+		return nil, fmt.Errorf("failed to get event service: %w", err)
 	}
 	if !ev.ServiceEnabled {
-		return fmt.Errorf("event service is not enabled")
+		return nil, fmt.Errorf("event service is not enabled")
+	}
+	return ev, nil
+}
+
+func (r *RedfishBaseBMC) GetEventSubscription(_ context.Context, uri string) (bool, error) {
+	ev, err := r.getEventService()
+	if err != nil {
+		return false, err
+	}
+	event, err := ev.GetEventSubscription(uri)
+	if err != nil {
+		// A 404 means the subscription no longer exists on the BMC — not a real error.
+		var redfishErr *schemas.Error
+		if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusNotFound {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get event subscription: %w", err)
+	}
+	return event != nil, nil
+}
+
+func (r *RedfishBaseBMC) DeleteEventSubscription(_ context.Context, uri string) error {
+	ev, err := r.getEventService()
+	if err != nil {
+		return err
 	}
 	event, err := ev.GetEventSubscription(uri)
 	if err != nil {

@@ -549,6 +549,15 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 	log.V(1).Info("Handling event subscriptions for BMC", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP)
 	modified := false
 
+	if bmcObj.Status.MetricsReportSubscriptionLink != "" {
+		exists, err := bmcClient.GetEventSubscription(ctx, bmcObj.Status.MetricsReportSubscriptionLink)
+		if err != nil {
+			log.Error(err, "Failed to check metrics report subscription, skipping staleness check", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP)
+		} else if !exists {
+			log.Info("Metrics report subscription no longer exists on BMC, clearing stale link", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "link", bmcObj.Status.MetricsReportSubscriptionLink)
+			bmcObj.Status.MetricsReportSubscriptionLink = ""
+		}
+	}
 	if bmcObj.Status.MetricsReportSubscriptionLink == "" {
 		link, err := serverevents.SubscribeMetricsReport(ctx, r.EventURL, bmcObj.Name, bmcClient)
 		if err != nil {
@@ -558,9 +567,19 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		bmcObj.Status.MetricsReportSubscriptionLink = link
 		modified = true
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+			return false, fmt.Errorf("failed to patch BMC status with metrics subscription link: %w", err)
 		}
 		log.Info("Event subscription established", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "type", "metrics", "link", link)
+	}
+
+	if bmcObj.Status.EventsSubscriptionLink != "" {
+		exists, err := bmcClient.GetEventSubscription(ctx, bmcObj.Status.EventsSubscriptionLink)
+		if err != nil {
+			log.Error(err, "Failed to check events subscription, skipping staleness check", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP)
+		} else if !exists {
+			log.Info("Events subscription no longer exists on BMC, clearing stale link", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "link", bmcObj.Status.EventsSubscriptionLink)
+			bmcObj.Status.EventsSubscriptionLink = ""
+		}
 	}
 	if bmcObj.Status.EventsSubscriptionLink == "" {
 		link, err := serverevents.SubscribeEvents(ctx, r.EventURL, bmcObj.Name, bmcClient)
@@ -571,7 +590,7 @@ func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient 
 		bmcObj.Status.EventsSubscriptionLink = link
 		modified = true
 		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return false, fmt.Errorf("failed to patch server status with subscription links: %w", err)
+			return false, fmt.Errorf("failed to patch BMC status with events subscription link: %w", err)
 		}
 		log.Info("Event subscription established", "bmcName", bmcObj.Name, "bmcIP", bmcObj.Status.IP, "type", "events", "link", link)
 	}

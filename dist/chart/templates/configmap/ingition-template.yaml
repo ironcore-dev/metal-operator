@@ -1,0 +1,17 @@
+{{- if .Values.ignition.override }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "chart.name" . }}-ignition-template
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "chart.labels" . | nindent 4 }}
+data:
+  # The Ignition template has the following parameters substituted at runtime:
+  # {{.Image}} - The Docker image to run for metalprobe
+  # {{.Flags}} - The flags to pass to the metalprobe container, this includes --registry-url and --server-uuid
+  # {{.SSHPublicKey}} - The SSH public key for the 'metal' user
+  # {{.PasswordHash}} - The password hash for the 'metal' user
+  ignition-template.yaml: |
+{{ .Values.ignition.template | indent 4 }}
+{{- end }}

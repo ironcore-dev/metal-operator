@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: metal-operator
+    app.kubernetes.io/instance: leader-election-rolebinding
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/name: rolebinding
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+    app.kubernetes.io/part-of: metal-operator
+  name: {{ include "metal-operator.resourceName" (dict "suffix" "leader-election-rolebinding" "context" $) }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "metal-operator.resourceName" (dict "suffix" "leader-election-role" "context" $) }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "metal-operator.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}

@@ -57,12 +57,13 @@ type Options struct {
 	PowerPollingInterval    time.Duration
 	PowerPollingTimeout     time.Duration
 
-	// Vendors maps a manufacturer string (as reported by Redfish) to a
-	// factory that wraps the base Redfish client in a vendor-specific
-	// implementation. When nil, NewRedfishBMCClient uses DefaultVendors().
-	// To extend the set with a private OEM, copy DefaultVendors() and add
-	// the additional entries.
-	Vendors map[Manufacturer]VendorFactory
+	// AdditionalVendors maps a manufacturer string (as reported by Redfish)
+	// to a factory that wraps the base Redfish client in a vendor-specific
+	// implementation. Entries are merged on top of DefaultVendors() by
+	// NewRedfishBMCClient, so callers only need to supply the extra OEMs
+	// they want to add. Existing built-in manufacturers can be overridden
+	// by registering the same key.
+	AdditionalVendors map[Manufacturer]VendorFactory
 }
 
 // RedfishBaseBMC is the base implementation of the BMC interface for Redfish.
@@ -121,9 +122,10 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 
 // NewRedfishBMCClient creates a vendor-specific BMC client by connecting to the
 // Redfish endpoint, detecting the manufacturer, and dispatching through the
-// vendor registry in options.Vendors (defaulting to DefaultVendors() when nil).
-// If no factory matches the detected manufacturer, the base Redfish
-// implementation is returned.
+// vendor registry. DefaultVendors() is used as the base and merged with any
+// entries in options.AdditionalVendors (which may override built-ins). If no
+// factory matches the detected manufacturer, the base Redfish implementation
+// is returned.
 func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	base, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
@@ -138,9 +140,12 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	}
 	base.manufacturer = manufacturer
 
-	vendors := options.Vendors
-	if vendors == nil {
-		vendors = DefaultVendors()
+	vendors := DefaultVendors()
+	for k, v := range options.AdditionalVendors {
+		if v == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", k)
+		}
+		vendors[k] = v
 	}
 	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
 		if factory == nil {
@@ -148,6 +153,8 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 		}
 		return factory(base), nil
 	}
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("No vendor factory registered for manufacturer, using base Redfish implementation", "manufacturer", manufacturer)
 	return base, nil
 }
 
@@ -158,16 +165,16 @@ func (r *RedfishBaseBMC) Client() *gofish.APIClient {
 	return r.client
 }
 
-// ClientOptions Options returns the options the client was constructed with.
-func (r *RedfishBaseBMC) ClientOptions() Options {
+// Options returns the options the client was constructed with.
+func (r *RedfishBaseBMC) Options() Options {
 	return r.options
 }
 
 // Manufacturer returns the manufacturer detected during connect, or the empty
 // string when detection failed (for example because no Systems were exposed
 // during endpoint discovery).
-func (r *RedfishBaseBMC) Manufacturer() string {
-	return r.manufacturer
+func (r *RedfishBaseBMC) Manufacturer() Manufacturer {
+	return Manufacturer(r.manufacturer)
 }
 
 // Logout closes the BMC client connection by logging out

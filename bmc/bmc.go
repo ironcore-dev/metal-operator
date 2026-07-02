@@ -183,12 +183,6 @@ type EventSubscriber interface {
 	DeleteEventSubscription(ctx context.Context, uri string) error
 }
 
-// Logouter closes the BMC client connection.
-type Logouter interface {
-	// Logout closes the BMC client connection by logging out.
-	Logout()
-}
-
 // BMC is the union of every capability a Redfish BMC client may offer. It
 // exists so that constructors can return a single fully-featured value;
 // individual consumers should depend on the narrower capability interfaces
@@ -203,17 +197,20 @@ type BMC interface {
 	ManagerController
 	AccountManager
 	EventSubscriber
-	Logouter
+
+	// Logout closes the BMC client connection by logging out.
+	Logout()
 }
 
 // VendorFactory wraps a *RedfishBaseBMC in a vendor-specific implementation.
-// External packages can supply their own factories via Options.Vendors to
-// extend the BMC client with new manufacturers without modifying this package.
+// External packages can supply their own factories via Options.AdditionalVendors
+// to extend the BMC client with new manufacturers, or to override a built-in,
+// without modifying this package.
 type VendorFactory func(base *RedfishBaseBMC) BMC
 
 // DefaultVendors returns the built-in vendor factories for Dell, HPE, Lenovo
 // and Supermicro. Callers can copy and extend this map, or build their own
-// from scratch, and pass the result through Options.Vendors.
+// from scratch, and pass the extras through Options.AdditionalVendors.
 func DefaultVendors() map[Manufacturer]VendorFactory {
 	return map[Manufacturer]VendorFactory{
 		ManufacturerDell:       func(b *RedfishBaseBMC) BMC { return &DellRedfishBMC{RedfishBaseBMC: b} },

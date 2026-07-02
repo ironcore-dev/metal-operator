@@ -77,6 +77,13 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		}
 	}
 
+	// If neither the bmcRef nor the version changed, no new duplicate can be introduced.
+	if oldObj.Spec.BMCRef != nil && newObj.Spec.BMCRef != nil &&
+		oldObj.Spec.BMCRef.Name == newObj.Spec.BMCRef.Name &&
+		oldObj.Spec.Version == newObj.Spec.Version {
+		return nil, nil
+	}
+
 	bmcSettingsList := &metalv1alpha1.BMCSettingsList{}
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
@@ -113,16 +120,20 @@ func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSetting
 		if settings.Name == bs.Name {
 			continue
 		}
-		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
-				settings.Spec.BMCRef.Name,
-				settings.Name,
-				bs.Spec.BMCRef.Name,
-				bs.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
+		if bs.Spec.BMCRef.Name != settings.Spec.BMCRef.Name {
+			continue
 		}
+		if bs.Spec.Version != settings.Spec.Version {
+			continue
+		}
+		err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+			settings.Spec.BMCRef.Name,
+			settings.Name,
+			bs.Spec.BMCRef.Name,
+			bs.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
+			settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 	}
 	return nil, nil
 }

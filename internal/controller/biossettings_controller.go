@@ -1023,6 +1023,9 @@ func (r *BIOSSettingsReconciler) handleAppliedState(ctx context.Context, bmcClie
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get BIOS version and settings diff: %w", err)
 	}
+	if settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied && len(settingsDiff) == 0 {
+		return ctrl.Result{}, nil
+	}
 	if len(settingsDiff) > 0 {
 		log.V(1).Info("Found BIOS setting difference after applied state", "SettingsDiff", settingsDiff)
 		return ctrl.Result{}, r.updateStatus(ctx, settings, metalv1alpha1.BIOSSettingsStatePending, nil)
@@ -1490,9 +1493,7 @@ func (r *BIOSSettingsReconciler) enqueueBiosSettingsByServerRefs(ctx context.Con
 		if settings.Spec.ServerMaintenanceRef == nil ||
 			(server.Spec.ServerMaintenanceRef != nil &&
 				(server.Spec.ServerMaintenanceRef.Name != settings.Spec.ServerMaintenanceRef.Name ||
-					server.Spec.ServerMaintenanceRef.Namespace != settings.Spec.ServerMaintenanceRef.Namespace)) ||
-			settings.Status.State == metalv1alpha1.BIOSSettingsStateApplied ||
-			settings.Status.State == metalv1alpha1.BIOSSettingsStateFailed {
+					server.Spec.ServerMaintenanceRef.Namespace != settings.Spec.ServerMaintenanceRef.Namespace)) {
 			continue
 		}
 		reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: settings.Name}})

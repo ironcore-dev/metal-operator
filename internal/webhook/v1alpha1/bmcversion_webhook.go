@@ -68,6 +68,13 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		}
 	}
 
+	// If neither the bmcRef nor the version changed, no new duplicate can be introduced.
+	if oldObj.Spec.BMCRef != nil && newObj.Spec.BMCRef != nil &&
+		oldObj.Spec.BMCRef.Name == newObj.Spec.BMCRef.Name &&
+		oldObj.Spec.Version == newObj.Spec.Version {
+		return nil, nil
+	}
+
 	bmcVersionList := &metalv1alpha1.BMCVersionList{}
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
@@ -95,20 +102,30 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *met
 }
 
 func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+	if version.Spec.BMCRef == nil {
+		return nil, nil
+	}
 	for _, v := range versionList.Items {
 		if version.Name == v.Name {
 			continue
 		}
-		if v.Spec.BMCRef.Name == version.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
-				version.Spec.BMCRef.Name,
-				version.Name,
-				v.Spec.BMCRef.Name,
-				v.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
-				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
+		if v.Spec.BMCRef == nil {
+			continue
 		}
+		if v.Spec.BMCRef.Name != version.Spec.BMCRef.Name {
+			continue
+		}
+		if v.Spec.Version != version.Spec.Version {
+			continue
+		}
+		err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+			version.Spec.BMCRef.Name,
+			version.Name,
+			v.Spec.BMCRef.Name,
+			v.Name)
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
+			version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 	}
 	return nil, nil
 }

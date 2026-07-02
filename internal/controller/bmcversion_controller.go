@@ -179,6 +179,10 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 	log := ctrl.LoggerFrom(ctx)
 	bmcObj, err := r.getBMCFromBMCVersion(ctx, bmcVersion)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("Referred BMC object not found, skipping", "BMCVersion", bmcVersion.Name)
+			return ctrl.Result{}, nil
+		}
 		log.V(1).Info("Referred BMC object could not be fetched", "BMCVersion", bmcVersion.Name)
 		return ctrl.Result{}, err
 	}
@@ -263,7 +267,7 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 		}
 
 		if ok, err := r.resetBMC(ctx, bmcVersion, bmcObj, ConditionResetIssued); !ok || err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to reset bmc %s: %w", client.ObjectKeyFromObject(bmcObj), err)
+			return ctrl.Result{}, err
 		}
 
 		return r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)
@@ -560,6 +564,11 @@ func (r *BMCVersionReconciler) removeServerMaintenanceRefAndResetConditions(
 	currentBMCVersion, err := r.getBMCVersionFromBMC(ctx, bmcClient, BMC)
 	if err != nil {
 		return err
+	}
+	if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateCompleted &&
+		currentBMCVersion == bmcVersion.Spec.Version &&
+		len(bmcVersion.Spec.ServerMaintenanceRefs) == 0 {
+		return nil
 	}
 	state := metalv1alpha1.BMCVersionStateInProgress
 	if currentBMCVersion == bmcVersion.Spec.Version {
@@ -1223,8 +1232,13 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(ctx context.Context, o
 
 	for _, bmcVersion := range bmcVersionList.Items {
 		if bmcVersion.Spec.BMCRef != nil && bmcVersion.Spec.BMCRef.Name == bmcObj.Name {
+			// For Completed/Failed BMCVersions, only re-enqueue if the BMC firmware version
+			// has actually changed away from spec.version — indicating genuine hardware drift.
+			// Routine BMC status updates (polling, maintenance activity) must not retrigger them.
 			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateCompleted || bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed {
-				return nil
+				if bmcObj.Status.FirmwareVersion == bmcVersion.Spec.Version {
+					continue
+				}
 			}
 			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
 		}

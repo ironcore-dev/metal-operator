@@ -218,6 +218,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				BasicAuth:            true,
 			},
 			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
+			DiscoveryTokenExpiry:  time.Hour,
 			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -346,7 +347,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
+			registryServer := registry.NewServer(
+				GinkgoLogr,
+				":30000",
+				k8sManager.GetClient(),
+				"discovery-token-signing-secret",
+				ns.Name,
+			)
 			if err := registryServer.Start(ctx); err != nil {
 				return fmt.Errorf("failed to start registry server: %w", err)
 			}

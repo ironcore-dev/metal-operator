@@ -25,6 +25,10 @@ type ServerClaimSpecApplyConfiguration struct {
 	// IgnitionSecretRef is a reference to the Secret object that contains
 	// the ignition configuration for the server.
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
+	// UserDataRef references a Secret in the same namespace as this ServerClaim
+	// containing user-data exposed to the claimed server via the metaldata
+	// service. The referenced Secret must be of type metal.ironcore.dev/user-data.
+	UserDataRef *v1.LocalObjectReference `json:"userDataRef,omitempty"`
 	// Image specifies the boot image to be used for the server.
 	Image *string `json:"image,omitempty"`
 	// Tolerations allow a ServerClaim to bind to a Server with matching taints.
@@ -66,6 +70,14 @@ func (b *ServerClaimSpecApplyConfiguration) WithServerSelector(value *metav1.Lab
 // If called multiple times, the IgnitionSecretRef field is set to the value of the last call.
 func (b *ServerClaimSpecApplyConfiguration) WithIgnitionSecretRef(value v1.LocalObjectReference) *ServerClaimSpecApplyConfiguration {
 	b.IgnitionSecretRef = &value
+	return b
+}
+
+// WithUserDataRef sets the UserDataRef field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the UserDataRef field is set to the value of the last call.
+func (b *ServerClaimSpecApplyConfiguration) WithUserDataRef(value v1.LocalObjectReference) *ServerClaimSpecApplyConfiguration {
+	b.UserDataRef = &value
 	return b
 }
 

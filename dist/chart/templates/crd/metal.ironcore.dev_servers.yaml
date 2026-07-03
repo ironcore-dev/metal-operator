@@ -383,6 +383,10 @@ spec:
                       description: CarrierStatus is the operational carrier status
                         of the network interface.
                       type: string
+                    firmwareVersion:
+                      description: FirmwareVersion is the firmware version reported
+                        by the NIC driver.
+                      type: string
                     ip:
                       description: |-
                         IP is the IP address assigned to the network interface.
@@ -393,6 +397,12 @@ spec:
                         assigned to the network interface.
                       items:
                         format: ip
+                        type: string
+                      type: array
+                    linkModes:
+                      description: LinkModes is the list of link modes supported by
+                        the NIC.
+                      items:
                         type: string
                       type: array
                     macAddress:
@@ -428,6 +438,19 @@ spec:
                               neighbor.
                             type: string
                         type: object
+                      type: array
+                    pciAddress:
+                      description: PCIAddress is the PCI bus address of the underlying
+                        NIC (e.g. "0000:01:00.0").
+                      type: string
+                    speed:
+                      description: Speed is the link speed reported by the NIC driver.
+                      type: string
+                    supportedPorts:
+                      description: SupportedPorts is the list of port types supported
+                        by the NIC (e.g. TP, FIBRE).
+                      items:
+                        type: string
                       type: array
                   required:
                   - macAddress

@@ -1556,6 +1556,16 @@ func (in *NetworkInterface) DeepCopyInto(out *NetworkInterface) {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
 	}
+	if in.LinkModes != nil {
+		in, out := &in.LinkModes, &out.LinkModes
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.SupportedPorts != nil {
+		in, out := &in.SupportedPorts, &out.SupportedPorts
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	if in.Neighbors != nil {
 		in, out := &in.Neighbors, &out.Neighbors
 		*out = make([]LLDPNeighbor, len(*in))

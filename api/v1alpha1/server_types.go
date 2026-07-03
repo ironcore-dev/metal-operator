@@ -329,6 +329,26 @@ type NetworkInterface struct {
 	// +optional
 	CarrierStatus string `json:"carrierStatus,omitempty"`
 
+	// PCIAddress is the PCI bus address of the underlying NIC (e.g. "0000:01:00.0").
+	// +optional
+	PCIAddress string `json:"pciAddress,omitempty"`
+
+	// Speed is the link speed reported by the NIC driver.
+	// +optional
+	Speed string `json:"speed,omitempty"`
+
+	// LinkModes is the list of link modes supported by the NIC.
+	// +optional
+	LinkModes []string `json:"linkModes,omitempty"`
+
+	// SupportedPorts is the list of port types supported by the NIC (e.g. TP, FIBRE).
+	// +optional
+	SupportedPorts []string `json:"supportedPorts,omitempty"`
+
+	// FirmwareVersion is the firmware version reported by the NIC driver.
+	// +optional
+	FirmwareVersion string `json:"firmwareVersion,omitempty"`
+
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	// +optional
 	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`

@@ -25,6 +25,16 @@ type NetworkInterfaceApplyConfiguration struct {
 	MACAddress *string `json:"macAddress,omitempty"`
 	// CarrierStatus is the operational carrier status of the network interface.
 	CarrierStatus *string `json:"carrierStatus,omitempty"`
+	// PCIAddress is the PCI bus address of the underlying NIC (e.g. "0000:01:00.0").
+	PCIAddress *string `json:"pciAddress,omitempty"`
+	// Speed is the link speed reported by the NIC driver.
+	Speed *string `json:"speed,omitempty"`
+	// LinkModes is the list of link modes supported by the NIC.
+	LinkModes []string `json:"linkModes,omitempty"`
+	// SupportedPorts is the list of port types supported by the NIC (e.g. TP, FIBRE).
+	SupportedPorts []string `json:"supportedPorts,omitempty"`
+	// FirmwareVersion is the firmware version reported by the NIC driver.
+	FirmwareVersion *string `json:"firmwareVersion,omitempty"`
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	Neighbors []LLDPNeighborApplyConfiguration `json:"neighbors,omitempty"`
 }
@@ -74,6 +84,50 @@ func (b *NetworkInterfaceApplyConfiguration) WithMACAddress(value string) *Netwo
 // If called multiple times, the CarrierStatus field is set to the value of the last call.
 func (b *NetworkInterfaceApplyConfiguration) WithCarrierStatus(value string) *NetworkInterfaceApplyConfiguration {
 	b.CarrierStatus = &value
+	return b
+}
+
+// WithPCIAddress sets the PCIAddress field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the PCIAddress field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithPCIAddress(value string) *NetworkInterfaceApplyConfiguration {
+	b.PCIAddress = &value
+	return b
+}
+
+// WithSpeed sets the Speed field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Speed field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithSpeed(value string) *NetworkInterfaceApplyConfiguration {
+	b.Speed = &value
+	return b
+}
+
+// WithLinkModes adds the given value to the LinkModes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the LinkModes field.
+func (b *NetworkInterfaceApplyConfiguration) WithLinkModes(values ...string) *NetworkInterfaceApplyConfiguration {
+	for i := range values {
+		b.LinkModes = append(b.LinkModes, values[i])
+	}
+	return b
+}
+
+// WithSupportedPorts adds the given value to the SupportedPorts field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SupportedPorts field.
+func (b *NetworkInterfaceApplyConfiguration) WithSupportedPorts(values ...string) *NetworkInterfaceApplyConfiguration {
+	for i := range values {
+		b.SupportedPorts = append(b.SupportedPorts, values[i])
+	}
+	return b
+}
+
+// WithFirmwareVersion sets the FirmwareVersion field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the FirmwareVersion field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithFirmwareVersion(value string) *NetworkInterfaceApplyConfiguration {
+	b.FirmwareVersion = &value
 	return b
 }
 

@@ -1049,6 +1049,10 @@ func buildNetworkInterfaces(
 		nics[i].LinkModes = hw.LinkModes
 		nics[i].SupportedPorts = hw.SupportedPorts
 		nics[i].FirmwareVersion = hw.FirmwareVersion
+		nics[i].NUMANode = int32(hw.NUMANode)
+		nics[i].Vendor = hw.Vendor
+		nics[i].SubsystemVendor = hw.SubsystemVendor
+		nics[i].Device = hw.Device
 	}
 
 	// Merge LLDP neighbors into corresponding network interfaces

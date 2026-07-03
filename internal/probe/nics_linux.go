@@ -35,7 +35,7 @@ func collectNICInfoData() ([]registry.NIC, error) {
 		if err != nil {
 			return []registry.NIC{}, fmt.Errorf("failed to get driver info: %w", err)
 		}
-		nics = append(nics, registry.NIC{
+		nicData := registry.NIC{
 			Name:            nic.Name,
 			MAC:             nic.MACAddress,
 			PCIAddress:      pci,
@@ -43,7 +43,25 @@ func collectNICInfoData() ([]registry.NIC, error) {
 			LinkModes:       nic.SupportedLinkModes,
 			SupportedPorts:  nic.SupportedPorts,
 			FirmwareVersion: drvInfo.FwVersion,
-		})
+		}
+
+		// Read additional NIC properties from sysfs. The device symlink may be
+		// absent for virtual interfaces (lo, bonds, bridges, etc.) — skip gracefully.
+		sysfsBase := fmt.Sprintf("/sys/class/net/%s/device", nic.Name)
+		if numaNode, err := ToInt(sysfsBase + "/numa_node"); err == nil {
+			nicData.NUMANode = numaNode
+		}
+		if vendor, err := ToString(sysfsBase + "/vendor"); err == nil {
+			nicData.Vendor = vendor
+		}
+		if subsysVendor, err := ToString(sysfsBase + "/subsystem_vendor"); err == nil {
+			nicData.SubsystemVendor = subsysVendor
+		}
+		if device, err := ToString(sysfsBase + "/device"); err == nil {
+			nicData.Device = device
+		}
+
+		nics = append(nics, nicData)
 	}
 	return nics, nil
 }

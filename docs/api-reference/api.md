@@ -1218,6 +1218,10 @@ _Appears in:_
 | `linkModes` _string array_ | LinkModes is the list of link modes supported by the NIC. |  |  |
 | `supportedPorts` _string array_ | SupportedPorts is the list of port types supported by the NIC (e.g. TP, FIBRE). |  |  |
 | `firmwareVersion` _string_ | FirmwareVersion is the firmware version reported by the NIC driver. |  |  |
+| `numaNode` _integer_ | NUMANode is the NUMA node ID as reported by the NIC driver. |  |  |
+| `vendor` _string_ | Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver. |  |  |
+| `subsystemVendor` _string_ | SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver. |  |  |
+| `device` _string_ | Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver. |  |  |
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 

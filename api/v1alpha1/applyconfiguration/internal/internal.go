@@ -930,6 +930,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: carrierStatus
       type:
         scalar: string
+    - name: device
+      type:
+        scalar: string
     - name: firmwareVersion
       type:
         scalar: string
@@ -960,10 +963,16 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
           elementRelationship: atomic
+    - name: numaNode
+      type:
+        scalar: numeric
     - name: pciAddress
       type:
         scalar: string
     - name: speed
+      type:
+        scalar: string
+    - name: subsystemVendor
       type:
         scalar: string
     - name: supportedPorts
@@ -972,6 +981,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+    - name: vendor
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectFieldRefSelector
   map:
     fields:

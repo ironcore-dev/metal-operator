@@ -349,6 +349,22 @@ type NetworkInterface struct {
 	// +optional
 	FirmwareVersion string `json:"firmwareVersion,omitempty"`
 
+	// NUMANode is the NUMA node ID as reported by the NIC driver.
+	// +optional
+	NUMANode int32 `json:"numaNode,omitempty"`
+
+	// Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver.
+	// +optional
+	Vendor string `json:"vendor,omitempty"`
+
+	// SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver.
+	// +optional
+	SubsystemVendor string `json:"subsystemVendor,omitempty"`
+
+	// Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver.
+	// +optional
+	Device string `json:"device,omitempty"`
+
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	// +optional
 	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`

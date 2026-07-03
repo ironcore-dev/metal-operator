@@ -354,6 +354,10 @@ var _ = Describe("Server Controller", func() {
 					LinkModes:       []string{"10000baseT/Full"},
 					SupportedPorts:  []string{"TP"},
 					FirmwareVersion: "1.2.3",
+					NUMANode:        0,
+					Vendor:          "0x8086",
+					SubsystemVendor: "0x8086",
+					Device:          "0x1533",
 				}},
 				LLDP: []registry.LLDPInterface{{
 					Name: "eth0",
@@ -392,6 +396,10 @@ var _ = Describe("Server Controller", func() {
 				LinkModes:       []string{"10000baseT/Full"},
 				SupportedPorts:  []string{"TP"},
 				FirmwareVersion: "1.2.3",
+				NUMANode:        0,
+				Vendor:          "0x8086",
+				SubsystemVendor: "0x8086",
+				Device:          "0x1533",
 				Neighbors: []metalv1alpha1.LLDPNeighbor{{
 					MACAddress:        "11:22:33:44:55:66",
 					PortID:            "swp1",

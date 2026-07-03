@@ -35,6 +35,14 @@ type NetworkInterfaceApplyConfiguration struct {
 	SupportedPorts []string `json:"supportedPorts,omitempty"`
 	// FirmwareVersion is the firmware version reported by the NIC driver.
 	FirmwareVersion *string `json:"firmwareVersion,omitempty"`
+	// NUMANode is the NUMA node ID as reported by the NIC driver.
+	NUMANode *int32 `json:"numaNode,omitempty"`
+	// Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver.
+	Vendor *string `json:"vendor,omitempty"`
+	// SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver.
+	SubsystemVendor *string `json:"subsystemVendor,omitempty"`
+	// Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver.
+	Device *string `json:"device,omitempty"`
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	Neighbors []LLDPNeighborApplyConfiguration `json:"neighbors,omitempty"`
 }
@@ -128,6 +136,38 @@ func (b *NetworkInterfaceApplyConfiguration) WithSupportedPorts(values ...string
 // If called multiple times, the FirmwareVersion field is set to the value of the last call.
 func (b *NetworkInterfaceApplyConfiguration) WithFirmwareVersion(value string) *NetworkInterfaceApplyConfiguration {
 	b.FirmwareVersion = &value
+	return b
+}
+
+// WithNUMANode sets the NUMANode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the NUMANode field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithNUMANode(value int32) *NetworkInterfaceApplyConfiguration {
+	b.NUMANode = &value
+	return b
+}
+
+// WithVendor sets the Vendor field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Vendor field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithVendor(value string) *NetworkInterfaceApplyConfiguration {
+	b.Vendor = &value
+	return b
+}
+
+// WithSubsystemVendor sets the SubsystemVendor field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the SubsystemVendor field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithSubsystemVendor(value string) *NetworkInterfaceApplyConfiguration {
+	b.SubsystemVendor = &value
+	return b
+}
+
+// WithDevice sets the Device field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Device field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithDevice(value string) *NetworkInterfaceApplyConfiguration {
+	b.Device = &value
 	return b
 }
 

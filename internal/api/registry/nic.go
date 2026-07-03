@@ -11,4 +11,8 @@ type NIC struct {
 	LinkModes       []string `json:"linkModes"`
 	SupportedPorts  []string `json:"supportedPorts"`
 	FirmwareVersion string   `json:"firmwareVersion"`
+	NUMANode        int      `json:"numaNode"`
+	Vendor          string   `json:"vendor"`
+	SubsystemVendor string   `json:"subsystemVendor"`
+	Device          string   `json:"device"`
 }

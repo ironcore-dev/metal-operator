@@ -954,6 +954,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: macAddress
       type:
         scalar: string
+    - name: maxCombined
+      type:
+        scalar: numeric
+    - name: maxOther
+      type:
+        scalar: numeric
+    - name: maxRx
+      type:
+        scalar: numeric
+    - name: maxTx
+      type:
+        scalar: numeric
     - name: name
       type:
         scalar: string

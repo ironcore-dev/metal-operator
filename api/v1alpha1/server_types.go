@@ -365,6 +365,22 @@ type NetworkInterface struct {
 	// +optional
 	Device string `json:"device,omitempty"`
 
+	// MaxRx is the maximum number of RX channels supported by the NIC.
+	// +optional
+	MaxRx int32 `json:"maxRx,omitempty"`
+
+	// MaxTx is the maximum number of TX channels supported by the NIC.
+	// +optional
+	MaxTx int32 `json:"maxTx,omitempty"`
+
+	// MaxOther is the maximum number of other channels supported by the NIC.
+	// +optional
+	MaxOther int32 `json:"maxOther,omitempty"`
+
+	// MaxCombined is the maximum number of combined channels supported by the NIC.
+	// +optional
+	MaxCombined int32 `json:"maxCombined,omitempty"`
+
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	// +optional
 	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`

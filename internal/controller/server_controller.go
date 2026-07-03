@@ -1053,6 +1053,10 @@ func buildNetworkInterfaces(
 		nics[i].Vendor = hw.Vendor
 		nics[i].SubsystemVendor = hw.SubsystemVendor
 		nics[i].Device = hw.Device
+		nics[i].MaxRx = int32(hw.MaxRx)
+		nics[i].MaxTx = int32(hw.MaxTx)
+		nics[i].MaxOther = int32(hw.MaxOther)
+		nics[i].MaxCombined = int32(hw.MaxCombined)
 	}
 
 	// Merge LLDP neighbors into corresponding network interfaces

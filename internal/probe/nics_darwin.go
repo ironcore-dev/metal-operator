@@ -21,6 +21,10 @@ func collectNICInfoData() ([]registry.NIC, error) {
 			Vendor:          "0x8086",
 			SubsystemVendor: "0x8086",
 			Device:          "0x1533",
+			MaxRx:           8,
+			MaxTx:           8,
+			MaxOther:        0,
+			MaxCombined:     8,
 		},
 	}, nil
 }

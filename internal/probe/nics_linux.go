@@ -61,6 +61,13 @@ func collectNICInfoData() ([]registry.NIC, error) {
 			nicData.Device = device
 		}
 
+		if channels, err := ethHandle.GetChannels(nic.Name); err == nil {
+			nicData.MaxRx = channels.MaxRx
+			nicData.MaxTx = channels.MaxTx
+			nicData.MaxOther = channels.MaxOther
+			nicData.MaxCombined = channels.MaxCombined
+		}
+
 		nics = append(nics, nicData)
 	}
 	return nics, nil

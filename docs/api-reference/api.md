@@ -1222,6 +1222,10 @@ _Appears in:_
 | `vendor` _string_ | Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver. |  |  |
 | `subsystemVendor` _string_ | SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver. |  |  |
 | `device` _string_ | Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver. |  |  |
+| `maxRx` _integer_ | MaxRx is the maximum number of RX channels supported by the NIC. |  |  |
+| `maxTx` _integer_ | MaxTx is the maximum number of TX channels supported by the NIC. |  |  |
+| `maxOther` _integer_ | MaxOther is the maximum number of other channels supported by the NIC. |  |  |
+| `maxCombined` _integer_ | MaxCombined is the maximum number of combined channels supported by the NIC. |  |  |
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 

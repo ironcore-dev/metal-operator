@@ -358,6 +358,10 @@ var _ = Describe("Server Controller", func() {
 					Vendor:          "0x8086",
 					SubsystemVendor: "0x8086",
 					Device:          "0x1533",
+					MaxRx:           8,
+					MaxTx:           8,
+					MaxOther:        0,
+					MaxCombined:     8,
 				}},
 				LLDP: []registry.LLDPInterface{{
 					Name: "eth0",
@@ -400,6 +404,10 @@ var _ = Describe("Server Controller", func() {
 				Vendor:          "0x8086",
 				SubsystemVendor: "0x8086",
 				Device:          "0x1533",
+				MaxRx:           8,
+				MaxTx:           8,
+				MaxOther:        0,
+				MaxCombined:     8,
 				Neighbors: []metalv1alpha1.LLDPNeighbor{{
 					MACAddress:        "11:22:33:44:55:66",
 					PortID:            "swp1",

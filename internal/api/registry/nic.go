@@ -15,4 +15,8 @@ type NIC struct {
 	Vendor          string   `json:"vendor"`
 	SubsystemVendor string   `json:"subsystemVendor"`
 	Device          string   `json:"device"`
+	MaxRx           uint32   `json:"maxRx"`
+	MaxTx           uint32   `json:"maxTx"`
+	MaxOther        uint32   `json:"maxOther"`
+	MaxCombined     uint32   `json:"maxCombined"`
 }

@@ -406,6 +406,26 @@ spec:
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
+                    maxCombined:
+                      description: MaxCombined is the maximum number of combined channels
+                        supported by the NIC.
+                      format: int32
+                      type: integer
+                    maxOther:
+                      description: MaxOther is the maximum number of other channels
+                        supported by the NIC.
+                      format: int32
+                      type: integer
+                    maxRx:
+                      description: MaxRx is the maximum number of RX channels supported
+                        by the NIC.
+                      format: int32
+                      type: integer
+                    maxTx:
+                      description: MaxTx is the maximum number of TX channels supported
+                        by the NIC.
+                      format: int32
+                      type: integer
                     name:
                       description: Name is the name of the network interface.
                       type: string

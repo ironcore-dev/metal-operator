@@ -43,6 +43,14 @@ type NetworkInterfaceApplyConfiguration struct {
 	SubsystemVendor *string `json:"subsystemVendor,omitempty"`
 	// Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver.
 	Device *string `json:"device,omitempty"`
+	// MaxRx is the maximum number of RX channels supported by the NIC.
+	MaxRx *int32 `json:"maxRx,omitempty"`
+	// MaxTx is the maximum number of TX channels supported by the NIC.
+	MaxTx *int32 `json:"maxTx,omitempty"`
+	// MaxOther is the maximum number of other channels supported by the NIC.
+	MaxOther *int32 `json:"maxOther,omitempty"`
+	// MaxCombined is the maximum number of combined channels supported by the NIC.
+	MaxCombined *int32 `json:"maxCombined,omitempty"`
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	Neighbors []LLDPNeighborApplyConfiguration `json:"neighbors,omitempty"`
 }
@@ -168,6 +176,38 @@ func (b *NetworkInterfaceApplyConfiguration) WithSubsystemVendor(value string) *
 // If called multiple times, the Device field is set to the value of the last call.
 func (b *NetworkInterfaceApplyConfiguration) WithDevice(value string) *NetworkInterfaceApplyConfiguration {
 	b.Device = &value
+	return b
+}
+
+// WithMaxRx sets the MaxRx field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxRx field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithMaxRx(value int32) *NetworkInterfaceApplyConfiguration {
+	b.MaxRx = &value
+	return b
+}
+
+// WithMaxTx sets the MaxTx field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxTx field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithMaxTx(value int32) *NetworkInterfaceApplyConfiguration {
+	b.MaxTx = &value
+	return b
+}
+
+// WithMaxOther sets the MaxOther field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxOther field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithMaxOther(value int32) *NetworkInterfaceApplyConfiguration {
+	b.MaxOther = &value
+	return b
+}
+
+// WithMaxCombined sets the MaxCombined field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the MaxCombined field is set to the value of the last call.
+func (b *NetworkInterfaceApplyConfiguration) WithMaxCombined(value int32) *NetworkInterfaceApplyConfiguration {
+	b.MaxCombined = &value
 	return b
 }
 

@@ -488,9 +488,15 @@ func (r *RedfishBaseBMC) GetBiosAttributeValues(ctx context.Context, systemURI s
 	if err != nil {
 		return nil, err
 	}
+	readOnlyAttr, err := r.getFilteredBiosRegistryAttributes(true, false)
+	if err != nil {
+		return nil, err
+	}
 	result := make(schemas.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
+			result[name] = bios.Attributes[name]
+		} else if _, ok := readOnlyAttr[name]; ok {
 			result[name] = bios.Attributes[name]
 		}
 	}

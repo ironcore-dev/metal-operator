@@ -240,6 +240,16 @@ func (r *RedfishBaseBMC) Reset(ctx context.Context, systemURI string, resetType 
 	return nil
 }
 
+// SetIndicatorLED sets the indicator LED state on the system using Redfish.
+func (r *RedfishBaseBMC) SetIndicatorLED(ctx context.Context, systemURI string, state schemas.IndicatorLED) error { //nolint:staticcheck
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+	system.IndicatorLED = state //nolint:staticcheck
+	return system.Update()
+}
+
 // GetSystems get managed systems
 func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	service := r.client.GetService()

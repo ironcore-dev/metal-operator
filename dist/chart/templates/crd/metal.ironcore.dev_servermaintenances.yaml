@@ -69,6 +69,11 @@ spec:
           spec:
             description: ServerMaintenanceSpec defines the desired state of a ServerMaintenance
             properties:
+              locatorLED:
+                description: |-
+                  LocatorLED specifies the desired state of the server's locator LED during maintenance.
+                  When maintenance ends, the locator LED is turned off.
+                type: string
               policy:
                 description: Policy specifies the maintenance policy to be enforced
                   on the server.

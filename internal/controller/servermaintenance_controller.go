@@ -452,10 +452,10 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, maintenance *
 				metalv1alpha1.ServerMaintenanceNeededLabelKey,
 			})
 			if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
-				return fmt.Errorf("failed to patch ServerClaim annotations: %w", err)
+				return fmt.Errorf("failed to patch ServerClaim labels: %w", err)
 			}
 		} else {
-			log.V(1).Info("Postponning the removal of approval annotation as other maintenances are in queue", "Server", server.Name)
+			log.V(1).Info("Postponing the removal of approval labels as other maintenances are in queue", "Server", server.Name)
 		}
 
 	}

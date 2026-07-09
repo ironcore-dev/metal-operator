@@ -3,6 +3,7 @@
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
 BMCTOOLS_IMG   ?= bmctools:latest
+METALDATA_IMG  ?= metaldata:latest
 
 # Docker image name for the mkdocs based local development setup
 IMAGE=ironcore-dev/metal-operator-docs
@@ -180,7 +181,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: docker-build-controller-manager docker-build-metalprobe
+docker-build: docker-build-controller-manager docker-build-metalprobe docker-build-metaldata
 
 .PHONY: docker-build-controller-manager
 docker-build-controller-manager: ## Build controller-manager.
@@ -194,11 +195,16 @@ docker-build-metalprobe: ## Build metalprobe.
 docker-build-bmctools: ## Build bmctools.
 	docker build --target bmctools -t ${BMCTOOLS_IMG} .
 
+.PHONY: docker-build-metaldata
+docker-build-metaldata: ## Build metaldata.
+	docker build --target metaldata -t ${METALDATA_IMG} .
+
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMG}
 	$(CONTAINER_TOOL) push ${METALPROBE_IMG}
 	$(CONTAINER_TOOL) push ${BMCTOOLS_IMG}
+	$(CONTAINER_TOOL) push ${METALDATA_IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:

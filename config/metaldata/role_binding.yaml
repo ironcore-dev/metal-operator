@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metaldata-rolebinding
+  labels:
+    app.kubernetes.io/name: metal-operator
+    app.kubernetes.io/component: metaldata
+    app.kubernetes.io/managed-by: kustomize
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metaldata-role
+subjects:
+- kind: ServiceAccount
+  name: metaldata
+  namespace: system

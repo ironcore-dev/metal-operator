@@ -34,6 +34,12 @@ type ServerClaimSpec struct {
 	// +optional
 	IgnitionSecretRef *v1.LocalObjectReference `json:"ignitionSecretRef,omitempty"`
 
+	// UserDataRef references a Secret in the same namespace as this ServerClaim
+	// containing user-data exposed to the claimed server via the metaldata
+	// service. The referenced Secret must be of type metal.ironcore.dev/user-data.
+	// +optional
+	UserDataRef *v1.LocalObjectReference `json:"userDataRef,omitempty"`
+
 	// Image specifies the boot image to be used for the server.
 	// +required
 	Image string `json:"image"`

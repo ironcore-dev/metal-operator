@@ -1540,6 +1540,7 @@ _Appears in:_
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed. |  | Optional: \{\} <br /> |
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
+| `userDataRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | UserDataRef references a Secret in the same namespace as this ServerClaim<br />containing user-data exposed to the claimed server via the metaldata<br />service. The referenced Secret must be of type metal.ironcore.dev/user-data. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
 | `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  |  |
 

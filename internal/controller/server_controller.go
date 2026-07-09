@@ -580,9 +580,60 @@ func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bm
 	return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
 }
 
+func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
+		return false, fmt.Errorf("failed to list ServerMaintenances: %w", err)
+	}
+
+	var pendingOwnerApproval bool
+	for i := range maintenanceList.Items {
+		m := &maintenanceList.Items[i]
+		if !m.DeletionTimestamp.IsZero() {
+			continue
+		}
+		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
+			return true, nil
+		}
+		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
+			pendingOwnerApproval = true
+		}
+	}
+
+	if pendingOwnerApproval {
+		if server.Spec.ServerClaimRef == nil {
+			return true, nil
+		}
+		serverClaim := &metalv1alpha1.ServerClaim{}
+		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, fmt.Errorf("failed to get ServerClaim: %w", err)
+		}
+		if _, hasApproval := serverClaim.Labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]; hasApproval {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.ServerMaintenanceRef == nil {
+		hasPending, err := r.hasPendingMaintenances(ctx, server)
+		if err != nil {
+			return false, fmt.Errorf("failed to check pending maintenances: %w", err)
+		}
+		if hasPending {
+			log.V(1).Info("Other maintenances are pending, staying in Maintenance state", "Server", server.Name)
+			if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
+				return false, fmt.Errorf("failed to update server status system info between maintenances: %w", err)
+			}
+			return false, nil
+		}
+
 		log.V(1).Info("Server is in Maintenance state, but no ServerMaintenanceRef is set, transitioning back to previous state")
 		// update system info in case the server was changed during Maintenance state (hardwere changes, biosVersion etc.)
 		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {

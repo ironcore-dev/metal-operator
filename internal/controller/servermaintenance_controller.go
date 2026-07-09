@@ -428,18 +428,39 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, maintenance *
 		if server.Spec.ServerClaimRef == nil {
 			return nil
 		}
-		serverClaim := &metalv1alpha1.ServerClaim{}
-		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
-			return fmt.Errorf("failed to get ServerClaim: %w", err)
+		serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
+		if err := r.List(ctx, serverMaintenancesList, client.MatchingFields{serverRefField: server.Name}); err != nil {
+			return fmt.Errorf("failed to list ServerMaintenances for Server %s: %w", server.Name, err)
 		}
-		serverClaimBase := serverClaim.DeepCopy()
-		metautils.DeleteLabels(serverClaim, []string{
-			metalv1alpha1.ServerMaintenanceApprovedLabelKey,
-			metalv1alpha1.ServerMaintenanceNeededLabelKey,
-		})
-		if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
-			return fmt.Errorf("failed to patch ServerClaim annotations: %w", err)
+		activeItems := serverMaintenancesList.Items[:0]
+		for i := range serverMaintenancesList.Items {
+			m := &serverMaintenancesList.Items[i]
+			if m.Name == maintenance.Name && m.Namespace == maintenance.Namespace {
+				continue
+			}
+			if !m.DeletionTimestamp.IsZero() {
+				continue
+			}
+			activeItems = append(activeItems, *m)
 		}
+		serverMaintenancesList.Items = activeItems
+		if len(serverMaintenancesList.Items) == 0 {
+			serverClaim := &metalv1alpha1.ServerClaim{}
+			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
+				return fmt.Errorf("failed to get ServerClaim: %w", err)
+			}
+			serverClaimBase := serverClaim.DeepCopy()
+			metautils.DeleteLabels(serverClaim, []string{
+				metalv1alpha1.ServerMaintenanceApprovedLabelKey,
+				metalv1alpha1.ServerMaintenanceNeededLabelKey,
+			})
+			if err := r.Patch(ctx, serverClaim, client.MergeFrom(serverClaimBase)); err != nil {
+				return fmt.Errorf("failed to patch ServerClaim labels: %w", err)
+			}
+		} else {
+			log.V(1).Info("Postponing the removal of approval labels as other maintenances are in queue", "Server", server.Name)
+		}
+
 	}
 	return nil
 }

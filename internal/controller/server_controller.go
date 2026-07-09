@@ -600,10 +600,6 @@ func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *m
 		}
 	}
 
-	// For OwnerApproval maintenances, only stay in Maintenance if they can actually proceed.
-	// With no ServerClaim, they are auto-approved (same as Enforced). With a ServerClaim,
-	// check that the approval label is still present — if revoked externally, exit Maintenance
-	// to avoid getting stuck.
 	if pendingOwnerApproval {
 		if server.Spec.ServerClaimRef == nil {
 			return true, nil
@@ -626,16 +622,12 @@ func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *m
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.ServerMaintenanceRef == nil {
-		// Before exiting maintenance, check if other maintenances are queued for this server.
-		// If so, stay in Maintenance so the next one can claim the ref without a Reserved -> maintenance state bounce.
 		hasPending, err := r.hasPendingMaintenances(ctx, server)
 		if err != nil {
 			return false, fmt.Errorf("failed to check pending maintenances: %w", err)
 		}
 		if hasPending {
 			log.V(1).Info("Other maintenances are pending, staying in Maintenance state", "Server", server.Name)
-			// Refresh system info between maintenances so the next one sees up-to-date
-			// hardware state (e.g. BIOS version after a firmware update).
 			if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
 				return false, fmt.Errorf("failed to update server status system info between maintenances: %w", err)
 			}

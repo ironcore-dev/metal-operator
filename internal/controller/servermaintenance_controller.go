@@ -429,18 +429,21 @@ func (r *ServerMaintenanceReconciler) cleanup(ctx context.Context, maintenance *
 			return nil
 		}
 		serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
-		if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
-			serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
-			if serverMaintenance.Name == maintenance.Name && serverMaintenance.Namespace == maintenance.Namespace {
-				return false, nil
-			}
-			if !serverMaintenance.DeletionTimestamp.IsZero() {
-				return false, nil
-			}
-			return serverMaintenance.Spec.ServerRef != nil && serverMaintenance.Spec.ServerRef.Name == server.Name, nil
-		}); err != nil {
+		if err := r.List(ctx, serverMaintenancesList, client.MatchingFields{serverRefField: server.Name}); err != nil {
 			return fmt.Errorf("failed to list ServerMaintenances for Server %s: %w", server.Name, err)
 		}
+		activeItems := serverMaintenancesList.Items[:0]
+		for i := range serverMaintenancesList.Items {
+			m := &serverMaintenancesList.Items[i]
+			if m.Name == maintenance.Name && m.Namespace == maintenance.Namespace {
+				continue
+			}
+			if !m.DeletionTimestamp.IsZero() {
+				continue
+			}
+			activeItems = append(activeItems, *m)
+		}
+		serverMaintenancesList.Items = activeItems
 		if len(serverMaintenancesList.Items) == 0 {
 			serverClaim := &metalv1alpha1.ServerClaim{}
 			if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {

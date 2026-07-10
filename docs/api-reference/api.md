@@ -483,6 +483,24 @@ BMCSettings is the Schema for the BMCSettings API.
 | `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
 
 
+#### BMCSettingsApplyResultEntry
+
+
+
+BMCSettingsApplyResultEntry holds the URI, ETag, and value hash from the last successful apply of a single settings key.
+
+
+
+_Appears in:_
+- [BMCSettingsStatus](#bmcsettingsstatus)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `uri` _string_ | URI is the Redfish resource URI from the apply response. |  |  |
+| `etag` _string_ | ETag is the drift-detection token captured after the last successful apply.<br />Either a real ETag returned by the BMC (e.g. W/"20B77DA6") or a SHA-256<br />hash of the GET response prefixed with "hash:sha256:" for BMCs that do<br />not return ETag headers. |  |  |
+| `valueHash` _string_ | ValueHash is the SHA-256 hash of the effective (resolved) value at apply time.<br />Used to detect desired-state changes from ConfigMap/Secret rotation. |  |  |
+
+
 #### BMCSettingsSet
 
 
@@ -597,6 +615,7 @@ _Appears in:_
 | `state` _[BMCSettingsState](#bmcsettingsstate)_ | State represents the current state of the BMC configuration task. |  |  |
 | `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
 | `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
+| `appliedETags` _object (keys:string, values:[BMCSettingsApplyResultEntry](#bmcsettingsapplyresultentry))_ | AppliedETags stores the URI, ETag, and value hash from the last successful apply for each settings key.<br />Used for ETag-based drift detection during verification. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
 
 

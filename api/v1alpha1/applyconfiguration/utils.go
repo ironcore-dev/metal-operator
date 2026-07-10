@@ -57,6 +57,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCSecretApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettings"):
 		return &apiv1alpha1.BMCSettingsApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsApplyResultEntry"):
+		return &apiv1alpha1.BMCSettingsApplyResultEntryApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsSet"):
 		return &apiv1alpha1.BMCSettingsSetApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsSetSpec"):

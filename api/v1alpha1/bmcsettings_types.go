@@ -174,11 +174,35 @@ type BMCSettingsStatus struct {
 	// +optional
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
+	// AppliedETags stores the URI, ETag, and value hash from the last successful apply for each settings key.
+	// Used for ETag-based drift detection during verification.
+	// +optional
+	AppliedETags map[string]BMCSettingsApplyResultEntry `json:"appliedETags,omitempty"`
+
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	// +patchStrategy=merge
 	// +patchMergeKey=type
 	// +optional
 	Conditions []metav1.Condition `json:"conditions,omitempty" patchStrategy:"merge" patchMergeKey:"type" protobuf:"bytes,1,rep,name=conditions"`
+}
+
+// BMCSettingsApplyResultEntry holds the URI, ETag, and value hash from the last successful apply of a single settings key.
+type BMCSettingsApplyResultEntry struct {
+	// URI is the Redfish resource URI from the apply response.
+	// +optional
+	URI string `json:"uri,omitempty"`
+
+	// ETag is the drift-detection token captured after the last successful apply.
+	// Either a real ETag returned by the BMC (e.g. W/"20B77DA6") or a SHA-256
+	// hash of the GET response prefixed with "hash:sha256:" for BMCs that do
+	// not return ETag headers.
+	// +optional
+	ETag string `json:"etag,omitempty"`
+
+	// ValueHash is the SHA-256 hash of the effective (resolved) value at apply time.
+	// Used to detect desired-state changes from ConfigMap/Secret rotation.
+	// +optional
+	ValueHash string `json:"valueHash,omitempty"`
 }
 
 // +kubebuilder:object:root=true

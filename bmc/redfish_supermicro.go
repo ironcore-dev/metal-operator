@@ -48,6 +48,9 @@ func (r *SupermicroRedfishBMC) SetBootOverride(ctx context.Context, systemURI st
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Setting boot override (Supermicro)", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(setBoot); err != nil {
+		if isBootOverrideBusyError(err) {
+			return fmt.Errorf("%w: %v", ErrBootOverrideBusy, err)
+		}
 		return fmt.Errorf("failed to set boot override: %w", err)
 	}
 	return nil

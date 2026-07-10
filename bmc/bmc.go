@@ -15,6 +15,11 @@ import (
 // ErrNotSupported is returned when a BMC operation is not supported by the vendor.
 var ErrNotSupported = errors.New("operation not supported by this vendor")
 
+// ErrBootOverrideBusy is returned by SetBootOverride / ClearBootOverride when
+// the BMC transiently refuses a boot override write (e.g. host in POST).
+// Callers should retry on the next reconcile.
+var ErrBootOverrideBusy = errors.New("BMC refused boot override write, retry later")
+
 type Manufacturer string
 
 const (

@@ -79,6 +79,28 @@ var clearedBootOverride = schemas.Boot{
 	BootSourceOverrideTarget:  schemas.NoneBootSource,
 }
 
+// bootOverrideBusyMessageIDs lists Redfish MessageIds indicating a transient
+// BMC refusal of a boot override write (retry on next reconcile).
+var bootOverrideBusyMessageIDs = []string{
+	// HPE iLO, host in POST: iLO.2.37.UnableToModifyDuringSystemPOST
+	"UnableToModifyDuringSystemPOST",
+}
+
+// isBootOverrideBusyError substring-matches known busy MessageIds in the
+// gofish error body (which embeds the raw response payload).
+func isBootOverrideBusyError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	for _, id := range bootOverrideBusyMessageIDs {
+		if strings.Contains(msg, id) {
+			return true
+		}
+	}
+	return false
+}
+
 type InvalidBIOSSettingsError struct {
 	SettingName  string
 	SettingValue any
@@ -310,6 +332,9 @@ func (r *RedfishBaseBMC) SetBootOverride(ctx context.Context, systemURI string, 
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Setting boot override", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(&setBoot); err != nil {
+		if isBootOverrideBusyError(err) {
+			return fmt.Errorf("%w: %v", ErrBootOverrideBusy, err)
+		}
 		return fmt.Errorf("failed to set boot override: %w", err)
 	}
 	return nil
@@ -332,6 +357,9 @@ func (r *RedfishBaseBMC) ClearBootOverride(ctx context.Context, systemURI string
 	log := ctrl.LoggerFrom(ctx)
 	log.V(2).Info("Clearing boot override", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(&setBoot); err != nil {
+		if isBootOverrideBusyError(err) {
+			return fmt.Errorf("%w: %v", ErrBootOverrideBusy, err)
+		}
 		return fmt.Errorf("failed to clear boot override: %w", err)
 	}
 	return nil

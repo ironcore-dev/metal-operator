@@ -647,12 +647,17 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 		}
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
-	// Re-assert the persistent network-boot override on every reconcile while in Maintenance.
-	// This protects against reboots not driven by metal-operator (e.g. a vendor BIOS
-	// upgrade task rebooting the system itself) falling through to disk and starting
-	// the production OS while the host is still being worked on.
+	// Re-assert the persistent network-boot override while in Maintenance so
+	// reboots not driven by metal-operator (e.g. vendor BIOS upgrade tasks)
+	// don't fall through to disk. Some BMCs (HPE iLO) refuse writes while the
+	// host is in POST; we log-and-continue on ErrBootOverrideBusy so the rest
+	// of the maintenance reconcile can still make progress.
 	if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, true); err != nil {
-		return false, fmt.Errorf("failed to set persistent network boot for maintenance: %w", err)
+		if errors.Is(err, bmc.ErrBootOverrideBusy) {
+			log.V(1).Info("BMC busy, deferring persistent boot override re-assert", "err", err)
+		} else {
+			return false, fmt.Errorf("failed to set persistent network boot for maintenance: %w", err)
+		}
 	}
 	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)

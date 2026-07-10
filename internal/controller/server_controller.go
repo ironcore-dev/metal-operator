@@ -243,6 +243,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	log.V(1).Info("Ensured finalizer has been added")
 
 	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
+		// Set the persistent network-boot override once at maintenance entry. A
+		// Continuous override survives reboots, so re-asserting each reconcile is
+		// redundant and races with mid-POST, which Redfish (e.g. HPE iLO) rejects.
+		// It is cleared on exit in handleMaintenanceState.
+		if server.Status.State != metalv1alpha1.ServerStateMaintenance {
+			if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, true); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to set persistent network boot for maintenance: %w", err)
+			}
+		}
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -647,13 +656,8 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 		}
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
-	// Re-assert the persistent network-boot override on every reconcile while in Maintenance.
-	// This protects against reboots not driven by metal-operator (e.g. a vendor BIOS
-	// upgrade task rebooting the system itself) falling through to disk and starting
-	// the production OS while the host is still being worked on.
-	if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, true); err != nil {
-		return false, fmt.Errorf("failed to set persistent network boot for maintenance: %w", err)
-	}
+	// The persistent network-boot override is set once at maintenance entry (in
+	// reconcile) and cleared below on exit; it is not re-asserted here.
 	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}

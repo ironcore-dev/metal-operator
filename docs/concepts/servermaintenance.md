@@ -1,8 +1,7 @@
 # ServerMaintenance
 
 > **Deprecated:** `metal.ironcore.dev/v1alpha1 ServerMaintenance` is deprecated and will be removed in a future release.
-> Use `servermaintenance.metal.ironcore.dev/v1alpha1 ServerMaintenance` instead, provided by `maintenance-operator`.
-> See the [maintenance-operator documentation](../../maintenance-operator/docs/concepts/servermaintenance.md) for the current API.
+> Use `servermaintenance.metal.ironcore.dev/v1alpha1 ServerMaintenance` instead, provided by `metal-maintenance-operator`.
 
 `ServerMaintenance` represents a maintenance operation for a physical server. It transitions a `Server` from its
 current operational state (e.g., Available/Reserved) into a Maintenance state. Each `ServerMaintenance` object tracks

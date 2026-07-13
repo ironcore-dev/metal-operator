@@ -16,29 +16,19 @@ type SupermicroRedfishBMC struct {
 	*RedfishBaseBMC
 }
 
-// SetBootOverride sets a network-boot override on Supermicro hardware. Newer
-// Supermicro BMCs require BootSourceOverrideMode=UEFI to be sent explicitly for
-// the override to take effect; older boards (e.g. X10-series with Redfish
-// ComputerSystem v1_3_0) don't expose the property at all and reject the whole
-// PATCH when it's included.
-func (r *SupermicroRedfishBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
+// SetBootOverride sets the boot device to network boot for the next system boot
+// on Supermicro hardware. Newer Supermicro BMCs require BootSourceOverrideMode=UEFI
+// to be sent explicitly for the override to take effect; older boards (e.g.
+// X10-series with Redfish ComputerSystem v1_3_0) don't expose the property at
+// all and reject the whole PATCH when it's included.
+func (r *SupermicroRedfishBMC) SetBootOverride(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	wantEnabled := schemas.OnceBootSourceOverrideEnabled
-	if persistent {
-		wantEnabled = schemas.ContinuousBootSourceOverrideEnabled
-		if system.Boot.BootSourceOverrideEnabled == schemas.ContinuousBootSourceOverrideEnabled &&
-			system.Boot.BootSourceOverrideTarget == schemas.PxeBootSource &&
-			(system.Boot.BootSourceOverrideMode == "" ||
-				system.Boot.BootSourceOverrideMode == schemas.UEFIBootSourceOverrideMode) {
-			return nil
-		}
-	}
 
 	setBoot := &schemas.Boot{
-		BootSourceOverrideEnabled: wantEnabled,
+		BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
 		BootSourceOverrideTarget:  schemas.PxeBootSource,
 	}
 	if system.Boot.BootSourceOverrideMode != "" {
@@ -46,9 +36,9 @@ func (r *SupermicroRedfishBMC) SetBootOverride(ctx context.Context, systemURI st
 	}
 
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting boot override (Supermicro)", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting PXE boot once (Supermicro)", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(setBoot); err != nil {
-		return fmt.Errorf("failed to set boot override: %w", err)
+		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	return nil
 }

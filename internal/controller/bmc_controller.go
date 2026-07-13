@@ -739,13 +739,17 @@ func (r *BMCReconciler) updateConditions(ctx context.Context, bmcObj *metalv1alp
 }
 
 // updateResetConditionByName fetches the latest BMC object by name and updates the Reset condition to False.
-// Use this when updating Reset condition from async SSH reset worker after a failure.
+// Use this when updating Reset condition from the async SSH reset worker after a failure.
+// It creates the Reset condition if it is not already present: the worker runs on a separate
+// goroutine from the reconcile loop that set Reset=True, so its freshly fetched BMC copy may not
+// yet observe that condition. Passing createIfNotFound=true ensures the failure condition is always
+// recorded instead of being silently dropped.
 func (r *BMCReconciler) updateResetConditionByName(ctx context.Context, bmcName string, reason, message string) error {
 	currentBMC := &metalv1alpha1.BMC{}
 	if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, currentBMC); err != nil {
 		return fmt.Errorf("failed to fetch BMC object: %w", err)
 	}
-	return r.updateConditions(ctx, currentBMC, false, bmcResetConditionType, corev1.ConditionFalse, reason, message)
+	return r.updateConditions(ctx, currentBMC, true, bmcResetConditionType, corev1.ConditionFalse, reason, message)
 }
 
 func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {

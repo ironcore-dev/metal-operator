@@ -1,4 +1,1 @@
-# CODEOWNERS file for metal-operator
-# All code changes require approval from the Contributor team.
-
-* @ironcore-dev/metal-contributors
+* @ironcore-dev/metal-maintainers

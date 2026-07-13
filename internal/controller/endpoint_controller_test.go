@@ -5,7 +5,7 @@ package controller
 
 import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

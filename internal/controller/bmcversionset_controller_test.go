@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/netip"
 
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/bmcutils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"

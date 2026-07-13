@@ -120,81 +120,17 @@ func (r *ServerMaintenanceReconciler) ensureServerMaintenanceStateTransition(ctx
 	}
 }
 
-func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (result ctrl.Result, err error) {
+func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
-	if err != nil {
-		return ctrl.Result{}, err
+	// This CRD group (metal.ironcore.dev/ServerMaintenance) is deprecated.
+	// The canonical group is servermaintenance.metal.ironcore.dev, owned by maintenance-operator.
+	// Pending objects are deleted here so their owner controllers (BIOSSettings, BMCSettings, etc.)
+	// reconcile and recreate them in the correct group.
+	log.Info("Deleting deprecated ServerMaintenance in old group — owner will recreate in servermaintenance.metal.ironcore.dev",
+		"ServerMaintenance", maintenance.Name, "Namespace", maintenance.Namespace)
+	if err := r.Delete(ctx, maintenance); err != nil && !apierrors.IsNotFound(err) {
+		return ctrl.Result{}, fmt.Errorf("failed to delete deprecated ServerMaintenance: %w", err)
 	}
-
-	deferMaintenance, err := r.shouldDeferToHigherPriorityMaintenance(ctx, maintenance)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	if deferMaintenance {
-		log.V(1).Info("Deferring maintenance because higher-priority maintenance is pending", "Server", server.Name, "Priority", maintenance.Spec.Priority)
-		return ctrl.Result{}, nil
-	}
-
-	if server.Spec.ServerClaimRef == nil {
-		log.V(1).Info("Server has no ServerClaim, move to maintenance state right away", "Server", server.Name)
-		if err = r.updateServerRef(ctx, maintenance, server); err != nil {
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-	}
-
-	serverClaim := &metalv1alpha1.ServerClaim{}
-	if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to get ServerClaim: %w", err)
-		}
-		log.V(1).Info("ServerClaim gone")
-		return ctrl.Result{}, nil
-	}
-	patch := client.MergeFrom(serverClaim.DeepCopy())
-	if serverClaim.Labels == nil {
-		serverClaim.Labels = make(map[string]string)
-	}
-	serverClaim.Labels[metalv1alpha1.ServerMaintenanceNeededLabelKey] = trueValue
-	if serverClaim.Annotations == nil {
-		serverClaim.Annotations = make(map[string]string)
-	}
-
-	if err := r.Patch(ctx, serverClaim, patch); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to patch ServerClaim: %w", err)
-	}
-	log.V(1).Info("Patched ServerClaim labels and annotations", "ServerClaim", client.ObjectKeyFromObject(serverClaim))
-	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
-		labels := serverClaim.GetLabels()
-		_, hasLabel := labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]
-
-		if hasLabel {
-			log.V(1).Info("Server approved for maintenance", "Server", server.Name)
-			if err = r.updateServerRef(ctx, maintenance, server); err != nil {
-				return ctrl.Result{}, err
-			}
-			if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-				return ctrl.Result{}, err
-			}
-		}
-		log.V(1).Info("Server not approved for maintenance, waiting for approval", "Server", server.Name)
-		return ctrl.Result{}, nil
-	}
-
-	if maintenance.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
-		log.V(1).Info("Enforcing maintenance", "Server", server.Name)
-		if err := r.updateServerRef(ctx, maintenance, server); err != nil {
-			return ctrl.Result{}, err
-		}
-		if modified, err := r.patchMaintenanceState(ctx, maintenance, metalv1alpha1.ServerMaintenanceStateInMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-	}
-
-	log.V(1).Info("Reconciled ServerMaintenance in Pending state")
 	return ctrl.Result{}, nil
 }
 

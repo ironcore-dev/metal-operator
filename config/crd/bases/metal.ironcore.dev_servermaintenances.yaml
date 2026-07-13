@@ -38,6 +38,9 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 ServerMaintenance is deprecated;
+      use servermaintenance.metal.ironcore.dev/v1alpha1 instead
     name: v1alpha1
     schema:
       openAPIV3Schema:

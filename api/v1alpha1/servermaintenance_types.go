@@ -93,6 +93,7 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=sm
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 ServerMaintenance is deprecated; use servermaintenance.metal.ironcore.dev/v1alpha1 instead"
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Policy",type="string",JSONPath=`.spec.policy`
 // +kubebuilder:printcolumn:name="BootConfiguration",type="string",JSONPath=`.spec.serverBootConfigurationTemplate.name`

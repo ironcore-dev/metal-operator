@@ -7,6 +7,8 @@ import (
 	"context"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -56,15 +58,22 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 		return err
 	}
 
-	if err := indexer.IndexField(ctx, &metalv1alpha1.ServerMaintenance{}, serverRefField, func(rawObj client.Object) []string {
-		maintenance, ok := rawObj.(*metalv1alpha1.ServerMaintenance)
+	smObj := &unstructured.Unstructured{}
+	smObj.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "servermaintenance.metal.ironcore.dev",
+		Version: "v1alpha1",
+		Kind:    "ServerMaintenance",
+	})
+	if err := indexer.IndexField(ctx, smObj, serverRefField, func(rawObj client.Object) []string {
+		item, ok := rawObj.(*unstructured.Unstructured)
 		if !ok {
 			return nil
 		}
-		if maintenance.Spec.ServerRef != nil && maintenance.Spec.ServerRef.Name != "" {
-			return []string{maintenance.Spec.ServerRef.Name}
+		name, _, _ := unstructured.NestedString(item.Object, "spec", "serverRef", "name")
+		if name == "" {
+			return nil
 		}
-		return nil
+		return []string{name}
 	}); err != nil {
 		return err
 	}

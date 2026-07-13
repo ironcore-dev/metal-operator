@@ -32,7 +32,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
 	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
@@ -76,6 +78,12 @@ const (
 	// powerOpNoOP is the no operation
 	powerOpNoOP = "NoOp"
 )
+
+var serverMaintenanceGVK = schema.GroupVersionKind{
+	Group:   "servermaintenance.metal.ironcore.dev",
+	Version: "v1alpha1",
+	Kind:    "ServerMaintenanceList",
+}
 
 // ServerReconciler reconciles a Server object
 type ServerReconciler struct {
@@ -581,21 +589,23 @@ func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bm
 }
 
 func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
+	list := &unstructured.UnstructuredList{}
+	list.SetGroupVersionKind(serverMaintenanceGVK)
+	if err := r.List(ctx, list, client.MatchingFields{serverRefField: server.Name}); err != nil {
 		return false, fmt.Errorf("failed to list ServerMaintenances: %w", err)
 	}
 
 	var pendingOwnerApproval bool
-	for i := range maintenanceList.Items {
-		m := &maintenanceList.Items[i]
-		if !m.DeletionTimestamp.IsZero() {
+	for i := range list.Items {
+		m := &list.Items[i]
+		if !m.GetDeletionTimestamp().IsZero() {
 			continue
 		}
-		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
+		policy, _, _ := unstructured.NestedString(m.Object, "spec", "policy")
+		if policy == string(metalv1alpha1.ServerMaintenancePolicyEnforced) {
 			return true, nil
 		}
-		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
+		if policy == string(metalv1alpha1.ServerMaintenancePolicyOwnerApproval) {
 			pendingOwnerApproval = true
 		}
 	}

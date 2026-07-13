@@ -134,51 +134,6 @@ func (r *ServerMaintenanceReconciler) handlePendingState(ctx context.Context, ma
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerMaintenanceReconciler) shouldDeferToHigherPriorityMaintenance(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (bool, error) {
-	if maintenance.Spec.ServerRef == nil {
-		return false, nil
-	}
-
-	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: maintenance.Spec.ServerRef.Name}); err != nil {
-		return false, fmt.Errorf("failed to list ServerMaintenances: %w", err)
-	}
-
-	for i := range maintenanceList.Items {
-		other := &maintenanceList.Items[i]
-		if other.Name == maintenance.Name && other.Namespace == maintenance.Namespace {
-			continue
-		}
-		if !other.DeletionTimestamp.IsZero() {
-			continue
-		}
-		if other.Status.State != "" && other.Status.State != metalv1alpha1.ServerMaintenanceStatePending {
-			continue
-		}
-		if shouldRunBefore(other, maintenance) {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func shouldRunBefore(a, b *metalv1alpha1.ServerMaintenance) bool {
-	if a.Spec.Priority != b.Spec.Priority {
-		return a.Spec.Priority > b.Spec.Priority
-	}
-	if a.Spec.Policy != b.Spec.Policy {
-		return a.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced
-	}
-	if !a.CreationTimestamp.Equal(&b.CreationTimestamp) {
-		return a.CreationTimestamp.Before(&b.CreationTimestamp)
-	}
-	if a.Namespace != b.Namespace {
-		return a.Namespace < b.Namespace
-	}
-	return a.Name < b.Name
-}
-
 func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	server, err := GetServerByName(ctx, r.Client, maintenance.Spec.ServerRef.Name)
@@ -263,25 +218,6 @@ func (r *ServerMaintenanceReconciler) setAndPatchServerState(ctx context.Context
 		server.Spec.IndicatorLED = maintenance.Spec.LocatorLED
 	}
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
-}
-
-func (r *ServerMaintenanceReconciler) updateServerRef(ctx context.Context, maintenance *metalv1alpha1.ServerMaintenance, server *metalv1alpha1.Server) error {
-	log := ctrl.LoggerFrom(ctx)
-	if server.Spec.ServerMaintenanceRef != nil {
-		log.V(1).Info("Server is already in Maintenance", "Server", server.Name, "Maintenance", server.Spec.ServerMaintenanceRef.Name)
-		return nil
-	}
-	server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
-		Namespace: maintenance.Namespace,
-		Name:      maintenance.Name,
-	}
-	// use update to not overwrite ServerMaintenanceRef if another maintenance was quicker
-	if err := r.Update(ctx, server); err != nil {
-		return fmt.Errorf("failed to patch maintenance ref for server: %w", err)
-	}
-	log.V(1).Info("Updated ServerMaintenance reference on Server", "Server", server.Name)
-
-	return nil
 }
 
 func (r *ServerMaintenanceReconciler) handleFailedState(ctx context.Context, _ *metalv1alpha1.ServerMaintenance) (ctrl.Result, error) {

@@ -20,6 +20,36 @@ type HPERedfishBMC struct {
 	*RedfishBaseBMC
 }
 
+// hpeClearedBootOverride disables the boot override using Pxe as the target.
+var hpeClearedBootOverride = schemas.Boot{
+	BootSourceOverrideEnabled: schemas.DisabledBootSourceOverrideEnabled,
+	// HPE iLO rejects setting BootSourceOverrideEnabled while the target is
+	// unset/None. The target is irrelevant once Disabled, so keep Pxe to satisfy
+	// iLO's ordering requirement.
+	BootSourceOverrideTarget: schemas.PxeBootSource,
+}
+
+// ClearBootOverride overrides the base implementation because HPE iLO rejects a
+// PATCH that sets BootSourceOverrideEnabled while BootSourceOverrideTarget is
+// None or unset ("BootSourceOverrideEnabled cannot be set before
+// BootSourceOverrideTarget is set"). Disable the override with Pxe as the
+// target, which iLO accepts.
+func (r *HPERedfishBMC) ClearBootOverride(ctx context.Context, systemURI string) error {
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get systems: %w", err)
+	}
+	if system.Boot.BootSourceOverrideEnabled == "" ||
+		system.Boot.BootSourceOverrideEnabled == schemas.DisabledBootSourceOverrideEnabled {
+		return nil
+	}
+
+	if err := system.SetBoot(&hpeClearedBootOverride); err != nil {
+		return fmt.Errorf("failed to clear boot override: %w", err)
+	}
+	return nil
+}
+
 // --- BMC interface method overrides ---
 
 func (r *HPERedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {

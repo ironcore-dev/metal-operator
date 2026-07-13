@@ -81,7 +81,7 @@ var _ = Describe("SupermicroRedfishBMC SetBootOverride", func() {
 		defer server.Close()
 
 		bmc := newTestSupermicroBMC(server)
-		Expect(bmc.SetBootOverride(ctx, systemURI, false)).To(Succeed())
+		Expect(bmc.SetBootOverride(ctx, systemURI)).To(Succeed())
 
 		mu.Lock()
 		body := append(json.RawMessage(nil), *patched...)
@@ -111,7 +111,7 @@ var _ = Describe("SupermicroRedfishBMC SetBootOverride", func() {
 		defer server.Close()
 
 		bmc := newTestSupermicroBMC(server)
-		Expect(bmc.SetBootOverride(ctx, systemURI, true)).To(Succeed())
+		Expect(bmc.SetBootOverride(ctx, systemURI)).To(Succeed())
 
 		mu.Lock()
 		body := append(json.RawMessage(nil), *patched...)
@@ -123,96 +123,7 @@ var _ = Describe("SupermicroRedfishBMC SetBootOverride", func() {
 		}
 		Expect(json.Unmarshal(body, &typed)).To(Succeed())
 		Expect(typed.Boot.BootSourceOverrideMode).To(Equal(schemas.UEFIBootSourceOverrideMode))
-		Expect(typed.Boot.BootSourceOverrideEnabled).To(Equal(schemas.ContinuousBootSourceOverrideEnabled))
+		Expect(typed.Boot.BootSourceOverrideEnabled).To(Equal(schemas.OnceBootSourceOverrideEnabled))
 		Expect(typed.Boot.BootSourceOverrideTarget).To(Equal(schemas.PxeBootSource))
-	})
-
-	It("should no-op when the persistent override is already in the desired state", func(ctx SpecContext) {
-		var patchCount int
-		var mu sync.Mutex
-		mux := http.NewServeMux()
-		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(serviceRootJSON()) //nolint:errcheck
-		})
-		mux.HandleFunc("/redfish/v1/Systems/1", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPatch {
-				mu.Lock()
-				patchCount++
-				mu.Unlock()
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			// Already-persistent PXE + UEFI Continuous.
-			sys := map[string]any{
-				"@odata.id":   "/redfish/v1/Systems/1",
-				"@odata.type": "#ComputerSystem.v1_3_0.ComputerSystem",
-				"Id":          "1",
-				"Name":        "System 1",
-				"UUID":        "00000000-0000-0000-0000-000000000001",
-				"Boot": map[string]any{
-					"BootSourceOverrideEnabled": "Continuous",
-					"BootSourceOverrideTarget":  "Pxe",
-					"BootSourceOverrideMode":    "UEFI",
-				},
-			}
-			b, _ := json.Marshal(sys)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(b) //nolint:errcheck
-		})
-
-		server := httptest.NewServer(mux)
-		defer server.Close()
-
-		bmc := newTestSupermicroBMC(server)
-		Expect(bmc.SetBootOverride(ctx, systemURI, true)).To(Succeed())
-
-		mu.Lock()
-		defer mu.Unlock()
-		Expect(patchCount).To(Equal(0), "SetBootOverride should not PATCH when the state already matches")
-	})
-
-	It("should no-op when persistent PXE is already configured and the BMC does not report a mode", func(ctx SpecContext) {
-		var patchCount int
-		var mu sync.Mutex
-		mux := http.NewServeMux()
-		mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(serviceRootJSON()) //nolint:errcheck
-		})
-		mux.HandleFunc("/redfish/v1/Systems/1", func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPatch {
-				mu.Lock()
-				patchCount++
-				mu.Unlock()
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
-			sys := map[string]any{
-				"@odata.id":   "/redfish/v1/Systems/1",
-				"@odata.type": "#ComputerSystem.v1_3_0.ComputerSystem",
-				"Id":          "1",
-				"Name":        "System 1",
-				"UUID":        "00000000-0000-0000-0000-000000000001",
-				"Boot": map[string]any{
-					"BootSourceOverrideEnabled": "Continuous",
-					"BootSourceOverrideTarget":  "Pxe",
-					// BootSourceOverrideMode intentionally omitted.
-				},
-			}
-			b, _ := json.Marshal(sys)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(b) //nolint:errcheck
-		})
-
-		server := httptest.NewServer(mux)
-		defer server.Close()
-
-		bmc := newTestSupermicroBMC(server)
-		Expect(bmc.SetBootOverride(ctx, systemURI, true)).To(Succeed())
-
-		mu.Lock()
-		defer mu.Unlock()
-		Expect(patchCount).To(Equal(0), "SetBootOverride should not PATCH on BMCs without BootSourceOverrideMode when Continuous/Pxe is already set")
 	})
 })

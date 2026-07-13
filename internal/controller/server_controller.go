@@ -243,15 +243,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	log.V(1).Info("Ensured finalizer has been added")
 
 	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
-		// Set the persistent network-boot override once at maintenance entry. A
-		// Continuous override survives reboots, so re-asserting each reconcile is
-		// redundant and races with mid-POST, which Redfish (e.g. HPE iLO) rejects.
-		// It is cleared on exit in handleMaintenanceState.
-		if server.Status.State != metalv1alpha1.ServerStateMaintenance {
-			if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, true); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to set persistent network boot for maintenance: %w", err)
-			}
-		}
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
 			return ctrl.Result{}, err
 		}
@@ -433,12 +424,6 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 
 func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	// Self-heal: drop any boot override that may have been left set by a
-	// previous Maintenance cycle that ended unexpectedly. ClearBootOverride
-	// is a no-op when no override is active.
-	if err := bmcClient.ClearBootOverride(ctx, server.Spec.SystemURI); err != nil {
-		return false, fmt.Errorf("failed to clear boot override: %w", err)
-	}
 	serverBase := server.DeepCopy()
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		server.Spec.Power = metalv1alpha1.PowerOff
@@ -484,12 +469,6 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 
 func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	// Self-heal: drop any boot override that may have been left set by a
-	// previous Maintenance cycle that ended unexpectedly. ClearBootOverride
-	// is a no-op when no override is active.
-	if err := bmcClient.ClearBootOverride(ctx, server.Spec.SystemURI); err != nil {
-		return false, fmt.Errorf("failed to clear boot override: %w", err)
-	}
 	serverClaimRef := server.Spec.ServerClaimRef
 	if serverClaimRef == nil {
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
@@ -648,16 +627,11 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
 			return false, fmt.Errorf("failed to update server status system info: %w", err)
 		}
-		if err := bmcClient.ClearBootOverride(ctx, server.Spec.SystemURI); err != nil {
-			return false, fmt.Errorf("failed to clear boot override on maintenance exit: %w", err)
-		}
 		if server.Spec.ServerClaimRef == nil {
 			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
 		}
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
-	// The persistent network-boot override is set once at maintenance entry (in
-	// reconcile) and cleared below on exit; it is not re-asserted here.
 	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
@@ -991,7 +965,7 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 		return fmt.Errorf("can only PXE boot server with valid BMC ref or inline BMC configuration")
 	}
 
-	if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI, false); err != nil {
+	if err := bmcClient.SetBootOverride(ctx, server.Spec.SystemURI); err != nil {
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 	return nil

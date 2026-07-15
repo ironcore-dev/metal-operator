@@ -1311,7 +1311,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Taint
           elementRelationship: atomic
-    - name: unschedulable
+    - name: unclaimable
       type:
         scalar: boolean
       default: false

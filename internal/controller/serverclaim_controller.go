@@ -392,7 +392,7 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *m
 		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return false
 	}
-	if server.Spec.Unschedulable {
+	if server.Spec.Unclaimable {
 		log.V(1).Info("Server is cordoned", "Server", server.Name, "Claim", claim.Name)
 		return false
 	}

@@ -128,13 +128,13 @@ kubectl patch server my-server --type=merge -p '{"spec":{"serverClaimRef":null}}
 
 ## Cordoning
 
-`spec.unschedulable` is a first-class, typed **cordon** signal on a `Server`. When set to `true`, it prevents **new** [`ServerClaim`](serverclaims.md)s from binding to the server. Already-bound claims are unaffected: the existing `spec.serverClaimRef` stays in place while the server is cordoned.
+`spec.unclaimable` is a first-class, typed **cordon** signal on a `Server`. When set to `true`, it prevents **new** [`ServerClaim`](serverclaims.md)s from binding to the server. Already-bound claims are unaffected: the existing `spec.serverClaimRef` stays in place while the server is cordoned.
 
-Cordon is orthogonal to the `Initial → Discovery → Available → Reserved` state machine: it affects scheduling, not phase progression. A server may be cordoned in any state; a cordoned server in `Available` simply will not be picked up by new claims until it is uncordoned.
+Cordon is orthogonal to the `Initial → Discovery → Available → Reserved` state machine: it affects claimability, not phase progression. A server may be cordoned in any state; a cordoned server in `Available` simply will not be picked up by new claims until it is uncordoned.
 
 - A claim with an explicit `serverRef` to a cordoned server stays `Pending` (its phase remains `Unbound`).
 - A claim using a `serverSelector` skips cordoned candidates. If no uncordoned candidate matches, the claim stays `Pending`.
-- Toggling `spec.unschedulable` back to `false` automatically re-triggers binding for any pending claims targeting the server.
+- Toggling `spec.unclaimable` back to `false` automatically re-triggers binding for any pending claims targeting the server.
 
 ```yaml
 apiVersion: metal.ironcore.dev/v1alpha1
@@ -143,7 +143,7 @@ metadata:
   name: my-server
 spec:
   systemUUID: "123e4567-e89b-12d3-a456-426614174000"
-  unschedulable: true
+  unclaimable: true
   bmcRef:
     name: my-bmc
 ```
@@ -154,7 +154,7 @@ Cordon a server for manual maintenance using [`metalctl`](../usage/metalctl.md#c
 metalctl cordon server my-server
 ```
 
-Uncordon a server to return it to the schedulable pool:
+Uncordon a server to return it to the claimable pool:
 
 ```bash
 metalctl uncordon server my-server
@@ -163,18 +163,18 @@ metalctl uncordon server my-server
 Both commands accept `--kubeconfig`/`--context` to select the target cluster and `--dry-run` to preview the patch
 without applying it. See the [`metalctl` documentation](../usage/metalctl.md#cordon) for details.
 
-If `metalctl` is not available, `spec.unschedulable` is a plain spec field and can be toggled directly with
+If `metalctl` is not available, `spec.unclaimable` is a plain spec field and can be toggled directly with
 `kubectl patch` as a fallback:
 
 ```bash
 # Cordon
-kubectl patch server my-server --type=merge -p '{"spec":{"unschedulable":true}}'
+kubectl patch server my-server --type=merge -p '{"spec":{"unclaimable":true}}'
 
 # Uncordon
-kubectl patch server my-server --type=merge -p '{"spec":{"unschedulable":false}}'
+kubectl patch server my-server --type=merge -p '{"spec":{"unclaimable":false}}'
 ```
 
-Any subject with `update` permission on the `Server` resource can toggle `spec.unschedulable`, typically operators/admins for manual maintenance and automated maintenance controllers.
+Any subject with `update` permission on the `Server` resource can toggle `spec.unclaimable`, typically operators/admins for manual maintenance and automated maintenance controllers.
 
 ## Interaction with BMC
 

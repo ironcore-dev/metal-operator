@@ -580,7 +580,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	It("should not claim a cordoned server by explicit ServerRef", func(ctx SpecContext) {
 		By("Cordoning the server")
 		Eventually(Update(server, func() {
-			server.Spec.Unschedulable = true
+			server.Spec.Unclaimable = true
 		})).Should(Succeed())
 
 		By("Creating a ServerClaim referencing the cordoned server")
@@ -610,7 +610,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Uncordoning the server")
 		Eventually(Update(server, func() {
-			server.Spec.Unschedulable = false
+			server.Spec.Unclaimable = false
 		})).Should(Succeed())
 
 		By("Ensuring the server is now claimed")
@@ -631,7 +631,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Labeling and cordoning the server")
 		Eventually(Update(server, func() {
 			server.Labels = map[string]string{"type": "storage"}
-			server.Spec.Unschedulable = true
+			server.Spec.Unclaimable = true
 		})).Should(Succeed())
 
 		By("Creating a ServerClaim with a matching selector")
@@ -688,7 +688,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Cordoning the server after binding")
 		Eventually(Update(server, func() {
-			server.Spec.Unschedulable = true
+			server.Spec.Unclaimable = true
 		})).Should(Succeed())
 
 		By("Ensuring the existing claim stays bound")

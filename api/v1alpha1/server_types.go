@@ -155,11 +155,11 @@ type ServerSpec struct {
 	// +optional
 	Taints []Taint `json:"taints,omitempty"`
 
-	// Unschedulable, when true, prevents new ServerClaims from being bound to
+	// Unclaimable, when true, prevents new ServerClaims from being bound to
 	// this Server. Already-bound claims are unaffected.
 	// +kubebuilder:default=false
 	// +optional
-	Unschedulable bool `json:"unschedulable,omitempty"`
+	Unclaimable bool `json:"unclaimable,omitempty"`
 }
 
 // ServerState defines the possible states of a server.
@@ -448,7 +448,7 @@ type Storage struct {
 // +kubebuilder:printcolumn:name="PowerState",type=string,JSONPath=`.status.powerState`
 // +kubebuilder:printcolumn:name="IndicatorLED",type=string,JSONPath=`.status.indicatorLED`,priority=100
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
-// +kubebuilder:printcolumn:name="Unschedulable",type=boolean,JSONPath=`.spec.unschedulable`,priority=100
+// +kubebuilder:printcolumn:name="Unclaimable",type=boolean,JSONPath=`.spec.unclaimable`,priority=100
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // Server is the Schema for the servers API

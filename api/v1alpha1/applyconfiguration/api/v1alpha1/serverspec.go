@@ -50,9 +50,9 @@ type ServerSpecApplyConfiguration struct {
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
-	// Unschedulable, when true, prevents new ServerClaims from being bound to
+	// Unclaimable, when true, prevents new ServerClaims from being bound to
 	// this Server. Already-bound claims are unaffected.
-	Unschedulable *bool `json:"unschedulable,omitempty"`
+	Unclaimable *bool `json:"unclaimable,omitempty"`
 }
 
 // ServerSpecApplyConfiguration constructs a declarative configuration of the ServerSpec type for use with
@@ -183,10 +183,10 @@ func (b *ServerSpecApplyConfiguration) WithTaints(values ...*TaintApplyConfigura
 	return b
 }
 
-// WithUnschedulable sets the Unschedulable field in the declarative configuration to the given value
+// WithUnclaimable sets the Unclaimable field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the Unschedulable field is set to the value of the last call.
-func (b *ServerSpecApplyConfiguration) WithUnschedulable(value bool) *ServerSpecApplyConfiguration {
-	b.Unschedulable = &value
+// If called multiple times, the Unclaimable field is set to the value of the last call.
+func (b *ServerSpecApplyConfiguration) WithUnclaimable(value bool) *ServerSpecApplyConfiguration {
+	b.Unclaimable = &value
 	return b
 }

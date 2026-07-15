@@ -53,8 +53,8 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
-    - jsonPath: .spec.unschedulable
-      name: Unschedulable
+    - jsonPath: .spec.unclaimable
+      name: Unclaimable
       priority: 100
       type: boolean
     - jsonPath: .metadata.creationTimestamp
@@ -300,10 +300,10 @@ spec:
                   - key
                   type: object
                 type: array
-              unschedulable:
+              unclaimable:
                 default: false
                 description: |-
-                  Unschedulable, when true, prevents new ServerClaims from being bound to
+                  Unclaimable, when true, prevents new ServerClaims from being bound to
                   this Server. Already-bound claims are unaffected.
                 type: boolean
             required:

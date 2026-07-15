@@ -22,11 +22,11 @@ var (
 )
 
 // NewCordonCommand returns the `metalctl cordon` command that marks a resource as
-// unschedulable, preventing new ServerClaims from binding to it.
+// unclaimable, preventing new ServerClaims from binding to it.
 func NewCordonCommand() *cobra.Command {
 	cordonCmd := &cobra.Command{
 		Use:   "cordon",
-		Short: "Mark a resource as unschedulable",
+		Short: "Mark a resource as unclaimable",
 		Args:  cobra.NoArgs,
 	}
 	cordonCmd.AddCommand(newCordonServerCommand(true))
@@ -39,11 +39,11 @@ func NewCordonCommand() *cobra.Command {
 }
 
 // NewUncordonCommand returns the `metalctl uncordon` command that marks a resource as
-// schedulable again, allowing new ServerClaims to bind to it.
+// claimable again, allowing new ServerClaims to bind to it.
 func NewUncordonCommand() *cobra.Command {
 	uncordonCmd := &cobra.Command{
 		Use:   "uncordon",
-		Short: "Mark a resource as schedulable",
+		Short: "Mark a resource as claimable",
 		Args:  cobra.NoArgs,
 	}
 	uncordonCmd.AddCommand(newCordonServerCommand(false))
@@ -55,22 +55,22 @@ func NewUncordonCommand() *cobra.Command {
 	return uncordonCmd
 }
 
-func newCordonServerCommand(unschedulable bool) *cobra.Command {
-	short := "Mark a Server as schedulable, allowing new ServerClaims to bind to it"
-	if unschedulable {
-		short = "Mark a Server as unschedulable, preventing new ServerClaims from binding to it"
+func newCordonServerCommand(unclaimable bool) *cobra.Command {
+	short := "Mark a Server as claimable, allowing new ServerClaims to bind to it"
+	if unclaimable {
+		short = "Mark a Server as unclaimable, preventing new ServerClaims from binding to it"
 	}
 	return &cobra.Command{
 		Use:   "server SERVER_NAME",
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runCordonServer(cmd.Context(), args[0], unschedulable)
+			return runCordonServer(cmd.Context(), args[0], unclaimable)
 		},
 	}
 }
 
-func runCordonServer(ctx context.Context, serverName string, unschedulable bool) error {
+func runCordonServer(ctx context.Context, serverName string, unclaimable bool) error {
 	k8sClient, err := cmdclient.CreateClient(cordonKubeconfig, cordonKubeContext, scheme)
 	if err != nil {
 		return err
@@ -81,13 +81,13 @@ func runCordonServer(ctx context.Context, serverName string, unschedulable bool)
 		return fmt.Errorf("failed to get Server %s: %w", serverName, err)
 	}
 
-	if server.Spec.Unschedulable == unschedulable {
+	if server.Spec.Unclaimable == unclaimable {
 		// Already in the desired state; nothing to do.
 		return nil
 	}
 
 	base := server.DeepCopy()
-	server.Spec.Unschedulable = unschedulable
+	server.Spec.Unclaimable = unclaimable
 
 	patchOpts := []client.PatchOption{}
 	if cordonDryRun {

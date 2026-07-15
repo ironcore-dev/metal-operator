@@ -66,6 +66,6 @@ spec:
 
 ## Cordoned Servers
 
-A server can be **cordoned** via [`spec.unschedulable`](servers.md#cordoning) to prevent new
+A server can be **cordoned** via [`spec.unclaimable`](servers.md#cordoning) to prevent new
 `ServerClaim`s from binding to it. See [Cordoning](servers.md#cordoning) for details on how cordon
 interacts with claim binding and already-bound claims.

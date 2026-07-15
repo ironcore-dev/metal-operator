@@ -17,7 +17,7 @@ COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
-COPY bmcutils/ bmcutils/
+COPY pkg/ pkg/
 COPY third_party/ third_party/
 
 # Build

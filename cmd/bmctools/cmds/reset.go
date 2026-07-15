@@ -11,7 +11,7 @@ import (
 	"log"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/bmcutils"
+	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	"github.com/spf13/cobra"
 )
 

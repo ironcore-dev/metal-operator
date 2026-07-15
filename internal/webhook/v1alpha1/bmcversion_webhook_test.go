@@ -52,14 +52,14 @@ var _ = Describe("BMCVersion Webhook", func() {
 
 	Context("When creating or updating BMCVersion under Validating Webhook", func() {
 		It("should deny creation if a BMC referred is already referred by another", func(ctx SpecContext) {
-			By("Creating another BMCVersion with reference to existing referred BMC")
+			By("Creating another BMCVersion with reference to existing referred BMC and same version")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
 					GenerateName: "test-bmc-ver",
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
 					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-						Version:                 "P71 v1.45 (12/06/2017)",
+						Version:                 "P70 v1.45 (12/06/2017)",
 						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
@@ -87,7 +87,54 @@ var _ = Describe("BMCVersion Webhook", func() {
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
 		})
 
-		It("should deny update if a BMC referred is already referred by another", func() {
+		It("should deny update if both bmcRef and version match an existing record", func() {
+			By("Creating another BMCVersion with different BMCRef and version")
+			BMCVersionV2 := &metalv1alpha1.BMCVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-ver",
+				},
+				Spec: metalv1alpha1.BMCVersionSpec{
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+				},
+			}
+			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
+
+			By("Updating BMCVersionV2 to match both bmcRef and version of V1")
+			BMCVersionV2Updated := BMCVersionV2.DeepCopy()
+			BMCVersionV2Updated.Spec.BMCRef = BMCVersionV1.Spec.BMCRef
+			BMCVersionV2Updated.Spec.Version = BMCVersionV1.Spec.Version
+			Expect(validator.ValidateUpdate(ctx, BMCVersionV2, BMCVersionV2Updated)).Error().To(HaveOccurred())
+		})
+
+		It("should allow update if bmcRef changes to an existing one but version differs", func() {
+			By("Creating another BMCVersion with different BMCRef and version")
+			BMCVersionV2 := &metalv1alpha1.BMCVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					GenerateName: "test-bmc-ver",
+				},
+				Spec: metalv1alpha1.BMCVersionSpec{
+					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
+						Version:                 "P71 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+					},
+					BMCRef: &v1.LocalObjectReference{Name: "bar"},
+				},
+			}
+			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
+
+			By("Updating BMCVersionV2 bmcRef to match V1 while keeping a different version")
+			BMCVersionV2Updated := BMCVersionV2.DeepCopy()
+			BMCVersionV2Updated.Spec.BMCRef = BMCVersionV1.Spec.BMCRef
+			Expect(validator.ValidateUpdate(ctx, BMCVersionV2, BMCVersionV2Updated)).Error().NotTo(HaveOccurred())
+		})
+
+		It("should allow update when bmcRef is unchanged even if version now matches another record", func() {
 			By("Creating another BMCVersion with different BMCRef")
 			BMCVersionV2 := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
@@ -104,10 +151,10 @@ var _ = Describe("BMCVersion Webhook", func() {
 			}
 			Expect(k8sClient.Create(ctx, BMCVersionV2)).To(Succeed())
 
-			By("Updating an BMCVersionV2 to refer to existing BMC")
+			By("Updating BMCVersionV2 version to match V1 without changing bmcRef")
 			BMCVersionV2Updated := BMCVersionV2.DeepCopy()
-			BMCVersionV2Updated.Spec.BMCRef = BMCVersionV1.Spec.BMCRef
-			Expect(validator.ValidateUpdate(ctx, BMCVersionV1, BMCVersionV2Updated)).Error().To(HaveOccurred())
+			BMCVersionV2Updated.Spec.Version = BMCVersionV1.Spec.Version
+			Expect(validator.ValidateUpdate(ctx, BMCVersionV2, BMCVersionV2Updated)).Error().NotTo(HaveOccurred())
 		})
 
 		It("should update if a BMC referred is not referred by another", func() {

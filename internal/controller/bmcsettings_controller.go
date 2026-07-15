@@ -221,6 +221,10 @@ func (r *BMCSettingsReconciler) reconcile(ctx context.Context, settings *metalv1
 
 	bmcObj, err := r.getBMC(ctx, settings)
 	if err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("Referred BMC object not found, skipping")
+			return ctrl.Result{}, nil
+		}
 		log.V(1).Info("Failed to fetch referred BMC object")
 		return ctrl.Result{}, err
 	}
@@ -580,6 +584,9 @@ func (r *BMCSettingsReconciler) handleSettingAppliedState(ctx context.Context, s
 	settingsDiff, err := r.getBMCSettingsDifference(ctx, settings, bmcObj, bmcClient)
 	if err != nil {
 		return fmt.Errorf("failed to fetch and check BMCSettings: %w", err)
+	}
+	if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied && len(settingsDiff) == 0 {
+		return nil
 	}
 	if len(settingsDiff) > 0 {
 		// Drift detected — reset all conditions and state so the next reconcile
@@ -1271,9 +1278,6 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCRefs(ctx context.Context,
 	var requests []ctrl.Request
 	for _, settings := range settingsList.Items {
 		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == bmcObj.Name {
-			if settings.Status.State == metalv1alpha1.BMCSettingsStateApplied || settings.Status.State == metalv1alpha1.BMCSettingsStateFailed {
-				continue
-			}
 			requests = append(requests, ctrl.Request{NamespacedName: types.NamespacedName{Namespace: settings.Namespace, Name: settings.Name}})
 		}
 	}

@@ -1,5 +1,10 @@
 # Endpoints
 
+> **Deprecation Notice:** The `Endpoint` resource is deprecated and will be removed in a future release.
+> The same information (MAC address and IP) can be modeled inline via
+> [`BMC.spec.access`](bmcs.md) (an `InlineEndpoint`) instead of creating a separate `Endpoint` object.
+> Creating or updating an `Endpoint` surfaces an admission warning pointing to this replacement.
+
 The Endpoint Custom Resource Definition (CRD) is a Kubernetes resource used to represent and identify devices or 
 entities within an out-of-band (OOB) network. It serves as a means to catalog and manage devices such as Baseboard 
 Management Controllers (BMCs) by capturing their unique identifiers, specifically the MAC address and IP address. 

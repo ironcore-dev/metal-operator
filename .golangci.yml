@@ -50,6 +50,12 @@ linters:
           - lll
           - goconst
         path: bmc/*
+      # The Endpoint resource is deprecated (see issue #1018). The operator still
+      # serves existing Endpoint objects and the endpointRef access path, so these
+      # legacy consumers reference the type until the resource is fully removed.
+      - linters:
+          - staticcheck
+        text: "SA1019.*metalv1alpha1\\.Endpoint"
     paths:
       - third_party$
       - builtin$

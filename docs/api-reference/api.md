@@ -984,6 +984,10 @@ _Appears in:_
 
 Endpoint is the Schema for the endpoints API
 
+Deprecated: The Endpoint resource is deprecated. Model the same information
+inline via BMC.spec.access (an InlineEndpoint carrying the MAC address and IP)
+instead of creating a separate Endpoint object.
+
 
 
 

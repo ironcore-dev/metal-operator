@@ -1798,6 +1798,7 @@ _Appears in:_
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
 | `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
+| `unschedulable` _boolean_ | Unschedulable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false |  |
 
 
 #### ServerState

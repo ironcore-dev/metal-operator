@@ -392,6 +392,10 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *m
 		log.V(1).Info("Server not in a claimable state", "Server", server.Name, "ServerState", server.Status.State)
 		return false
 	}
+	if server.Spec.Unschedulable {
+		log.V(1).Info("Server is cordoned", "Server", server.Name, "Claim", claim.Name)
+		return false
+	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 		return false

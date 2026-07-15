@@ -63,3 +63,9 @@ spec:
     - With `Recycle`, `spec.serverClaimRef` is also removed automatically and the server returns to `Available`.
     - With `Retain`, `spec.serverClaimRef` is preserved so the binding can be inspected before the
       server is released back into the pool.
+
+## Cordoned Servers
+
+A server can be **cordoned** via [`spec.unschedulable`](servers.md#cordoning) to prevent new
+`ServerClaim`s from binding to it. See [Cordoning](servers.md#cordoning) for details on how cordon
+interacts with claim binding and already-bound claims.

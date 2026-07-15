@@ -90,3 +90,28 @@ This can now be achieved with the following procedure:
 
 With `--dry-run` option you can dry-run the move action by only printing logs without taking any actual actions. Use
 `--verbose` flag to enable verbose logging.
+
+### cordon
+
+The `metalctl cordon` command marks a `Server` as unschedulable by setting its `spec.unschedulable` field to `true`.
+A cordoned server will not receive new [`ServerClaim`](/concepts/serverclaims) bindings; already-bound claims are
+unaffected. See [Cordoning](/concepts/servers#cordoning) for details.
+
+```bash
+metalctl cordon server my-server
+```
+
+This is equivalent to `kubectl patch server my-server --type=merge -p '{"spec":{"unschedulable":true}}'` but provides a
+typed, self-documenting alternative.
+
+### uncordon
+
+The `metalctl uncordon` command reverses a cordon by setting `spec.unschedulable` back to `false`, returning the server
+to the schedulable pool so pending [`ServerClaim`](/concepts/serverclaims)s can bind to it again.
+
+```bash
+metalctl uncordon server my-server
+```
+
+Both `cordon` and `uncordon` accept the standard `--kubeconfig` and `--context` flags to select the target cluster, and
+a `--dry-run` flag to preview the patch without applying it.

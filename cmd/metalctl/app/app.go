@@ -31,5 +31,7 @@ func NewCommand() *cobra.Command {
 	root.AddCommand(NewMoveCommand())
 	root.AddCommand(NewConsoleCommand())
 	root.AddCommand(NewVisualizationCommand())
+	root.AddCommand(NewCordonCommand())
+	root.AddCommand(NewUncordonCommand())
 	return root
 }

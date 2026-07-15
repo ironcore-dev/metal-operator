@@ -8,8 +8,10 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +22,12 @@ import (
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
+
+	// Blank-imported so that github.com/ironcore-dev/metal-maintenance-operator stays a
+	// real (non-test-pruned) go.mod dependency. This lets maintenanceOperatorCRDDir
+	// resolve the module's on-disk location via `go list -m`, instead of assuming a
+	// sibling checkout of that repository at a fixed relative path.
+	_ "github.com/ironcore-dev/metal-maintenance-operator/api/servermaintenance/v1alpha1"
 
 	// +kubebuilder:scaffold:imports
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
@@ -57,12 +65,38 @@ func TestAPIs(t *testing.T) {
 	RunSpecs(t, "Webhook Suite")
 }
 
+// maintenanceOperatorCRDDir returns the config/crd/bases directory of the
+// github.com/ironcore-dev/metal-maintenance-operator module (e.g. for the
+// ServerMaintenance CRD), resolved from the local Go module cache/proxy via
+// the go.mod requirement rather than a relative path to a sibling checkout.
+func maintenanceOperatorCRDDir() (string, error) {
+	const modulePath = "github.com/ironcore-dev/metal-maintenance-operator"
+
+	out, err := exec.Command("go", "list", "-m", "-f", "{{.Dir}}", modulePath).Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve module dir for %s: %w", modulePath, err)
+	}
+
+	dir := strings.TrimSpace(string(out))
+	if dir == "" {
+		return "", fmt.Errorf("empty module dir for %s", modulePath)
+	}
+
+	return filepath.Join(dir, "config", "crd", "bases"), nil
+}
+
 var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	By("bootstrapping test environment")
+	maintenanceCRDDir, err := maintenanceOperatorCRDDir()
+	Expect(err).NotTo(HaveOccurred())
+
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "..", "config", "crd", "bases"),
+			maintenanceCRDDir,
+		},
 		ErrorIfCRDPathMissing: false,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
@@ -78,7 +112,6 @@ var _ = BeforeSuite(func() {
 		},
 	}
 
-	var err error
 	// cfg is defined in this file globally.
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())

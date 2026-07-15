@@ -718,17 +718,45 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the Server is set to discovery")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
 
-		By("Creating the server maintenance")
+		By("Creating the server maintenance with ignore annotation to prevent immediate deletion")
 		maintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      server.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
+				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
 			},
 		}
 		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+		DeferCleanup(func(ctx SpecContext) {
+			m := &metalv1alpha1.ServerMaintenance{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(maintenance), m); apierrors.IsNotFound(err) {
+				return
+			}
+			Eventually(Update(m, func() { m.Finalizers = nil })).Should(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, m))).To(Succeed())
+		})
+
+		By("Adding finalizer, patching to InMaintenance and setting ServerMaintenanceRef on Server")
+		Eventually(Update(maintenance, func() {
+			maintenance.Finalizers = []string{serverMaintenanceFinalizer}
+		})).Should(Succeed())
+		Eventually(UpdateStatus(maintenance, func() {
+			maintenance.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
+		})).Should(Succeed())
+		Eventually(Update(server, func() {
+			server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
+				Name:      maintenance.Name,
+				Namespace: maintenance.Namespace,
+			}
+		})).Should(Succeed())
+		Eventually(Update(maintenance, func() {
+			delete(maintenance.Annotations, metalv1alpha1.OperationAnnotation)
+		})).Should(Succeed())
 
 		By("Ensuring that the server is set to maintenance")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
@@ -800,11 +828,14 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the Server is set to reserved")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
 
-		By("Ensuring the server maintenance is created and set to server")
+		By("Creating the server maintenance with ignore annotation to prevent immediate deletion")
 		maintenance := &metalv1alpha1.ServerMaintenance{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: ns.Name,
 				Name:      server.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
+				},
 			},
 			Spec: metalv1alpha1.ServerMaintenanceSpec{
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -812,6 +843,31 @@ var _ = Describe("Server Controller", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, maintenance)).To(Succeed())
+		DeferCleanup(func(ctx SpecContext) {
+			m := &metalv1alpha1.ServerMaintenance{}
+			if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(maintenance), m); apierrors.IsNotFound(err) {
+				return
+			}
+			Eventually(Update(m, func() { m.Finalizers = nil })).Should(Succeed())
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, m))).To(Succeed())
+		})
+
+		By("Adding finalizer, patching to InMaintenance and setting ServerMaintenanceRef on Server")
+		Eventually(Update(maintenance, func() {
+			maintenance.Finalizers = []string{serverMaintenanceFinalizer}
+		})).Should(Succeed())
+		Eventually(UpdateStatus(maintenance, func() {
+			maintenance.Status.State = metalv1alpha1.ServerMaintenanceStateInMaintenance
+		})).Should(Succeed())
+		Eventually(Update(server, func() {
+			server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
+				Name:      maintenance.Name,
+				Namespace: maintenance.Namespace,
+			}
+		})).Should(Succeed())
+		Eventually(Update(maintenance, func() {
+			delete(maintenance.Annotations, metalv1alpha1.OperationAnnotation)
+		})).Should(Succeed())
 
 		By("Ensuring that the server is set to maintenance")
 		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))

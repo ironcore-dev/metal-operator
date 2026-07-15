@@ -82,7 +82,7 @@ const (
 var serverMaintenanceGVK = schema.GroupVersionKind{
 	Group:   "servermaintenance.metal.ironcore.dev",
 	Version: "v1alpha1",
-	Kind:    "ServerMaintenanceList",
+	Kind:    "ServerMaintenance",
 }
 
 // ServerReconciler reconciles a Server object

@@ -24,11 +24,15 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
@@ -378,6 +382,12 @@ func main() { // nolint: gocyclo
 		})
 	}
 
+	smU := &unstructured.Unstructured{}
+	smU.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "servermaintenance.metal.ironcore.dev",
+		Version: "v1alpha1",
+		Kind:    "ServerMaintenance",
+	})
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -385,6 +395,21 @@ func main() { // nolint: gocyclo
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "f26702e4.ironcore.dev",
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				smU: {},
+			},
+		},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				// ServerMaintenance is only available as an unstructured type in this
+				// repo (its Go types now live in maintenance-operator). Unstructured
+				// Get/List calls bypass the cache by default, which would send field
+				// selectors (e.g. spec.serverRef.name) directly to the API server,
+				// which CRDs don't support. Enable caching so the field indexer is used.
+				Unstructured: true,
+			},
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
@@ -701,6 +726,7 @@ func main() { // nolint: gocyclo
 	}
 
 	ctx := ctrl.SetupSignalHandler()
+
 	if err := controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer()); err != nil {
 		setupLog.Error(err, "unable to register field indexers")
 		os.Exit(1)

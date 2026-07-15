@@ -72,6 +72,8 @@ func upgradeVersion(ctx context.Context, base *RedfishBaseBMC, params *schemas.U
 
 	requestBody := requestBodyFn(params)
 
+	updateService.DisableEtagMatch(true)
+
 	resp, err := updateService.PostWithResponse(tUS.Actions.SimpleUpdate.Target, &requestBody)
 	if err != nil {
 		return "", false, err

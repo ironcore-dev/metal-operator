@@ -570,7 +570,17 @@ func (s *MockServer) handleDelete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (s *MockServer) handleSimpleUpdate(w http.ResponseWriter, _ *http.Request, body []byte) {
+func (s *MockServer) handleSimpleUpdate(w http.ResponseWriter, r *http.Request, body []byte) {
+	if ifMatch := r.Header.Get("If-Match"); ifMatch != "" {
+		s.writeJSON(w, http.StatusPreconditionFailed, map[string]any{
+			"error": map[string]any{
+				"code":    "Base.1.18.PreconditionFailed",
+				"message": "The ETag supplied did not match the ETag required to change this resource.",
+			},
+		})
+		return
+	}
+
 	var req struct {
 		ImageURI string   `json:"ImageURI"`
 		Targets  []string `json:"Targets"`

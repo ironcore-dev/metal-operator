@@ -59,16 +59,10 @@ type PowerController interface {
 
 // BootController manages boot overrides and boot order for a system.
 type BootController interface {
-	// SetBootOverride configures the system to network-boot on its next
-	// power-on, bypassing the persistent boot order. If persistent is false
-	// the override applies to a single boot only; if true it applies to every
-	// subsequent boot until ClearBootOverride is called.
-	SetBootOverride(ctx context.Context, systemURI string, persistent bool) error
-
-	// ClearBootOverride removes any active boot override so the system uses
-	// its persistent boot order on the next power-on. No-op when no override
-	// is currently set.
-	ClearBootOverride(ctx context.Context, systemURI string) error
+	// SetBootOverride sets the boot device to network boot for the next system
+	// power-on, bypassing the persistent boot order. The override applies to a
+	// single boot only.
+	SetBootOverride(ctx context.Context, systemURI string) error
 
 	// GetBootOrder retrieves the boot order for the system.
 	GetBootOrder(ctx context.Context, systemURI string) ([]string, error)
@@ -116,13 +110,14 @@ type BMCSettingsManager interface {
 	GetBMCVersion(ctx context.Context, UUID string) (string, error)
 
 	// GetBMCAttributeValues retrieves BMC attribute values for the system.
-	GetBMCAttributeValues(ctx context.Context, UUID string, attributes map[string]string) (schemas.SettingsAttributes, error)
+	GetBMCAttributeValues(ctx context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error)
 
 	// GetBMCPendingAttributeValues retrieves pending BMC attribute values for the system.
 	GetBMCPendingAttributeValues(ctx context.Context, UUID string) (result schemas.SettingsAttributes, err error)
 
 	// SetBMCAttributesImmediately sets BMC attributes on the system and applies them immediately.
-	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (err error)
+	// Returns a map of attribute keys to ApplyResult containing URI and ETag from the response.
+	SetBMCAttributesImmediately(ctx context.Context, UUID string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error)
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
 	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)
@@ -394,4 +389,24 @@ type Manager struct {
 	State           string
 	MACAddress      string
 	OemLinks        json.RawMessage
+}
+
+// ApplyResult holds the outcome of a single settings apply operation.
+type ApplyResult struct {
+	// URI is the resource URI. For POST: Location header (created resource); for PATCH: request URI.
+	URI string
+	// ETag from the response header or follow-up GET.
+	// May be a real ETag (e.g. "W/\"abc\"") or a body hash (prefixed "hash:sha256:").
+	ETag string
+}
+
+// GetBMCAttributeValuesRequest bundles the inputs for GetBMCAttributeValues.
+type GetBMCAttributeValuesRequest struct {
+	// UUID identifies the BMC manager resource.
+	UUID string
+	// Attributes is the set of attribute keys to retrieve, mapped to their expected values.
+	Attributes map[string]string
+	// StoredETags provides previously captured ETags for ETag-based drift detection.
+	// May be nil when no prior apply results are available.
+	StoredETags map[string]ApplyResult
 }

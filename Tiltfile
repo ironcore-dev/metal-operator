@@ -103,6 +103,13 @@ if new_args:
     print("default metal yaml {}\n".format(yaml_metal))
 k8s_yaml(yaml_metal)
 
+k8s_resource('metal-operator-controller-manager')
+k8s_resource(
+    new_name='metal-operator-validating-webhook-configuration',
+    objects=['metal-operator-validating-webhook-configuration'],
+    resource_deps=['metal-operator-controller-manager'],
+)
+
 if settings.get("local_boot_operator") != "":
     local_boot_operator = settings.get("local_boot_operator")
     print("Using local boot-operator from {}".format(local_boot_operator))

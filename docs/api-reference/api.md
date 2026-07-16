@@ -635,7 +635,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcUUID` _string_ | BMCUUID is the unique identifier for the BMC as defined in Redfish API. |  | Optional: \{\} <br /> |
-| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC. |  | Optional: \{\} <br /> |
+| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.<br />Deprecated: The Endpoint resource is deprecated. Specify the network access inline via<br />access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an<br />Endpoint object. |  | Optional: \{\} <br /> |
 | `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint specifies inline network access details for the BMC. |  | Optional: \{\} <br /> |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |

@@ -31,6 +31,7 @@ type EndpointStatus struct {
 // +kubebuilder:printcolumn:name="MACAddress",type=string,JSONPath=`.spec.macAddress`
 // +kubebuilder:printcolumn:name="IP",type=string,JSONPath=`.spec.ip`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 Endpoints are deprecated; specify the network access inline via BMC.spec.access (an InlineEndpoint with macAddress and ip) instead"
 
 // Endpoint is the Schema for the endpoints API
 //

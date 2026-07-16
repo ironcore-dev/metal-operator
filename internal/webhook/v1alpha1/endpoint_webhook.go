@@ -42,10 +42,6 @@ type EndpointCustomValidator struct {
 	Client client.Client
 }
 
-// endpointDeprecationWarning is the admission warning surfaced on Endpoint create/update
-// to direct users toward the inlined BMC.spec.access path.
-const endpointDeprecationWarning = "Endpoint is deprecated; specify the network access inline via BMC.spec.access (an InlineEndpoint with macAddress and ip) instead"
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
 func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
 	endpointlog.Info("Validation for Endpoint upon creation", "name", obj.GetName())
@@ -58,7 +54,7 @@ func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metal
 			obj.GetName(), allErrs)
 	}
 
-	return admission.Warnings{endpointDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
@@ -73,7 +69,7 @@ func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, ne
 			newObj.GetName(), allErrs)
 	}
 
-	return admission.Warnings{endpointDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.

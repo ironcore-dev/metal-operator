@@ -32,6 +32,10 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 Endpoints are deprecated; specify
+      the network access inline via BMC.spec.access (an InlineEndpoint with macAddress
+      and ip) instead
     name: v1alpha1
     schema:
       openAPIV3Schema:

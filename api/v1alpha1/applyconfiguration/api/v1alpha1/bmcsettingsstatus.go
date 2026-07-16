@@ -21,6 +21,9 @@ type BMCSettingsStatusApplyConfiguration struct {
 	FailedAttempts *int32 `json:"failedAttempts,omitempty"`
 	// ObservedGeneration is the most recent generation observed by the controller.
 	ObservedGeneration *int64 `json:"observedGeneration,omitempty"`
+	// AppliedETags stores the URI, ETag, and value hash from the last successful apply for each settings key.
+	// Used for ETag-based drift detection during verification.
+	AppliedETags map[string]BMCSettingsApplyResultEntryApplyConfiguration `json:"appliedETags,omitempty"`
 	// Conditions represents the latest available observations of the BMC Settings Resource state.
 	Conditions []v1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
@@ -52,6 +55,20 @@ func (b *BMCSettingsStatusApplyConfiguration) WithFailedAttempts(value int32) *B
 // If called multiple times, the ObservedGeneration field is set to the value of the last call.
 func (b *BMCSettingsStatusApplyConfiguration) WithObservedGeneration(value int64) *BMCSettingsStatusApplyConfiguration {
 	b.ObservedGeneration = &value
+	return b
+}
+
+// WithAppliedETags puts the entries into the AppliedETags field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, the entries provided by each call will be put on the AppliedETags field,
+// overwriting an existing map entries in AppliedETags field with the same key.
+func (b *BMCSettingsStatusApplyConfiguration) WithAppliedETags(entries map[string]BMCSettingsApplyResultEntryApplyConfiguration) *BMCSettingsStatusApplyConfiguration {
+	if b.AppliedETags == nil && len(entries) > 0 {
+		b.AppliedETags = make(map[string]BMCSettingsApplyResultEntryApplyConfiguration, len(entries))
+	}
+	for k, v := range entries {
+		b.AppliedETags[k] = v
+	}
 	return b
 }
 

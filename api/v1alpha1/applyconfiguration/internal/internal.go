@@ -395,6 +395,18 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsApplyResultEntry
+  map:
+    fields:
+    - name: etag
+      type:
+        scalar: string
+    - name: uri
+      type:
+        scalar: string
+    - name: valueHash
+      type:
+        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSet
   map:
     fields:
@@ -480,6 +492,11 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
   map:
     fields:
+    - name: appliedETags
+      type:
+        map:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsApplyResultEntry
     - name: conditions
       type:
         list:

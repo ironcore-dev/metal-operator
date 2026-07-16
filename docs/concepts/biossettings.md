@@ -1,5 +1,7 @@
 # BIOSSettings
 
+> **Deprecation Notice:** The `BIOSSettings` resource is deprecated and will be removed in a future release.
+
 `BIOSSettings` applies ordered BIOS configuration changes on exactly one `Server`.
 
 It is intended for granular, per-server Day-2 operations where you need deterministic sequencing (`settingsFlow`) and safety gates (version check, maintenance, verification).

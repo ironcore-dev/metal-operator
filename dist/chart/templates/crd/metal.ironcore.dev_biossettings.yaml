@@ -41,10 +41,15 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 BIOSSettings is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BIOSSettings is the Schema for the biossettings API.
+        description: |-
+          BIOSSettings is the Schema for the biossettings API.
+
+          Deprecated: The BIOSSettings resource is deprecated.
         properties:
           apiVersion:
             description: |-

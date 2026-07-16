@@ -184,11 +184,14 @@ type BMCSettingsStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BMCSettings is deprecated"
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="State",type=string,JSONPath=`.status.state`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.BMCRef.name`
 
 // BMCSettings is the Schema for the BMCSettings API.
+//
+// Deprecated: The BMCSettings resource is deprecated.
 type BMCSettings struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

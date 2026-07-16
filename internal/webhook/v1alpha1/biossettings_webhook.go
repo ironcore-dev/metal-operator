@@ -39,6 +39,9 @@ type BIOSSettingsCustomValidator struct {
 	client.Client
 }
 
+// biosSettingsDeprecationWarning is the admission warning surfaced on BIOSSettings create/update.
+const biosSettingsDeprecationWarning = "BIOSSettings is deprecated"
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
 func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
 	settingsLog.Info("Validation for BIOSSettings upon creation", "name", obj.GetName())
@@ -48,7 +51,10 @@ func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *m
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, obj)
+	if err := checkForDuplicateBIOSSettingsRefToServer(settingsList, obj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{biosSettingsDeprecationWarning}, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -74,7 +80,10 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, newObj)
+	if err := checkForDuplicateBIOSSettingsRefToServer(settingsList, newObj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{biosSettingsDeprecationWarning}, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -95,7 +104,7 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *m
 	return nil, nil
 }
 
-func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
+func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) error {
 	for _, bs := range settingsList.Items {
 		if settings.Name == bs.Name {
 			continue
@@ -106,10 +115,10 @@ func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSe
 				settings.Name,
 				bs.Spec.ServerRef.Name,
 				bs.Name)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
 				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef"), err)})
 		}
 	}
-	return nil, nil
+	return nil
 }

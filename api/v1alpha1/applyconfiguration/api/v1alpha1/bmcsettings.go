@@ -18,6 +18,8 @@ import (
 // with apply.
 //
 // BMCSettings is the Schema for the BMCSettings API.
+//
+// Deprecated: The BMCSettings resource is deprecated.
 type BMCSettingsApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

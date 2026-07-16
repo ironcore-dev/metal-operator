@@ -1,5 +1,7 @@
 # ServerMaintenance
 
+> **Deprecation Notice:** The `ServerMaintenance` resource is deprecated and will be removed in a future release.
+
 `ServerMaintenance` represents a maintenance operation for a physical server. It transitions a `Server` from its 
 current operational state (e.g., Available/Reserved) into a Maintenance state. Each `ServerMaintenance` object tracks
 the lifecycle of a maintenance task, ensuring servers are properly taken offline, updated, and restored.

@@ -37,6 +37,8 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 
 BIOSSettings is the Schema for the biossettings API.
 
+Deprecated: The BIOSSettings resource is deprecated.
+
 
 
 
@@ -94,6 +96,8 @@ _Appears in:_
 
 
 BIOSSettingsSet is the Schema for the biossettingssets API.
+
+Deprecated: The BIOSSettingsSet resource is deprecated.
 
 
 
@@ -233,6 +237,8 @@ _Appears in:_
 
 BIOSVersion is the Schema for the biosversions API.
 
+Deprecated: The BIOSVersion resource is deprecated.
+
 
 
 
@@ -251,6 +257,8 @@ BIOSVersion is the Schema for the biosversions API.
 
 
 BIOSVersionSet is the Schema for the biosversionsets API.
+
+Deprecated: The BIOSVersionSet resource is deprecated.
 
 
 
@@ -470,6 +478,8 @@ BMCSecret is the Schema for the bmcsecrets API
 
 BMCSettings is the Schema for the BMCSettings API.
 
+Deprecated: The BMCSettings resource is deprecated.
+
 
 
 
@@ -488,6 +498,8 @@ BMCSettings is the Schema for the BMCSettings API.
 
 
 BMCSettingsSet is the Schema for the bmcsettingssets API.
+
+Deprecated: The BMCSettingsSet resource is deprecated.
 
 
 
@@ -755,6 +767,8 @@ _Appears in:_
 
 BMCVersion is the Schema for the bmcversions API.
 
+Deprecated: The BMCVersion resource is deprecated.
+
 
 
 
@@ -773,6 +787,8 @@ BMCVersion is the Schema for the bmcversions API.
 
 
 BMCVersionSet is the Schema for the bmcversionsets API.
+
+Deprecated: The BMCVersionSet resource is deprecated.
 
 
 
@@ -1566,6 +1582,8 @@ _Appears in:_
 
 
 ServerMaintenance is the Schema for the ServerMaintenance API
+
+Deprecated: The ServerMaintenance resource is deprecated.
 
 
 

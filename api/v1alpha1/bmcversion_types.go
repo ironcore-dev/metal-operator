@@ -84,6 +84,7 @@ type BMCVersionStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=bmcv
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BMCVersion is deprecated"
 // +kubebuilder:printcolumn:name="BMCVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="UpdatePolicy",type=string,JSONPath=`.spec.updatePolicy`
 // +kubebuilder:printcolumn:name="BMCRef",type=string,JSONPath=`.spec.bmcRef.name`
@@ -94,6 +95,8 @@ type BMCVersionStatus struct {
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BMCVersion is the Schema for the bmcversions API.
+//
+// Deprecated: The BMCVersion resource is deprecated.
 type BMCVersion struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

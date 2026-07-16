@@ -37,6 +37,7 @@ type BIOSSettingsSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=biosss
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BIOSSettingsSet is deprecated"
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosSettingsTemplate.version`
 // +kubebuilder:printcolumn:name="TotalServers",type="string",JSONPath=`.status.fullyLabeledServers`
 // +kubebuilder:printcolumn:name="AvailableBIOSSettings",type="string",JSONPath=`.status.availableBIOSSettings`
@@ -47,6 +48,8 @@ type BIOSSettingsSetStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BIOSSettingsSet is the Schema for the biossettingssets API.
+//
+// Deprecated: The BIOSSettingsSet resource is deprecated.
 type BIOSSettingsSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

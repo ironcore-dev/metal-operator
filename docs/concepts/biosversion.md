@@ -1,5 +1,7 @@
 # BIOSVersion
 
+> **Deprecation Notice:** The `BIOSVersion` resource is deprecated and will be removed in a future release.
+
 `BIOSVersion` upgrades BIOS firmware for one `Server`.
 
 It models a task-oriented firmware lifecycle (issue upgrade task, monitor completion, reboot/power-cycle flow, verify final version).

@@ -1,5 +1,7 @@
 # BMCVersion
 
+> **Deprecation Notice:** The `BMCVersion` resource is deprecated and will be removed in a future release.
+
 `BMCVersion` upgrades BMC firmware for one `BMC`.
 
 It is the BMC counterpart of `BIOSVersion`, with additional multi-server maintenance gating because one BMC can manage multiple hosts.

@@ -47,10 +47,15 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 BMCVersion is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BMCVersion is the Schema for the bmcversions API.
+        description: |-
+          BMCVersion is the Schema for the bmcversions API.
+
+          Deprecated: The BMCVersion resource is deprecated.
         properties:
           apiVersion:
             description: |-

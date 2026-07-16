@@ -42,6 +42,9 @@ type BMCSettingsCustomValidator struct {
 	Client client.Client
 }
 
+// bmcSettingsDeprecationWarning is the admission warning surfaced on BMCSettings create/update.
+const bmcSettingsDeprecationWarning = "BMCSettings is deprecated"
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
 func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", obj.GetName())
@@ -50,7 +53,10 @@ func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *me
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj)
+	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{bmcSettingsDeprecationWarning}, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -81,7 +87,10 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj)
+	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{bmcSettingsDeprecationWarning}, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -108,7 +117,7 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *me
 	return nil, nil
 }
 
-func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) error {
 	for _, bs := range settingsList.Items {
 		if settings.Name == bs.Name {
 			continue
@@ -119,10 +128,10 @@ func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSetting
 				settings.Name,
 				bs.Spec.BMCRef.Name,
 				bs.Name)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
 				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 		}
 	}
-	return nil, nil
+	return nil
 }

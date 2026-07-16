@@ -30,10 +30,15 @@ spec:
     - jsonPath: .spec.BMCRef.name
       name: BMCRef
       type: string
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 BMCSettings is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BMCSettings is the Schema for the BMCSettings API.
+        description: |-
+          BMCSettings is the Schema for the BMCSettings API.
+
+          Deprecated: The BMCSettings resource is deprecated.
         properties:
           apiVersion:
             description: |-

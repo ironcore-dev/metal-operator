@@ -40,6 +40,9 @@ type BMCVersionCustomValidator struct {
 	Client client.Client
 }
 
+// bmcVersionDeprecationWarning is the admission warning surfaced on BMCVersion create/update.
+const bmcVersionDeprecationWarning = "BMCVersion is deprecated"
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
 func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
 	bmcversionlog.Info("Validation for BMCVersion upon creation", "name", obj.GetName())
@@ -47,7 +50,10 @@ func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *met
 	if err := v.Client.List(ctx, bmcVersionList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, obj)
+	if err := checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, obj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{bmcVersionDeprecationWarning}, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -73,7 +79,10 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
 
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, newObj)
+	if err := checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, newObj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{bmcVersionDeprecationWarning}, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -94,7 +103,7 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *met
 	return nil, nil
 }
 
-func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
+func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) error {
 	for _, v := range versionList.Items {
 		if version.Name == v.Name {
 			continue
@@ -105,10 +114,10 @@ func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionL
 				version.Name,
 				v.Spec.BMCRef.Name,
 				v.Name)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
 				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
 		}
 	}
-	return nil, nil
+	return nil
 }

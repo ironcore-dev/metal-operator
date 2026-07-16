@@ -1,5 +1,7 @@
 # BIOSVersionSet
 
+> **Deprecation Notice:** The `BIOSVersionSet` resource is deprecated and will be removed in a future release.
+
 `BIOSVersionSet` performs BIOS firmware rollout across multiple servers selected by labels.
 
 ## What It Does

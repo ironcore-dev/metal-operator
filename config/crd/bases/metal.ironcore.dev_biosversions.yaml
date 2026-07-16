@@ -44,10 +44,15 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 BIOSVersion is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BIOSVersion is the Schema for the biosversions API.
+        description: |-
+          BIOSVersion is the Schema for the biosversions API.
+
+          Deprecated: The BIOSVersion resource is deprecated.
         properties:
           apiVersion:
             description: |-

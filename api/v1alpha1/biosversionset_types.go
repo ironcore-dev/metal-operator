@@ -37,6 +37,7 @@ type BIOSVersionSetStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=biosvs
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BIOSVersionSet is deprecated"
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.biosVersionTemplate.version`
 // +kubebuilder:printcolumn:name="selectedServers",type="integer",JSONPath=`.status.fullyLabeledServers`
 // +kubebuilder:printcolumn:name="AvailableBIOSVersion",type="integer",JSONPath=`.status.availableBIOSVersion`
@@ -47,6 +48,8 @@ type BIOSVersionSetStatus struct {
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // BIOSVersionSet is the Schema for the biosversionsets API.
+//
+// Deprecated: The BIOSVersionSet resource is deprecated.
 type BIOSVersionSet struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

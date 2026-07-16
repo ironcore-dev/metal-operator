@@ -40,6 +40,9 @@ type BIOSVersionCustomValidator struct {
 	client.Client
 }
 
+// biosVersionDeprecationWarning is the admission warning surfaced on BIOSVersion create/update.
+const biosVersionDeprecationWarning = "BIOSVersion is deprecated"
+
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
 func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	versionLog.Info("Validation for BIOSVersion upon creation", "name", obj.GetName())
@@ -48,7 +51,10 @@ func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *me
 	if err := v.List(ctx, versions); err != nil {
 		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
 	}
-	return checkForDuplicateBIOSVersionRefToServer(versions, obj)
+	if err := checkForDuplicateBIOSVersionRefToServer(versions, obj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{biosVersionDeprecationWarning}, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -74,7 +80,10 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 		return nil, fmt.Errorf("failed to list BIOSVersion: %w", err)
 	}
 
-	return checkForDuplicateBIOSVersionRefToServer(versions, newObj)
+	if err := checkForDuplicateBIOSVersionRefToServer(versions, newObj); err != nil {
+		return nil, err
+	}
+	return admission.Warnings{biosVersionDeprecationWarning}, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -94,9 +103,9 @@ func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj *me
 	return nil, nil
 }
 
-func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersionList, version *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
+func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersionList, version *metalv1alpha1.BIOSVersion) error {
 	if version.Spec.ServerRef == nil {
-		return nil, nil
+		return nil
 	}
 
 	for _, bv := range versions.Items {
@@ -113,10 +122,10 @@ func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersion
 				bv.Spec.ServerRef.Name,
 				bv.Name,
 			)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
 				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef").Child("name"), err)})
 		}
 	}
-	return nil, nil
+	return nil
 }

@@ -1,5 +1,7 @@
 # BMCSettingsSet
 
+> **Deprecation Notice:** The `BMCSettingsSet` resource is deprecated and will be removed in a future release.
+
 `BMCSettingsSet` performs declarative BMC settings rollout across a label-selected BMC fleet.
 
 ## What It Does

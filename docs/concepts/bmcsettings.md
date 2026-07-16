@@ -1,5 +1,7 @@
 # BMCSettings
 
+> **Deprecation Notice:** The `BMCSettings` resource is deprecated and will be removed in a future release.
+
 `BMCSettings` applies BMC manager settings for one `BMC` resource.
 
 Unlike BIOS settings on a single host, BMC settings may require maintenance for multiple servers managed by the same BMC.

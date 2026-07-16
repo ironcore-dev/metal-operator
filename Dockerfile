@@ -18,6 +18,7 @@ COPY cmd/metaldata/main.go cmd/metaldata/main.go
 COPY api/ api/
 COPY internal/ internal/
 COPY bmc/ bmc/
+COPY pkg/ pkg/
 COPY third_party/ third_party/
 
 # Build

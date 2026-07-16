@@ -19,7 +19,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 )
 
 var _ = Describe("BMCVersion Controller", func() {

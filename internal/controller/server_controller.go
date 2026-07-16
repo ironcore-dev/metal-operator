@@ -1008,9 +1008,23 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 	}
 
 	serverBase := server.DeepCopy()
-	// update network interfaces
-	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
-	for _, s := range serverDetails.NetworkInterfaces {
+	server.Status.NetworkInterfaces = buildNetworkInterfaces(ctx, serverDetails.NetworkInterfaces, serverDetails.NICs, serverDetails.LLDP)
+	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return false, fmt.Errorf("failed to patch server status: %w", err)
+	}
+
+	return true, nil
+}
+
+func buildNetworkInterfaces(
+	ctx context.Context,
+	registryInterfaces []registry.NetworkInterface,
+	registryNICs []registry.NIC,
+	registryLLDP []registry.LLDPInterface,
+) []metalv1alpha1.NetworkInterface {
+	log := ctrl.LoggerFrom(ctx)
+	nics := make([]metalv1alpha1.NetworkInterface, 0, len(registryInterfaces))
+	for _, s := range registryInterfaces {
 		nic := metalv1alpha1.NetworkInterface{
 			Name:          s.Name,
 			MACAddress:    s.MACAddress,
@@ -1026,14 +1040,12 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		}
 		for _, ipAddr := range ipAddrs {
 			if ipAddr != "" {
-				// Parse and validate the IP address
 				ip, err := metalv1alpha1.ParseIP(ipAddr)
 				if err != nil {
 					log.Error(err, "Invalid IP address, skipping", "interface", s.Name, "ip", ipAddr)
 					continue
 				}
 
-				// Add all valid IP addresses (both IPv4 and IPv6) to the slice
 				allIPs = append(allIPs, ip)
 			}
 		}
@@ -1042,8 +1054,42 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		nics = append(nics, nic)
 	}
 
+	// Merge NIC hardware details reported by metalprobe into corresponding network interfaces.
+	nicsByName := make(map[string]registry.NIC, len(registryNICs))
+	nicsByMAC := make(map[string]registry.NIC, len(registryNICs))
+	for _, n := range registryNICs {
+		if n.Name != "" {
+			nicsByName[n.Name] = n
+		}
+		if n.MAC != "" {
+			nicsByMAC[strings.ToLower(n.MAC)] = n
+		}
+	}
+	for i := range nics {
+		hw, ok := nicsByName[nics[i].Name]
+		if !ok {
+			hw, ok = nicsByMAC[strings.ToLower(nics[i].MACAddress)]
+		}
+		if !ok {
+			continue
+		}
+		nics[i].PCIAddress = hw.PCIAddress
+		nics[i].Speed = hw.Speed
+		nics[i].LinkModes = hw.LinkModes
+		nics[i].SupportedPorts = hw.SupportedPorts
+		nics[i].FirmwareVersion = hw.FirmwareVersion
+		nics[i].NUMANode = int32(hw.NUMANode)
+		nics[i].Vendor = hw.Vendor
+		nics[i].SubsystemVendor = hw.SubsystemVendor
+		nics[i].Device = hw.Device
+		nics[i].MaxRx = int32(hw.MaxRx)
+		nics[i].MaxTx = int32(hw.MaxTx)
+		nics[i].MaxOther = int32(hw.MaxOther)
+		nics[i].MaxCombined = int32(hw.MaxCombined)
+	}
+
 	// Merge LLDP neighbors into corresponding network interfaces
-	for _, lldpIface := range serverDetails.LLDP {
+	for _, lldpIface := range registryLLDP {
 		// Find the matching network interface by name
 		for i := range nics {
 			if nics[i].Name == lldpIface.Name {
@@ -1064,12 +1110,7 @@ func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context,
 		}
 	}
 
-	server.Status.NetworkInterfaces = nics
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server status: %w", err)
-	}
-
-	return true, nil
+	return nics
 }
 
 func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) (bool, error) {

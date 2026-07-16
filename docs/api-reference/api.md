@@ -1214,6 +1214,19 @@ _Appears in:_
 | `ips` _[IP](#ip) array_ | IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface. |  | Format: ip <br />Type: string <br /> |
 | `macAddress` _string_ | MACAddress is the MAC address of the network interface. |  |  |
 | `carrierStatus` _string_ | CarrierStatus is the operational carrier status of the network interface. |  |  |
+| `pciAddress` _string_ | PCIAddress is the PCI bus address of the underlying NIC (e.g. "0000:01:00.0"). |  |  |
+| `speed` _string_ | Speed is the link speed reported by the NIC driver. |  |  |
+| `linkModes` _string array_ | LinkModes is the list of link modes supported by the NIC. |  |  |
+| `supportedPorts` _string array_ | SupportedPorts is the list of port types supported by the NIC (e.g. TP, FIBRE). |  |  |
+| `firmwareVersion` _string_ | FirmwareVersion is the firmware version reported by the NIC driver. |  |  |
+| `numaNode` _integer_ | NUMANode is the NUMA node ID as reported by the NIC driver. |  |  |
+| `vendor` _string_ | Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver. |  |  |
+| `subsystemVendor` _string_ | SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver. |  |  |
+| `device` _string_ | Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver. |  |  |
+| `maxRx` _integer_ | MaxRx is the maximum number of RX channels supported by the NIC. |  |  |
+| `maxTx` _integer_ | MaxTx is the maximum number of TX channels supported by the NIC. |  |  |
+| `maxOther` _integer_ | MaxOther is the maximum number of other channels supported by the NIC. |  |  |
+| `maxCombined` _integer_ | MaxCombined is the maximum number of combined channels supported by the NIC. |  |  |
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 

@@ -383,6 +383,14 @@ spec:
                       description: CarrierStatus is the operational carrier status
                         of the network interface.
                       type: string
+                    device:
+                      description: Device is the PCI device ID (e.g. "0x1533") as
+                        reported by the NIC driver.
+                      type: string
+                    firmwareVersion:
+                      description: FirmwareVersion is the firmware version reported
+                        by the NIC driver.
+                      type: string
                     ip:
                       description: |-
                         IP is the IP address assigned to the network interface.
@@ -395,9 +403,35 @@ spec:
                         format: ip
                         type: string
                       type: array
+                    linkModes:
+                      description: LinkModes is the list of link modes supported by
+                        the NIC.
+                      items:
+                        type: string
+                      type: array
                     macAddress:
                       description: MACAddress is the MAC address of the network interface.
                       type: string
+                    maxCombined:
+                      description: MaxCombined is the maximum number of combined channels
+                        supported by the NIC.
+                      format: int32
+                      type: integer
+                    maxOther:
+                      description: MaxOther is the maximum number of other channels
+                        supported by the NIC.
+                      format: int32
+                      type: integer
+                    maxRx:
+                      description: MaxRx is the maximum number of RX channels supported
+                        by the NIC.
+                      format: int32
+                      type: integer
+                    maxTx:
+                      description: MaxTx is the maximum number of TX channels supported
+                        by the NIC.
+                      format: int32
+                      type: integer
                     name:
                       description: Name is the name of the network interface.
                       type: string
@@ -429,6 +463,32 @@ spec:
                             type: string
                         type: object
                       type: array
+                    numaNode:
+                      description: NUMANode is the NUMA node ID as reported by the
+                        NIC driver.
+                      format: int32
+                      type: integer
+                    pciAddress:
+                      description: PCIAddress is the PCI bus address of the underlying
+                        NIC (e.g. "0000:01:00.0").
+                      type: string
+                    speed:
+                      description: Speed is the link speed reported by the NIC driver.
+                      type: string
+                    subsystemVendor:
+                      description: SubsystemVendor is the PCI subsystem vendor ID
+                        as reported by the NIC driver.
+                      type: string
+                    supportedPorts:
+                      description: SupportedPorts is the list of port types supported
+                        by the NIC (e.g. TP, FIBRE).
+                      items:
+                        type: string
+                      type: array
+                    vendor:
+                      description: Vendor is the PCI vendor ID (e.g. "0x8086") as
+                        reported by the NIC driver.
+                      type: string
                   required:
                   - macAddress
                   - name

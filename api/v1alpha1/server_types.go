@@ -329,6 +329,58 @@ type NetworkInterface struct {
 	// +optional
 	CarrierStatus string `json:"carrierStatus,omitempty"`
 
+	// PCIAddress is the PCI bus address of the underlying NIC (e.g. "0000:01:00.0").
+	// +optional
+	PCIAddress string `json:"pciAddress,omitempty"`
+
+	// Speed is the link speed reported by the NIC driver.
+	// +optional
+	Speed string `json:"speed,omitempty"`
+
+	// LinkModes is the list of link modes supported by the NIC.
+	// +optional
+	LinkModes []string `json:"linkModes,omitempty"`
+
+	// SupportedPorts is the list of port types supported by the NIC (e.g. TP, FIBRE).
+	// +optional
+	SupportedPorts []string `json:"supportedPorts,omitempty"`
+
+	// FirmwareVersion is the firmware version reported by the NIC driver.
+	// +optional
+	FirmwareVersion string `json:"firmwareVersion,omitempty"`
+
+	// NUMANode is the NUMA node ID as reported by the NIC driver.
+	// +optional
+	NUMANode int32 `json:"numaNode,omitempty"`
+
+	// Vendor is the PCI vendor ID (e.g. "0x8086") as reported by the NIC driver.
+	// +optional
+	Vendor string `json:"vendor,omitempty"`
+
+	// SubsystemVendor is the PCI subsystem vendor ID as reported by the NIC driver.
+	// +optional
+	SubsystemVendor string `json:"subsystemVendor,omitempty"`
+
+	// Device is the PCI device ID (e.g. "0x1533") as reported by the NIC driver.
+	// +optional
+	Device string `json:"device,omitempty"`
+
+	// MaxRx is the maximum number of RX channels supported by the NIC.
+	// +optional
+	MaxRx int32 `json:"maxRx,omitempty"`
+
+	// MaxTx is the maximum number of TX channels supported by the NIC.
+	// +optional
+	MaxTx int32 `json:"maxTx,omitempty"`
+
+	// MaxOther is the maximum number of other channels supported by the NIC.
+	// +optional
+	MaxOther int32 `json:"maxOther,omitempty"`
+
+	// MaxCombined is the maximum number of combined channels supported by the NIC.
+	// +optional
+	MaxCombined int32 `json:"maxCombined,omitempty"`
+
 	// Neighbors contains the LLDP neighbors discovered on this interface.
 	// +optional
 	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`

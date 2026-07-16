@@ -17,6 +17,14 @@ func collectNICInfoData() ([]registry.NIC, error) {
 			LinkModes:       []string{"1000baseT/Full"},
 			SupportedPorts:  []string{"TP"},
 			FirmwareVersion: "1.0.0",
+			NUMANode:        0,
+			Vendor:          "0x8086",
+			SubsystemVendor: "0x8086",
+			Device:          "0x1533",
+			MaxRx:           8,
+			MaxTx:           8,
+			MaxOther:        0,
+			MaxCombined:     8,
 		},
 	}, nil
 }

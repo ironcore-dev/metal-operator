@@ -335,19 +335,87 @@ var _ = Describe("Server Controller", func() {
 			)),
 		))
 
-		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
-		go func() {
-			defer GinkgoRecover()
-			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
-		}()
+		By("Publishing server details to the registry")
+		registerPayload := registry.RegistrationPayload{
+			SystemUUID: server.Spec.SystemUUID,
+			Data: registry.Server{
+				Timestamp: &metav1.Time{Time: time.Now()},
+				NetworkInterfaces: []registry.NetworkInterface{{
+					Name:          "eth0",
+					MACAddress:    "aa:bb:cc:dd:ee:ff",
+					CarrierStatus: "up",
+					IPAddresses:   []string{"10.0.0.1"},
+				}},
+				NICs: []registry.NIC{{
+					Name:            "eth0",
+					MAC:             "aa:bb:cc:dd:ee:ff",
+					PCIAddress:      "0000:01:00.0",
+					Speed:           "10000",
+					LinkModes:       []string{"10000baseT/Full"},
+					SupportedPorts:  []string{"TP"},
+					FirmwareVersion: "1.2.3",
+					NUMANode:        0,
+					Vendor:          "0x8086",
+					SubsystemVendor: "0x8086",
+					Device:          "0x1533",
+					MaxRx:           8,
+					MaxTx:           8,
+					MaxOther:        0,
+					MaxCombined:     8,
+				}},
+				LLDP: []registry.LLDPInterface{{
+					Name: "eth0",
+					Neighbors: []registry.Neighbor{{
+						ChassisID:         "11:22:33:44:55:66",
+						PortID:            "swp1",
+						PortDescription:   "uplink",
+						SystemName:        "leaf-1",
+						SystemDescription: "leaf switch",
+					}},
+				}},
+			},
+		}
+		registerBody, err := json.Marshal(registerPayload)
+		Expect(err).NotTo(HaveOccurred())
+		registerResp, err := http.Post(registryURL+"/register", "application/json", bytes.NewReader(registerBody))
+		Expect(err).NotTo(HaveOccurred())
+		Expect(registerResp.Body.Close()).To(Succeed())
+		Expect(registerResp.StatusCode).To(Equal(http.StatusCreated))
+
+		expectedIP, err := metalv1alpha1.ParseIP("10.0.0.1")
+		Expect(err).NotTo(HaveOccurred())
 
 		By("Ensuring that the server is set to available and powered off")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
+			HaveField("Status.NetworkInterfaces", ConsistOf(metalv1alpha1.NetworkInterface{
+				Name:            "eth0",
+				MACAddress:      "aa:bb:cc:dd:ee:ff",
+				CarrierStatus:   "up",
+				IPs:             []metalv1alpha1.IP{expectedIP},
+				PCIAddress:      "0000:01:00.0",
+				Speed:           "10000",
+				LinkModes:       []string{"10000baseT/Full"},
+				SupportedPorts:  []string{"TP"},
+				FirmwareVersion: "1.2.3",
+				NUMANode:        0,
+				Vendor:          "0x8086",
+				SubsystemVendor: "0x8086",
+				Device:          "0x1533",
+				MaxRx:           8,
+				MaxTx:           8,
+				MaxOther:        0,
+				MaxCombined:     8,
+				Neighbors: []metalv1alpha1.LLDPNeighbor{{
+					MACAddress:        "11:22:33:44:55:66",
+					PortID:            "swp1",
+					PortDescription:   "uplink",
+					SystemName:        "leaf-1",
+					SystemDescription: "leaf switch",
+				}},
+			})),
 		))
 
 		By("Ensuring that the boot configuration has been removed")

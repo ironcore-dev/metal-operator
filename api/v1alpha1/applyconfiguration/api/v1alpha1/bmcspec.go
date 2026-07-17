@@ -29,7 +29,12 @@ type BMCSpecApplyConfiguration struct {
 	ConsoleProtocol *ConsoleProtocolApplyConfiguration `json:"consoleProtocol,omitempty"`
 	// BMCSettingRef is a reference to a BMCSettings object that specifies
 	// the BMC configuration for this BMC.
+	// Deprecated: use bmcSettingsRefs instead. Will be removed in next release.
 	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
+	// BMCSettingsRefs is a list of references to BMCSettings objects that specify
+	// the BMC configuration for this BMC. Replaces the single bmcSettingsRef to support
+	// multiple simultaneous settings objects created.
+	BMCSettingsRefs []v1.LocalObjectReference `json:"bmcSettingsRefs,omitempty"`
 	// Hostname is the hostname of the BMC.
 	Hostname *string `json:"hostname,omitempty"`
 }
@@ -93,6 +98,16 @@ func (b *BMCSpecApplyConfiguration) WithConsoleProtocol(value *ConsoleProtocolAp
 // If called multiple times, the BMCSettingRef field is set to the value of the last call.
 func (b *BMCSpecApplyConfiguration) WithBMCSettingRef(value v1.LocalObjectReference) *BMCSpecApplyConfiguration {
 	b.BMCSettingRef = &value
+	return b
+}
+
+// WithBMCSettingsRefs adds the given value to the BMCSettingsRefs field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the BMCSettingsRefs field.
+func (b *BMCSpecApplyConfiguration) WithBMCSettingsRefs(values ...v1.LocalObjectReference) *BMCSpecApplyConfiguration {
+	for i := range values {
+		b.BMCSettingsRefs = append(b.BMCSettingsRefs, values[i])
+	}
 	return b
 }
 

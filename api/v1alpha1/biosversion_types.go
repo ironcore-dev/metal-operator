@@ -52,6 +52,7 @@ type BIOSVersionTemplate struct {
 }
 
 // BIOSVersionSpec defines the desired state of BIOSVersion.
+// +kubebuilder:validation:XValidation:rule="has(self.serverRef)",message="serverRef is required"
 type BIOSVersionSpec struct {
 	// BIOSVersionTemplate defines the template for Version to be applied on the servers.
 	BIOSVersionTemplate `json:",inline"`
@@ -62,8 +63,7 @@ type BIOSVersionSpec struct {
 
 	// ServerRef is a reference to a specific server to apply the BIOS upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverRef is immutable"
-	// +optional
-	ServerRef *corev1.LocalObjectReference `json:"serverRef,omitempty"`
+	ServerRef *corev1.LocalObjectReference `json:"serverRef"`
 }
 
 type ImageSpec struct {

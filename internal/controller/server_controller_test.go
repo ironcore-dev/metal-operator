@@ -358,12 +358,20 @@ var _ = Describe("Server Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 
-		biosSettings := &metalv1alpha1.BIOSSettings{ObjectMeta: metav1.ObjectMeta{
-			Name: "bios-settings",
-		}}
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "bios-settings",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: "P79 v1.45 (12/06/2017)",
+				},
+			},
+		}
 		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
 		Eventually(Update(server, func() {
-			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
+			server.Spec.BIOSSettingsRefs = []v1.LocalObjectReference{{Name: biosSettings.Name}}
 		})).Should(Succeed())
 
 		// cleanup

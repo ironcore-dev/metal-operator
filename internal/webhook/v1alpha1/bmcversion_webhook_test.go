@@ -59,8 +59,8 @@ var _ = Describe("BMCVersion Webhook", func() {
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
 					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-						Version:                 "P71 v1.45 (12/06/2017)",
-						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						Version:                 "P70 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 					BMCRef: &v1.LocalObjectReference{Name: "foo"},
@@ -95,8 +95,8 @@ var _ = Describe("BMCVersion Webhook", func() {
 				},
 				Spec: metalv1alpha1.BMCVersionSpec{
 					BMCVersionTemplate: metalv1alpha1.BMCVersionTemplate{
-						Version:                 "P71 v1.45 (12/06/2017)",
-						Image:                   metalv1alpha1.ImageSpec{URI: "P71 v1.45 (12/06/2017)"},
+						Version:                 "P70 v1.45 (12/06/2017)",
+						Image:                   metalv1alpha1.ImageSpec{URI: "P70 v1.45 (12/06/2017)"},
 						ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
 					},
 					BMCRef: &v1.LocalObjectReference{Name: "bar"},

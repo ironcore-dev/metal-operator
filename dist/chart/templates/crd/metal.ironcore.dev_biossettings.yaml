@@ -150,8 +150,13 @@ spec:
                   these settings apply to.
                 type: string
             required:
-            - version
+            - serverRef
             type: object
+            x-kubernetes-validations:
+            - message: version is required on BIOSSettings
+              rule: size(self.version) > 0
+            - message: serverRef is required
+              rule: has(self.serverRef)
           status:
             description: BIOSSettingsStatus defines the observed state of BIOSSettings.
             properties:

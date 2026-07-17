@@ -51,6 +51,19 @@ func (b *BMCSettingsSpecApplyConfiguration) WithSettingsMap(entries map[string]s
 	return b
 }
 
+// WithSettingsFlow adds the given value to the SettingsFlow field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SettingsFlow field.
+func (b *BMCSettingsSpecApplyConfiguration) WithSettingsFlow(values ...*SettingsFlowItemApplyConfiguration) *BMCSettingsSpecApplyConfiguration {
+	for i := range values {
+		if values[i] == nil {
+			panic("nil value passed to WithSettingsFlow")
+		}
+		b.BMCSettingsTemplateApplyConfiguration.SettingsFlow = append(b.BMCSettingsTemplateApplyConfiguration.SettingsFlow, *values[i])
+	}
+	return b
+}
+
 // WithVariables adds the given value to the Variables field in the declarative configuration
 // and returns the receiver, so that objects can be build by chaining "With" function invocations.
 // If called multiple times, values provided by each call will be appended to the Variables field.

@@ -45,6 +45,7 @@ type BMCVersionTemplate struct {
 }
 
 // BMCVersionSpec defines the desired state of BMCVersion.
+// +kubebuilder:validation:XValidation:rule="has(self.bmcRef)",message="bmcRef is required"
 type BMCVersionSpec struct {
 	// BMCVersionTemplate defines the template for BMC version to be applied on the server's BMC.
 	BMCVersionTemplate `json:",inline"`
@@ -55,7 +56,7 @@ type BMCVersionSpec struct {
 
 	// BMCRef is a reference to a specific BMC to apply BMC upgrade on.
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="bmcRef is immutable"
-	BMCRef *corev1.LocalObjectReference `json:"bmcRef,omitempty"`
+	BMCRef *corev1.LocalObjectReference `json:"bmcRef"`
 }
 
 // BMCVersionStatus defines the observed state of BMCVersion.

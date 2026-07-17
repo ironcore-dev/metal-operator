@@ -43,11 +43,11 @@ type BMCVersionCustomValidator struct {
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
 func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
 	bmcversionlog.Info("Validation for BMCVersion upon creation", "name", obj.GetName())
-	bmcVersionList := &metalv1alpha1.BMCVersionList{}
-	if err := v.Client.List(ctx, bmcVersionList); err != nil {
+	list := &metalv1alpha1.BMCVersionList{}
+	if err := v.Client.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, obj)
+	return nil, checkDuplicateBMCVersions(list, obj)
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -68,12 +68,11 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 		}
 	}
 
-	bmcVersionList := &metalv1alpha1.BMCVersionList{}
-	if err := v.Client.List(ctx, bmcVersionList); err != nil {
+	list := &metalv1alpha1.BMCVersionList{}
+	if err := v.Client.List(ctx, list); err != nil {
 		return nil, fmt.Errorf("failed to list BMCVersions: %w", err)
 	}
-
-	return checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, newObj)
+	return nil, checkDuplicateBMCVersions(list, newObj)
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -91,24 +90,5 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *met
 		}
 	}
 
-	return nil, nil
-}
-
-func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
-	for _, v := range versionList.Items {
-		if version.Name == v.Name {
-			continue
-		}
-		if v.Spec.BMCRef.Name == version.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
-				version.Spec.BMCRef.Name,
-				version.Name,
-				v.Spec.BMCRef.Name,
-				v.Name)
-			return nil, apierrors.NewInvalid(
-				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
-				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
-		}
-	}
 	return nil, nil
 }

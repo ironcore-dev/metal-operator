@@ -30,6 +30,10 @@ type BMCSpec struct {
 	BMCUUID string `json:"bmcUUID,omitempty"`
 
 	// EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.
+	//
+	// Deprecated: The Endpoint resource is deprecated. Specify the network access inline via
+	// access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an
+	// Endpoint object.
 	// +optional
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="endpointRef is immutable"

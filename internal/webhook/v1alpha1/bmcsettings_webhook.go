@@ -120,7 +120,7 @@ func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSetting
 			continue
 		}
 		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
-			fldErr := field.Duplicate(field.NewPath("spec").Child("bmcRef"), settings.Spec.BMCRef.Name)
+			fldErr := field.Duplicate(field.NewPath("spec").Child("BMCRef"), settings.Spec.BMCRef.Name)
 			fldErr.Detail = fmt.Sprintf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
 				settings.Spec.BMCRef.Name,
 				settings.Name,

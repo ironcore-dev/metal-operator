@@ -66,6 +66,34 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 	return maintenance, nil
 }
 
+// shouldProceedWithDeletion returns true when obj should proceed with deletion.
+// isProgressing is called only when the object has the finalizer; it returns true
+// when deletion should be postponed (e.g. actively progressing under maintenance).
+// Callers own all state/ref/owner logic inside isProgressing.
+func shouldProceedWithDeletion(
+	ctx context.Context,
+	obj client.Object,
+	finalizer string,
+	isProgressing func() (bool, error),
+) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	if obj.GetDeletionTimestamp().IsZero() {
+		return false, nil
+	}
+	if controllerutil.ContainsFinalizer(obj, finalizer) {
+		progressing, err := isProgressing()
+		if err != nil {
+			return false, err
+		}
+		if progressing {
+			log.V(1).Info("Postponing deletion: resource is progressing under active maintenance")
+			return false, nil
+		}
+	}
+	log.V(1).Info("Proceeding with deletion")
+	return true, nil
+}
+
 // GetCondition finds a condition in a condition slice.
 // If the condition is not found, a new one with Status=False is returned.
 func GetCondition(acc *conditionutils.Accessor, conditions []metav1.Condition, conditionType string) (*metav1.Condition, error) {
@@ -207,7 +235,7 @@ func enqueueFromChildObjUpdatesExceptAnnotation(e event.UpdateEvent) bool {
 	return true
 }
 
-func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.BMC) error {
+func resetBMCOfServer(ctx context.Context, kClient client.Client, server *metalv1alpha1.Server, bmcClient bmc.ManagerController) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef != nil {
 		key := client.ObjectKey{Name: server.Spec.BMCRef.Name}

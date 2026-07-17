@@ -32,7 +32,7 @@ settings = {
          "--leader-elect",
          "--mac-prefixes-file=/etc/macdb/macdb.yaml",
          "--probe-image=ghcr.io/ironcore-dev/metalprobe:latest",
-         "--probe-os-image=ghcr.io/ironcore-dev/os-images/gardenlinux:1877.0",
+         "--probe-os-image=ghcr.io/ironcore-dev/gardenlinux:2150.4.0-metal",
          "--registry-url=http://127.0.0.1:30000",
          "--registry-port=30000",
          "--enforce-first-boot",
@@ -102,6 +102,13 @@ if new_args:
     yaml_metal = encode_yaml_stream(decode_yaml_stream(str(yaml_metal).replace("- args: []", "- args: {}".format(new_args))))
     print("default metal yaml {}\n".format(yaml_metal))
 k8s_yaml(yaml_metal)
+
+k8s_resource('metal-operator-controller-manager')
+k8s_resource(
+    new_name='metal-operator-validating-webhook-configuration',
+    objects=['metal-operator-validating-webhook-configuration'],
+    resource_deps=['metal-operator-controller-manager'],
+)
 
 if settings.get("local_boot_operator") != "":
     local_boot_operator = settings.get("local_boot_operator")

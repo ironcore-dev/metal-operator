@@ -27,8 +27,9 @@ import (
 )
 
 // RedfishBaseBMC implements all standard Redfish BMC methods.
-// Vendor-specific structs embed this and override methods as needed.
-var _ BMC = (*RedfishBaseBMC)(nil)
+// Vendor-specific structs embed this and override methods as needed. The
+// compile-time assertion that *RedfishBaseBMC satisfies BMC lives in bmc.go
+// alongside the per-vendor assertions.
 
 const (
 	// DefaultResourcePollingInterval is the default interval for polling resources.
@@ -55,6 +56,14 @@ type Options struct {
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
 	PowerPollingTimeout     time.Duration
+
+	// AdditionalVendors maps a manufacturer string (as reported by Redfish)
+	// to a factory that wraps the base Redfish client in a vendor-specific
+	// implementation. Entries are merged on top of DefaultVendors() by
+	// NewRedfishBMCClient, so callers only need to supply the extra OEMs
+	// they want to add. Existing built-in manufacturers can be overridden
+	// by registering the same key.
+	AdditionalVendors map[Manufacturer]VendorFactory
 }
 
 // RedfishBaseBMC is the base implementation of the BMC interface for Redfish.
@@ -63,11 +72,6 @@ type RedfishBaseBMC struct {
 	client       *gofish.APIClient
 	options      Options
 	manufacturer string
-}
-
-var clearedBootOverride = schemas.Boot{
-	BootSourceOverrideEnabled: schemas.DisabledBootSourceOverrideEnabled,
-	BootSourceOverrideTarget:  schemas.NoneBootSource,
 }
 
 type InvalidBIOSSettingsError struct {
@@ -112,9 +116,11 @@ func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBase
 }
 
 // NewRedfishBMCClient creates a vendor-specific BMC client by connecting to the
-// Redfish endpoint, detecting the manufacturer, and returning the appropriate
-// vendor-specific struct. The returned BMC interface implementation will have
-// vendor-specific method overrides where needed.
+// Redfish endpoint, detecting the manufacturer, and dispatching through the
+// vendor registry. DefaultVendors() is used as the base and merged with any
+// entries in options.AdditionalVendors (which may override built-ins). If no
+// factory matches the detected manufacturer, the base Redfish implementation
+// is returned.
 func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	base, err := newRedfishBaseBMCClient(ctx, options)
 	if err != nil {
@@ -129,18 +135,45 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 	}
 	base.manufacturer = manufacturer
 
-	switch Manufacturer(manufacturer) {
-	case ManufacturerDell:
-		return &DellRedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerHPE:
-		return &HPERedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerLenovo:
-		return &LenovoRedfishBMC{RedfishBaseBMC: base}, nil
-	case ManufacturerSupermicro:
-		return &SupermicroRedfishBMC{RedfishBaseBMC: base}, nil
-	default:
-		return base, nil
+	vendors := DefaultVendors()
+	for k, v := range options.AdditionalVendors {
+		if v == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", k)
+		}
+		vendors[k] = v
 	}
+	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
+		if factory == nil {
+			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", manufacturer)
+		}
+		client := factory(base)
+		if client == nil {
+			return nil, fmt.Errorf("vendor factory for manufacturer %q returned nil", manufacturer)
+		}
+		return client, nil
+	}
+	log := ctrl.LoggerFrom(ctx)
+	log.Info("No vendor factory registered for manufacturer, using base Redfish implementation", "manufacturer", manufacturer)
+	return base, nil
+}
+
+// Client returns the underlying gofish API client. External vendor
+// implementations that embed *RedfishBaseBMC use this to perform OEM-specific
+// HTTP requests without re-establishing the connection.
+func (r *RedfishBaseBMC) Client() *gofish.APIClient {
+	return r.client
+}
+
+// Options returns the options the client was constructed with.
+func (r *RedfishBaseBMC) Options() Options {
+	return r.options
+}
+
+// Manufacturer returns the manufacturer detected during connect, or the empty
+// string when detection failed (for example because no Systems were exposed
+// during endpoint discovery).
+func (r *RedfishBaseBMC) Manufacturer() Manufacturer {
+	return Manufacturer(r.manufacturer)
 }
 
 // Logout closes the BMC client connection by logging out
@@ -202,6 +235,16 @@ func (r *RedfishBaseBMC) Reset(ctx context.Context, systemURI string, resetType 
 	return nil
 }
 
+// SetIndicatorLED sets the indicator LED state on the system using Redfish.
+func (r *RedfishBaseBMC) SetIndicatorLED(ctx context.Context, systemURI string, state schemas.IndicatorLED) error { //nolint:staticcheck
+	system, err := r.getSystemFromUri(ctx, systemURI)
+	if err != nil {
+		return fmt.Errorf("failed to get system: %w", err)
+	}
+	system.IndicatorLED = state //nolint:staticcheck
+	return system.Update()
+}
+
 // GetSystems get managed systems
 func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	service := r.client.GetService()
@@ -226,65 +269,29 @@ func (r *RedfishBaseBMC) GetSystems(ctx context.Context) ([]Server, error) {
 	return servers, nil
 }
 
-// SetBootOverride sets a Redfish boot source override targeting network boot.
-// With persistent=false it sets BootSourceOverrideEnabled=Once; with
-// persistent=true it sets Continuous, which is preserved across power cycles.
-// When the requested persistent override already matches the current state
-// the call is a no-op.
-func (r *RedfishBaseBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
+// SetBootOverride sets the boot device to network boot for the next system boot
+// using Redfish. Only set BootSourceOverrideMode when the BMC reports it; older
+// BMCs that don't expose it will reject the field.
+func (r *RedfishBaseBMC) SetBootOverride(ctx context.Context, systemURI string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)
 	if err != nil {
 		return fmt.Errorf("failed to get systems: %w", err)
 	}
-	wantEnabled := schemas.OnceBootSourceOverrideEnabled
-	if persistent {
-		wantEnabled = schemas.ContinuousBootSourceOverrideEnabled
-		if system.Boot.BootSourceOverrideEnabled == schemas.ContinuousBootSourceOverrideEnabled &&
-			system.Boot.BootSourceOverrideTarget == schemas.PxeBootSource &&
-			(system.Boot.BootSourceOverrideMode == "" ||
-				system.Boot.BootSourceOverrideMode == schemas.UEFIBootSourceOverrideMode) {
-			return nil
-		}
-	}
 
 	setBoot := schemas.Boot{
-		BootSourceOverrideEnabled: wantEnabled,
+		BootSourceOverrideEnabled: schemas.OnceBootSourceOverrideEnabled,
 		BootSourceOverrideTarget:  schemas.PxeBootSource,
 	}
 	// TODO: cover setting BootSourceOverrideMode with BIOS settings profile
-	// Only set BootSourceOverrideMode when the BMC reports it; older BMCs that
-	// don't expose it will reject the field.
 	if system.Boot.BootSourceOverrideMode != "" && system.Boot.BootSourceOverrideMode != schemas.UEFIBootSourceOverrideMode {
 		setBoot.BootSourceOverrideMode = schemas.UEFIBootSourceOverrideMode
 	}
 
 	// TODO: pass logging context from caller
 	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Setting boot override", "SystemURI", systemURI, "Boot settings", setBoot)
+	log.V(2).Info("Setting PXE boot once", "SystemURI", systemURI, "Boot settings", setBoot)
 	if err := system.SetBoot(&setBoot); err != nil {
-		return fmt.Errorf("failed to set boot override: %w", err)
-	}
-	return nil
-}
-
-// ClearBootOverride disables any active Redfish boot source override so the
-// system uses its persistent boot order on the next power-on. No SetBoot call
-// is issued when the override is already disabled.
-func (r *RedfishBaseBMC) ClearBootOverride(ctx context.Context, systemURI string) error {
-	system, err := r.getSystemFromUri(ctx, systemURI)
-	if err != nil {
-		return fmt.Errorf("failed to get systems: %w", err)
-	}
-	if system.Boot.BootSourceOverrideEnabled == "" ||
-		system.Boot.BootSourceOverrideEnabled == schemas.DisabledBootSourceOverrideEnabled {
-		return nil
-	}
-
-	setBoot := clearedBootOverride
-	log := ctrl.LoggerFrom(ctx)
-	log.V(2).Info("Clearing boot override", "SystemURI", systemURI, "Boot settings", setBoot)
-	if err := system.SetBoot(&setBoot); err != nil {
-		return fmt.Errorf("failed to clear boot override: %w", err)
+		return fmt.Errorf("failed to set the boot order: %w", err)
 	}
 	return nil
 }
@@ -450,16 +457,23 @@ func (r *RedfishBaseBMC) GetBiosAttributeValues(ctx context.Context, systemURI s
 	if err != nil {
 		return nil, err
 	}
+	readOnlyAttr, err := r.getFilteredBiosRegistryAttributes(true, false)
+	if err != nil {
+		return nil, err
+	}
 	result := make(schemas.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
 		if _, ok := filteredAttr[name]; ok {
+			result[name] = bios.Attributes[name]
+		} else if _, ok := readOnlyAttr[name]; ok {
 			result[name] = bios.Attributes[name]
 		}
 	}
 	return result, err
 }
 
-func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, _ string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {
+	attributes := req.Attributes
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -552,11 +566,11 @@ func (r *RedfishBaseBMC) SetBiosAttributesOnReset(ctx context.Context, systemURI
 	return bios.UpdateBiosAttributesApplyAt(attrs, schemas.OnResetSettingsApplyTime)
 }
 
-func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) error {
+func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
-		return nil
+		return nil, nil
 	}
-	return fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
+	return nil, fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
 // SetBootOrder sets bios boot order

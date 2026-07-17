@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
@@ -436,16 +437,13 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		By("Deleting high-priority maintenance")
 		Expect(k8sClient.Delete(ctx, highPriorityMaintenance)).To(Succeed())
 		// check that the high-priority maintenance is deleted before checking the low-priority maintenance
-		Eventually(Get(highPriorityMaintenance)).ShouldNot(Succeed())
-		By("Approving lowPriorityMaintenance on the ServerClaim")
-		Eventually(Update(serverClaim, func() {
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
-		})).Should(Succeed())
-		By("Ensuring low-priority maintenance can proceed afterwards")
+		Eventually(Get(highPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+		By("Ensuring low-priority maintenance can proceed with the existing approval")
 		Eventually(Object(lowPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
 
 		By("Deleting low-priority maintenance")
 		Expect(k8sClient.Delete(ctx, lowPriorityMaintenance)).To(Succeed())
+		Eventually(Get(lowPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
@@ -528,18 +526,14 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting set-priority maintenance")
 		Expect(k8sClient.Delete(ctx, setPriorityMaintenance)).To(Succeed())
-		Eventually(Get(setPriorityMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(setPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 
-		By("Approving lowPriorityMaintenance on the ServerClaim")
-		Eventually(Update(serverClaim, func() {
-			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
-		})).Should(Succeed())
-
-		By("Ensuring unset-priority maintenance can proceed afterwards")
+		By("Ensuring unset-priority maintenance can proceed with the existing approval")
 		Eventually(Object(unsetPriorityMaintenance)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
 
 		By("Deleting unset-priority maintenance")
 		Expect(k8sClient.Delete(ctx, unsetPriorityMaintenance)).To(Succeed())
+		Eventually(Get(unsetPriorityMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
@@ -565,13 +559,256 @@ var _ = Describe("ServerMaintenance Controller", func() {
 
 		By("Deleting the Server before deleting the ServerMaintenance")
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Eventually(Get(server)).ShouldNot(Succeed())
+		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("Deleting the ServerMaintenance")
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Ensuring the ServerMaintenance is fully deleted despite the Server being gone")
-		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should not allow an Enforced maintenance to steal the ref from an already-active maintenance", func(ctx SpecContext) {
+		By("Creating first ServerMaintenance with Enforced policy")
+		serverMaintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-active",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "first-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance01)).To(Succeed())
+
+		By("Waiting for the first ServerMaintenance to reach InMaintenance state")
+		Eventually(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef points to the first maintenance")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Creating second Enforced ServerMaintenance for the same server")
+		serverMaintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-enforced-maintenance-challenger",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "second-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance02)).To(Succeed())
+
+		By("Ensuring the second Enforced maintenance stays Pending and does not steal the ref")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+		Consistently(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending),
+		)
+
+		By("Verifying the first maintenance remains InMaintenance (not evicted to Pending)")
+		Consistently(Object(serverMaintenance01)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Verifying the Server's ServerMaintenanceRef is still held by the first maintenance")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerMaintenanceRef.Name", serverMaintenance01.Name),
+		)
+
+		By("Deleting the first ServerMaintenance to release the server")
+		Expect(k8sClient.Delete(ctx, serverMaintenance01)).To(Succeed())
+		Eventually(Get(serverMaintenance01)).ShouldNot(Succeed())
+
+		By("Verifying the second maintenance can now proceed to InMaintenance")
+		Eventually(Object(serverMaintenance02)).Should(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		)
+
+		By("Deleting the second ServerMaintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance02)).To(Succeed())
+		Eventually(Get(serverMaintenance02)).ShouldNot(Succeed())
+	})
+
+	It("should keep server in Maintenance throughout all queued Enforced maintenances without state bounce", func(ctx SpecContext) {
+		By("Creating two Enforced ServerMaintenance objects")
+		maintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-no-bounce-enforced-01",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		maintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-no-bounce-enforced-02",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyEnforced,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, maintenance01)).To(Succeed())
+		Expect(k8sClient.Create(ctx, maintenance02)).To(Succeed())
+
+		By("Waiting for the first maintenance to be active and server to be in Maintenance")
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", maintenance01.Name))
+		Eventually(Object(maintenance01)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+
+		By("Ensuring the second maintenance is pending while first is active")
+		Eventually(Object(maintenance02)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Completing the first maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance01)).To(Succeed())
+
+		By("Verifying server stays in Maintenance while second maintenance takes over (no state bounce)")
+		Consistently(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", maintenance02.Name))
+		Eventually(Object(maintenance02)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+
+		By("Completing the second maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance02)).To(Succeed())
+		Eventually(Get(maintenance02)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Verifying server exits Maintenance only after all maintenances are done")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		))
+	})
+
+	It("should keep reserved server in Maintenance throughout all queued OwnerApproval maintenances and return to Reserved only after all are done", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating an Ignition secret")
+		ignitionSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Data: map[string][]byte{"foo": []byte("bar")},
+		}
+		Expect(k8sClient.Create(ctx, ignitionSecret)).To(Succeed())
+		DeferCleanup(k8sClient.Delete, ignitionSecret)
+
+		By("Creating a ServerClaim to reserve the server")
+		serverClaim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:             powerOpOff,
+				ServerRef:         &corev1.LocalObjectReference{Name: server.Name},
+				IgnitionSecretRef: &corev1.LocalObjectReference{Name: ignitionSecret.Name},
+				Image:             "foo:latest",
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverClaim)).To(Succeed())
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.ServerClaimRef.Name", serverClaim.Name),
+		))
+
+		By("Creating two OwnerApproval ServerMaintenance objects")
+		maintenance01 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-no-bounce-approval-01",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				Priority:    10,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		maintenance02 := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-no-bounce-approval-02",
+				Namespace: ns.Name,
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:   &corev1.LocalObjectReference{Name: server.Name},
+				Policy:      metalv1alpha1.ServerMaintenancePolicyOwnerApproval,
+				Priority:    5,
+				ServerPower: metalv1alpha1.PowerOff,
+			},
+		}
+		Expect(k8sClient.Create(ctx, maintenance01)).To(Succeed())
+		Expect(k8sClient.Create(ctx, maintenance02)).To(Succeed())
+		Eventually(Object(maintenance01)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+		Eventually(Object(maintenance02)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Approving maintenance on the ServerClaim (single approval covers all queued maintenances)")
+		Eventually(Update(serverClaim, func() {
+			metautils.SetLabel(serverClaim, metalv1alpha1.ServerMaintenanceApprovedLabelKey, trueValue)
+		})).Should(Succeed())
+
+		By("Ensuring the higher-priority maintenance starts first")
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", maintenance01.Name))
+		Eventually(Object(maintenance01)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+		Consistently(Object(maintenance02)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStatePending))
+
+		By("Completing the first maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance01)).To(Succeed())
+		Eventually(Get(maintenance01)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Verifying server stays in Maintenance while second maintenance takes over (no bounce to Reserved)")
+		Consistently(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateMaintenance))
+		Eventually(Object(server)).Should(HaveField("Spec.ServerMaintenanceRef.Name", maintenance02.Name))
+		Eventually(Object(maintenance02)).Should(HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance))
+
+		By("Completing the second maintenance")
+		Expect(k8sClient.Delete(ctx, maintenance02)).To(Succeed())
+		Eventually(Get(maintenance02)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Verifying server returns to Reserved only after all maintenances are done")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.ServerMaintenanceRef", BeNil()),
+		))
+
+		By("Verifying approval and maintenance-needed labels are cleaned up on the ServerClaim")
+		Eventually(Object(serverClaim)).Should(SatisfyAll(
+			HaveField("ObjectMeta.Labels", Not(HaveKey(metalv1alpha1.ServerMaintenanceApprovedLabelKey))),
+			HaveField("ObjectMeta.Labels", Not(HaveKey(metalv1alpha1.ServerMaintenanceNeededLabelKey))),
+		))
+
+		By("Deleting the ServerClaim")
+		Expect(k8sClient.Delete(ctx, serverClaim)).To(Succeed())
 	})
 
 	It("should skip cleanup and remove finalizer when no finalizer is present on deletion", func(ctx SpecContext) {
@@ -611,6 +848,51 @@ var _ = Describe("ServerMaintenance Controller", func() {
 		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
 
 		By("Ensuring the ServerMaintenance is deleted immediately without cleanup side-effects")
-		Eventually(Get(serverMaintenance)).ShouldNot(Succeed())
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
+	It("should set the LocatorLED on maintenance start and turn it off when maintenance ends", func(ctx SpecContext) {
+		By("Patching server to Available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Creating a ServerMaintenance with LocatorLED Lit")
+		serverMaintenance := &metalv1alpha1.ServerMaintenance{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-server-maintenance-led",
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					metalv1alpha1.ServerMaintenanceReasonAnnotationKey: "test-led-maintenance",
+				},
+			},
+			Spec: metalv1alpha1.ServerMaintenanceSpec{
+				ServerRef:  &corev1.LocalObjectReference{Name: server.Name},
+				Policy:     metalv1alpha1.ServerMaintenancePolicyEnforced,
+				LocatorLED: metalv1alpha1.LitIndicatorLED,
+			},
+		}
+		Expect(k8sClient.Create(ctx, serverMaintenance)).To(Succeed())
+
+		By("Checking the ServerMaintenance transitions to InMaintenance")
+		Eventually(Object(serverMaintenance)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerMaintenanceStateInMaintenance),
+		))
+
+		By("Checking that the server LocatorLED is set to Lit")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.IndicatorLED", metalv1alpha1.LitIndicatorLED),
+		))
+
+		By("Deleting the ServerMaintenance to end maintenance")
+		Expect(k8sClient.Delete(ctx, serverMaintenance)).To(Succeed())
+
+		By("Checking that the server LocatorLED is cleared to Off")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Spec.IndicatorLED", metalv1alpha1.OffIndicatorLED),
+		))
+
+		By("Waiting for ServerMaintenance to be fully removed")
+		Eventually(Get(serverMaintenance)).Should(Satisfy(apierrors.IsNotFound))
 	})
 })

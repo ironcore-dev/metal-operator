@@ -23,6 +23,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -41,6 +42,7 @@ type BMCVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -259,10 +261,17 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	var warnings []string
 	for _, bmcVersion := range bmcVersionList.Items {
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
-			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-				log.V(1).Info("Waiting for BMCVersion to move out of InProgress state", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
-				warnings = append(warnings, fmt.Sprintf("BMCVersion %s is still in progress, skipping deletion", bmcVersion.Name))
-				continue
+			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
+				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+				if err != nil {
+					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCVersion %s: %w", bmcVersion.Name, err))
+					continue
+				}
+				if active {
+					log.V(1).Info("Waiting for BMCVersion maintenance to complete before deletion", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
+					warnings = append(warnings, fmt.Sprintf("BMCVersion %s is under active maintenance, skipping deletion", bmcVersion.Name))
+					continue
+				}
 			}
 			if err := r.Delete(ctx, &bmcVersion); err != nil {
 				errs = append(errs, err)

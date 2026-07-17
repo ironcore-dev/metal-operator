@@ -635,7 +635,7 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `bmcUUID` _string_ | BMCUUID is the unique identifier for the BMC as defined in Redfish API. |  | Optional: \{\} <br /> |
-| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC. |  | Optional: \{\} <br /> |
+| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.<br />Deprecated: The Endpoint resource is deprecated. Specify the network access inline via<br />access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an<br />Endpoint object. |  | Optional: \{\} <br /> |
 | `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint specifies inline network access details for the BMC. |  | Optional: \{\} <br /> |
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
@@ -984,6 +984,10 @@ _Appears in:_
 
 Endpoint is the Schema for the endpoints API
 
+Deprecated: The Endpoint resource is deprecated. Model the same information
+inline via BMC.spec.access (an InlineEndpoint carrying the MAC address and IP)
+instead of creating a separate Endpoint object.
+
 
 
 
@@ -1129,6 +1133,7 @@ IndicatorLED represents LED indicator states
 
 
 _Appears in:_
+- [ServerMaintenanceSpec](#servermaintenancespec)
 - [ServerSpec](#serverspec)
 - [ServerStatus](#serverstatus)
 
@@ -1539,6 +1544,7 @@ _Appears in:_
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed. |  | Optional: \{\} <br /> |
 | `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
 | `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
+| `userDataRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | UserDataRef references a Secret in the same namespace as this ServerClaim<br />containing user-data exposed to the claimed server via the metaldata<br />service. The referenced Secret must be of type metal.ironcore.dev/user-data. |  |  |
 | `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
 | `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  |  |
 
@@ -1635,6 +1641,7 @@ _Appears in:_
 | `policy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | Policy specifies the maintenance policy to be enforced on the server. |  |  |
 | `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to the server that is to be maintained. |  |  |
 | `serverPower` _[Power](#power)_ | ServerPower specifies the power state of the server during maintenance. |  |  |
+| `locatorLED` _[IndicatorLED](#indicatorled)_ | LocatorLED specifies the desired state of the server's locator LED during maintenance.<br />When maintenance ends, the locator LED is turned off. |  |  |
 | `priority` _integer_ | Priority determines ordering when multiple ServerMaintenance resources target the same server.<br />Higher values are processed first. If priorities are equal, older resources are processed first.<br />If omitted, priority is treated as 0. | 0 |  |
 | `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance. |  |  |
 

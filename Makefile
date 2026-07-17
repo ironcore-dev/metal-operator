@@ -3,6 +3,7 @@
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
 BMCTOOLS_IMG   ?= bmctools:latest
+METALDATA_IMG  ?= metaldata:latest
 
 # Docker image name for the mkdocs based local development setup
 IMAGE=ironcore-dev/metal-operator-docs
@@ -180,7 +181,7 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
-docker-build: docker-build-controller-manager docker-build-metalprobe
+docker-build: docker-build-controller-manager docker-build-metalprobe docker-build-metaldata
 
 .PHONY: docker-build-controller-manager
 docker-build-controller-manager: ## Build controller-manager.
@@ -194,11 +195,16 @@ docker-build-metalprobe: ## Build metalprobe.
 docker-build-bmctools: ## Build bmctools.
 	docker build --target bmctools -t ${BMCTOOLS_IMG} .
 
+.PHONY: docker-build-metaldata
+docker-build-metaldata: ## Build metaldata.
+	docker build --target metaldata -t ${METALDATA_IMG} .
+
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMG}
 	$(CONTAINER_TOOL) push ${METALPROBE_IMG}
 	$(CONTAINER_TOOL) push ${BMCTOOLS_IMG}
+	$(CONTAINER_TOOL) push ${METALDATA_IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple
 # architectures. (i.e. make docker-buildx IMG=myregistry/mypoperator:0.0.1). To use this option you need to:
@@ -240,11 +246,13 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	cd config/metaldata && "$(KUSTOMIZE)" edit set image metaldata=${METALDATA_IMG}
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" apply -f -
 
 .PHONY: e2e-deploy
 e2e-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	cd config/metaldata && "$(KUSTOMIZE)" edit set image metaldata=${METALDATA_IMG}
 	"$(KUSTOMIZE)" build config/e2e-metrics-validation | "$(KUBECTL)" apply -f -
 
 .PHONY: undeploy
@@ -391,15 +399,15 @@ $(YQ): $(LOCALBIN)
 # $2 - package url which can be installed
 # $3 - specific version of package
 define go-install-tool
-@[ -f "$(1)-$(3)" ] || { \
+@[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
-rm -f "$(1)" || true ;\
+rm -f "$(1)" ;\
 GOBIN="$(LOCALBIN)" go install "$${package}" ;\
-mv "$(1)" "$(1)-$(3)" ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
 } ;\
-ln -sf "$(1)-$(3)" "$(1)"
+ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
 endef
 
 ## --------------------------------------

@@ -13,7 +13,8 @@ import (
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
+	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	"github.com/stmcginnis/gofish"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
@@ -68,28 +69,27 @@ func (r *BMCVersionReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 func (r *BMCVersionReconciler) reconcileExists(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, bmcVersion) {
+	ok, err := r.shouldDelete(ctx, bmcVersion)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if ok {
 		return r.delete(ctx, bmcVersion)
 	}
 	return r.reconcile(ctx, bmcVersion)
 }
 
-func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) bool {
-	log := ctrl.LoggerFrom(ctx)
-	if bmcVersion.DeletionTimestamp.IsZero() {
-		return false
-	}
-
-	if controllerutil.ContainsFinalizer(bmcVersion, bmcVersionFinalizer) &&
-		bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
-			log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcVersion.Spec.BMCRef.Name)
-			return true
+func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (bool, error) {
+	isProgressing := func() (bool, error) {
+		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
+			return false, nil
 		}
-		log.V(1).Info("Postponing deletion as BMC version update is in progress")
-		return false
+		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 	}
-	return true
+	return shouldProceedWithDeletion(ctx, bmcVersion, bmcVersionFinalizer, isProgressing)
 }
 
 func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1alpha1.BMCVersion) (ctrl.Result, error) {
@@ -99,9 +99,15 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 		return ctrl.Result{}, nil
 	}
 
-	if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress {
-		log.V(1).Info("Skipping delete as version update is in progress")
-		return r.reconcile(ctx, bmcVersion)
+	if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			log.V(1).Info("Skipping delete as BMCVersion is under active maintenance")
+			return r.reconcile(ctx, bmcVersion)
+		}
 	}
 
 	log.V(1).Info("Ensuring that the finalizer is removed")

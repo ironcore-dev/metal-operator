@@ -704,6 +704,12 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to set up ready check")
 		os.Exit(1)
 	}
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := mgr.AddReadyzCheck("webhook", mgr.GetWebhookServer().StartedChecker()); err != nil {
+			setupLog.Error(err, "Failed to set up webhook ready check")
+			os.Exit(1)
+		}
+	}
 
 	ctx := ctrl.SetupSignalHandler()
 	if err := controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer()); err != nil {

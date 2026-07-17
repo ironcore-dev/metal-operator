@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 // log is for logging in this package.
@@ -53,14 +54,18 @@ func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *met
 func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
 	bmcversionlog.Info("Validation for BMCVersion upon update", "name", newObj.GetName())
 
-	if oldObj.Status.State == metalv1alpha1.BMCVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRefs != nil {
-		err := fmt.Errorf("BMCVersion (%v) is in progress, unable to update %v",
-			oldObj.Name,
-			newObj.Name)
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
-			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	// Block updates while any referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceUpdateInProgress(newObj) && len(oldObj.Spec.ServerMaintenanceRefs) > 0 {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, oldObj.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			msg := fmt.Errorf("BMCVersion %s is under active maintenance, unable to update", oldObj.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
+				newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), msg.Error())})
+		}
 	}
 
 	bmcVersionList := &metalv1alpha1.BMCVersionList{}
@@ -75,17 +80,15 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
 	bmcversionlog.Info("Validation for BMCVersion upon deletion", "name", obj.GetName())
 
-	bv := &metalv1alpha1.BMCVersion{}
-	err := v.Client.Get(ctx, client.ObjectKey{
-		Name:      obj.GetName(),
-		Namespace: obj.GetNamespace(),
-	}, bv)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get BMCVersion: %w", err)
-	}
-
-	if bv.Status.State == metalv1alpha1.BMCVersionStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, apierrors.NewBadRequest("Unable to delete BMCVersion as it is in progress")
+	// Block deletion while any referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceDeleteInProgress(obj) && len(obj.Spec.ServerMaintenanceRefs) > 0 {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, obj.Spec.ServerMaintenanceRefs)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			return nil, apierrors.NewBadRequest("BMCVersion is under active maintenance, unable to delete")
+		}
 	}
 
 	return nil, nil

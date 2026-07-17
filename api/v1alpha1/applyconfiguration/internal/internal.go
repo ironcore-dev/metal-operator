@@ -1141,6 +1141,9 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Toleration
           elementRelationship: atomic
+    - name: userDataRef
+      type:
+        namedType: io.k8s.api.core.v1.LocalObjectReference
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimStatus
   map:
     fields:
@@ -1176,6 +1179,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
   map:
     fields:
+    - name: locatorLED
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
     - name: policy
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy

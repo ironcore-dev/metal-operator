@@ -36,5 +36,6 @@
         }
     },
     "@odata.id": "/redfish/v1/UpdateService",
+    "@odata.etag": "W/\"A1B2C3D4\"",
     "@Redfish.Copyright": "Copyright 2014-2023 DMTF. For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright."
 }

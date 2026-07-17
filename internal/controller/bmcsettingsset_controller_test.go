@@ -14,7 +14,7 @@ import (
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -732,6 +732,14 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			HaveField("Status.State", metalv1alpha1.BMCSettingsStateFailed),
 			HaveField("Status.FailedAttempts", Equal(int32(failedAutoRetryCount))),
 		))
+
+		By("Ensuring BMCSettingsSet has a stable view of bmc01 before triggering retry")
+		Eventually(Object(bmcSettingsSet)).Should(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+		)
+		Consistently(Object(bmcSettingsSet), "200ms").Should(
+			HaveField("Status.FullyLabeledBMCs", BeNumerically("==", 1)),
+		)
 
 		By("Updating the BMCSettingsSet with retry annotation")
 		Eventually(Update(bmcSettingsSet, func() {

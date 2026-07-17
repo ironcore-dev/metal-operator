@@ -201,7 +201,8 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 
 // --- BMC interface method overrides ---
 
-func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, bmcUUID string, attributes map[string]string) (schemas.SettingsAttributes, error) {
+func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {
+	attributes := req.Attributes
 	if len(attributes) == 0 {
 		return nil, nil
 	}
@@ -348,19 +349,19 @@ func (r *DellRedfishBMC) GetBMCPendingAttributeValues(ctx context.Context, bmcUU
 	return mergedPendingBMCAttributes, nil
 }
 
-func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) error {
+func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	manager, err := r.getManagerForOEM()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	bmcAttrValues, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	payloads := make(map[string]schemas.SettingsAttributes, len(bmcAttrValues))
@@ -415,10 +416,10 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 			}
 		}
 		if len(errs) > 0 {
-			return fmt.Errorf("some settings failed to apply %v", errs)
+			return nil, fmt.Errorf("some settings failed to apply %v", errs)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
 func (r *DellRedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs schemas.SettingsAttributes) (bool, error) {

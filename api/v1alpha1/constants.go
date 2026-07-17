@@ -3,7 +3,11 @@
 
 package v1alpha1
 
-import "github.com/stmcginnis/gofish/schemas"
+import (
+	v1 "k8s.io/api/core/v1"
+
+	"github.com/stmcginnis/gofish/schemas"
+)
 
 // establishing general rule for constants naming for Annotations
 // "Key" for Annotation constants should be named OperationAnnotation.
@@ -51,7 +55,22 @@ const (
 
 	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
+
+	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
+	// whose suffix is exposed via the metaldata service to the booted server.
+	MetadataKeyPrefix = "metadata.metal.ironcore.dev/"
+
+	// MetadataFlavorHeader is the HTTP header the metaldata service requires on
+	// every request, mirroring GCE/GCP metadata server conventions.
+	MetadataFlavorHeader = "Metadata-Flavor"
+
+	// MetadataFlavorValue is the expected value for MetadataFlavorHeader.
+	MetadataFlavorValue = "IronCore Metal"
 )
+
+// SecretTypeUserData is the Secret type required for Secrets referenced by
+// ServerClaim.Spec.UserDataRef.
+const SecretTypeUserData v1.SecretType = "metal.ironcore.dev/user-data"
 
 const (
 	// GracefulShutdownServerPower indicates to gracefully restart the baremetal server power.

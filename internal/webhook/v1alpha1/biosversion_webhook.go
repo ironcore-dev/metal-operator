@@ -16,6 +16,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 // nolint:unused
@@ -54,14 +55,18 @@ func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *me
 func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	versionLog.Info("Validation for BIOSVersion upon update", "name", newObj.GetName())
 
-	if oldObj.Status.State == metalv1alpha1.BIOSVersionStateInProgress &&
-		!ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
-		err := fmt.Errorf("BIOSVersion (%v) is in progress, unable to update %v",
-			oldObj.Name,
-			newObj.Name)
-		return nil, apierrors.NewInvalid(
-			schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
-			newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), err.Error())})
+	// Block updates while the referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceUpdateInProgress(newObj) && oldObj.Spec.ServerMaintenanceRef != nil {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*oldObj.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			msg := fmt.Errorf("BIOSVersion %s is under active maintenance, unable to update", oldObj.Name)
+			return nil, apierrors.NewInvalid(
+				schema.GroupKind{Group: newObj.GroupVersionKind().Group, Kind: newObj.Kind},
+				newObj.GetName(), field.ErrorList{field.Forbidden(field.NewPath("spec"), msg.Error())})
+		}
 	}
 
 	versions := &metalv1alpha1.BIOSVersionList{}
@@ -76,8 +81,15 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 func (v *BIOSVersionCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	versionLog.Info("Validation for BIOSVersion upon deletion", "name", obj.GetName())
 
-	if obj.Status.State == metalv1alpha1.BIOSVersionStateInProgress && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, apierrors.NewBadRequest("The BIOS version is in progress and cannot be deleted")
+	// Block deletion while the referenced ServerMaintenance is InMaintenance.
+	if !ShouldAllowForceDeleteInProgress(obj) && obj.Spec.ServerMaintenanceRef != nil {
+		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, v.Client, []metalv1alpha1.ObjectReference{*obj.Spec.ServerMaintenanceRef})
+		if err != nil {
+			return nil, fmt.Errorf("failed to check maintenance state: %w", err)
+		}
+		if active {
+			return nil, apierrors.NewBadRequest("BIOSVersion is under active maintenance, unable to delete")
+		}
 	}
 	return nil, nil
 }

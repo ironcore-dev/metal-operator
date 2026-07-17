@@ -17,6 +17,10 @@ type BMCSpecApplyConfiguration struct {
 	// BMCUUID is the unique identifier for the BMC as defined in Redfish API.
 	BMCUUID *string `json:"bmcUUID,omitempty"`
 	// EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.
+	//
+	// Deprecated: The Endpoint resource is deprecated. Specify the network access inline via
+	// access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an
+	// Endpoint object.
 	EndpointRef *v1.LocalObjectReference `json:"endpointRef,omitempty"`
 	// Endpoint specifies inline network access details for the BMC.
 	Endpoint *InlineEndpointApplyConfiguration `json:"access,omitempty"`

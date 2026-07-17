@@ -40,9 +40,6 @@ type BIOSVersionCustomValidator struct {
 	client.Client
 }
 
-// biosVersionDeprecationWarning is the admission warning surfaced on BIOSVersion create/update.
-const biosVersionDeprecationWarning = "BIOSVersion is deprecated"
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
 func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BIOSVersion) (admission.Warnings, error) {
 	versionLog.Info("Validation for BIOSVersion upon creation", "name", obj.GetName())
@@ -54,7 +51,7 @@ func (v *BIOSVersionCustomValidator) ValidateCreate(ctx context.Context, obj *me
 	if err := checkForDuplicateBIOSVersionRefToServer(versions, obj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{biosVersionDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -83,7 +80,7 @@ func (v *BIOSVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	if err := checkForDuplicateBIOSVersionRefToServer(versions, newObj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{biosVersionDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSVersion.
@@ -116,7 +113,8 @@ func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersion
 			continue
 		}
 		if version.Spec.ServerRef.Name == bv.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
+			fldErr := field.Duplicate(field.NewPath("spec").Child("serverRef").Child("name"), version.Spec.ServerRef.Name)
+			fldErr.Detail = fmt.Sprintf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
 				version.Spec.ServerRef.Name,
 				version.Name,
 				bv.Spec.ServerRef.Name,
@@ -124,7 +122,7 @@ func checkForDuplicateBIOSVersionRefToServer(versions *metalv1alpha1.BIOSVersion
 			)
 			return apierrors.NewInvalid(
 				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
-				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef").Child("name"), err)})
+				version.GetName(), field.ErrorList{fldErr})
 		}
 	}
 	return nil

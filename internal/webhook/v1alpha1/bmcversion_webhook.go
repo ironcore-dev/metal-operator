@@ -40,9 +40,6 @@ type BMCVersionCustomValidator struct {
 	Client client.Client
 }
 
-// bmcVersionDeprecationWarning is the admission warning surfaced on BMCVersion create/update.
-const bmcVersionDeprecationWarning = "BMCVersion is deprecated"
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
 func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCVersion) (admission.Warnings, error) {
 	bmcversionlog.Info("Validation for BMCVersion upon creation", "name", obj.GetName())
@@ -53,7 +50,7 @@ func (v *BMCVersionCustomValidator) ValidateCreate(ctx context.Context, obj *met
 	if err := checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, obj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{bmcVersionDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -82,7 +79,7 @@ func (v *BMCVersionCustomValidator) ValidateUpdate(ctx context.Context, oldObj, 
 	if err := checkForDuplicateBMCVersionsRefToBMC(bmcVersionList, newObj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{bmcVersionDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCVersion.
@@ -109,14 +106,15 @@ func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionL
 			continue
 		}
 		if v.Spec.BMCRef.Name == version.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+			fldErr := field.Duplicate(field.NewPath("spec").Child("bmcRef"), version.Spec.BMCRef.Name)
+			fldErr.Detail = fmt.Sprintf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
 				version.Spec.BMCRef.Name,
 				version.Name,
 				v.Spec.BMCRef.Name,
 				v.Name)
 			return apierrors.NewInvalid(
 				schema.GroupKind{Group: version.GroupVersionKind().Group, Kind: version.Kind},
-				version.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
+				version.GetName(), field.ErrorList{fldErr})
 		}
 	}
 	return nil

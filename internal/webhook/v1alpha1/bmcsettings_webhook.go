@@ -42,9 +42,6 @@ type BMCSettingsCustomValidator struct {
 	Client client.Client
 }
 
-// bmcSettingsDeprecationWarning is the admission warning surfaced on BMCSettings create/update.
-const bmcSettingsDeprecationWarning = "BMCSettings is deprecated"
-
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
 func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
 	bmcsettingslog.Info("Validation for BMCSettings upon creation", "name", obj.GetName())
@@ -56,7 +53,7 @@ func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *me
 	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{bmcSettingsDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -90,7 +87,7 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj); err != nil {
 		return nil, err
 	}
-	return admission.Warnings{bmcSettingsDeprecationWarning}, nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -123,14 +120,15 @@ func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSetting
 			continue
 		}
 		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+			fldErr := field.Duplicate(field.NewPath("spec").Child("bmcRef"), settings.Spec.BMCRef.Name)
+			fldErr.Detail = fmt.Sprintf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
 				settings.Spec.BMCRef.Name,
 				settings.Name,
 				bs.Spec.BMCRef.Name,
 				bs.Name)
 			return apierrors.NewInvalid(
 				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
+				settings.GetName(), field.ErrorList{fldErr})
 		}
 	}
 	return nil

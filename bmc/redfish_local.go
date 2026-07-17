@@ -260,16 +260,14 @@ func (r *RedfishLocalBMC) CheckBMCPendingComponentUpgrade(_ context.Context, _ C
 	return false, nil
 }
 
-// SetBootOverride sets the network-boot override and, for one-shot overrides
-// only, simulates probe registration by posting dummy network data to the
-// configured registryURL in a background goroutine. The persistent override
-// path skips the registration simulation since maintenance flows do not go
-// through discovery.
-func (r *RedfishLocalBMC) SetBootOverride(ctx context.Context, systemURI string, persistent bool) error {
-	if err := r.RedfishBaseBMC.SetBootOverride(ctx, systemURI, persistent); err != nil {
+// SetBootOverride sets the boot device for the next system boot using Redfish.
+// When a registryURL is configured, it additionally simulates probe registration
+// by posting dummy network data to the registry in a background goroutine.
+func (r *RedfishLocalBMC) SetBootOverride(ctx context.Context, systemURI string) error {
+	if err := r.RedfishBaseBMC.SetBootOverride(ctx, systemURI); err != nil {
 		return err
 	}
-	if persistent || r.registryURL == "" {
+	if r.registryURL == "" {
 		return nil
 	}
 	go func() {

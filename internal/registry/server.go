@@ -160,7 +160,7 @@ func (s *Server) validateDiscoveryToken(ctx context.Context, receivedToken strin
 	}
 
 	// Verify the signed token
-	systemUUID, timestamp, valid, err := metaltoken.VerifySignedDiscoveryToken(secret, receivedToken)
+	systemUUID, timestamp, valid, err := metaltoken.VerifySignedDiscoveryToken(secret, metaltoken.DefaultSigningMethod, receivedToken)
 	if err != nil || !valid {
 		// Token validation failed - could be due to secret rotation
 		// Clear cache and retry once with fresh secret
@@ -177,7 +177,7 @@ func (s *Server) validateDiscoveryToken(ctx context.Context, receivedToken strin
 			return "", false
 		}
 
-		systemUUID, timestamp, valid, err = metaltoken.VerifySignedDiscoveryToken(secret, receivedToken)
+		systemUUID, timestamp, valid, err = metaltoken.VerifySignedDiscoveryToken(secret, metaltoken.DefaultSigningMethod, receivedToken)
 		if err != nil {
 			s.log.Error(err, "Error verifying discovery token after retry")
 			return "", false

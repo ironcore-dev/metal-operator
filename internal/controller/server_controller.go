@@ -800,7 +800,8 @@ func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, se
 	}
 
 	// Generate signed discovery token
-	discoveryToken, err := metaltoken.GenerateSignedDiscoveryToken(signingSecret, server.Spec.SystemUUID, r.DiscoveryTokenExpiry)
+	discoveryToken, err := metaltoken.GenerateSignedDiscoveryToken(
+		signingSecret, metaltoken.DefaultSigningMethod, server.Spec.SystemUUID, r.DiscoveryTokenExpiry)
 	if err != nil {
 		return fmt.Errorf("failed to generate discovery token: %w", err)
 	}

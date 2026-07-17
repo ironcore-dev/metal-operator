@@ -33,7 +33,7 @@ func getSignedDiscoveryToken(ctx SpecContext, k8sClient client.Client, ns, syste
 		return "", fmt.Errorf("invalid signing secret")
 	}
 
-	return metaltoken.GenerateSignedDiscoveryToken(signingKey, systemUUID, time.Hour)
+	return metaltoken.GenerateSignedDiscoveryToken(signingKey, metaltoken.DefaultSigningMethod, systemUUID, time.Hour)
 }
 
 var _ = Describe("Variable templating", func() {

@@ -15,6 +15,12 @@ import (
 // uuidRegex matches RFC 4122 UUID format (8-4-4-4-12 hex digits)
 var uuidRegex = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
+// DefaultSigningMethod is the JWT signing method used for discovery tokens.
+// HMAC-SHA256 (HS256) is a symmetric algorithm that fits the shared-secret
+// model between the controller and the registry. It is passed explicitly to
+// the token functions so it can be swapped without touching call sites.
+var DefaultSigningMethod jwt.SigningMethod = jwt.SigningMethodHS256
+
 // GenerateSigningSecret generates a cryptographically secure signing secret
 // for HMAC token generation. Returns a 32-byte (256-bit) secret.
 func GenerateSigningSecret() ([]byte, error) {
@@ -32,10 +38,16 @@ func GenerateSigningSecret() ([]byte, error) {
 // for a specific systemUUID without storing any state.
 //
 // signingSecret: 32-byte shared secret between controller and registry
+// signingMethod: the JWT signing method to use (e.g. token.DefaultSigningMethod)
 // systemUUID: The server's system UUID (must be RFC 4122 format)
 // expiry: how long the token should be valid for
 // Returns: signed JWT token
-func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string, expiry time.Duration) (string, error) {
+func GenerateSignedDiscoveryToken(
+	signingSecret []byte,
+	signingMethod jwt.SigningMethod,
+	systemUUID string,
+	expiry time.Duration,
+) (string, error) {
 	if len(signingSecret) != 32 {
 		return "", fmt.Errorf("signing secret must be exactly 32 bytes")
 	}
@@ -52,8 +64,8 @@ func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string, expir
 		"exp": jwt.NewNumericDate(time.Now().Add(expiry)),
 	}
 
-	// Create token with HS256 signing method
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// Create token with the configured signing method
+	token := jwt.NewWithClaims(signingMethod, claims)
 
 	// Sign token with secret key
 	tokenString, err := token.SignedString(signingSecret)
@@ -67,15 +79,22 @@ func GenerateSignedDiscoveryToken(signingSecret []byte, systemUUID string, expir
 // VerifySignedDiscoveryToken verifies and extracts information from a JWT token.
 // Returns (systemUUID, timestamp, valid, error).
 // For invalid tokens, returns ("", 0, false, nil) - error is only for system errors.
-func VerifySignedDiscoveryToken(signingSecret []byte, tokenString string) (string, int64, bool, error) {
+//
+// signingMethod must match the method used to generate the token
+// (e.g. token.DefaultSigningMethod); tokens signed with any other method are rejected.
+func VerifySignedDiscoveryToken(
+	signingSecret []byte,
+	signingMethod jwt.SigningMethod,
+	tokenString string,
+) (string, int64, bool, error) {
 	if len(signingSecret) != 32 {
 		return "", 0, false, fmt.Errorf("signing secret must be exactly 32 bytes")
 	}
 
 	// Parse and validate JWT token
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (any, error) {
-		// Verify signing method is exactly HS256 (HMAC-SHA256)
-		if token.Method != jwt.SigningMethodHS256 {
+		// Verify the signing method matches exactly to prevent algorithm confusion attacks
+		if token.Method != signingMethod {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return signingSecret, nil

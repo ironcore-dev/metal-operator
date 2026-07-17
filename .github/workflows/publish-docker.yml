@@ -28,6 +28,8 @@ jobs:
           target: manager
         - name: metalprobe
           target: probe
+        - name: metaldata
+          target: metaldata
     permissions:
       contents: read
       packages: write

@@ -17,7 +17,11 @@ import (
 // EndpointApplyConfiguration represents a declarative configuration of the Endpoint type for use
 // with apply.
 //
-// Endpoint is the Schema for the endpoints API
+// # Endpoint is the Schema for the endpoints API
+//
+// Deprecated: The Endpoint resource is deprecated. Model the same information
+// inline via BMC.spec.access (an InlineEndpoint carrying the MAC address and IP)
+// instead of creating a separate Endpoint object.
 type EndpointApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

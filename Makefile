@@ -246,11 +246,13 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 .PHONY: deploy
 deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	cd config/metaldata && "$(KUSTOMIZE)" edit set image metaldata=${METALDATA_IMG}
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" apply -f -
 
 .PHONY: e2e-deploy
 e2e-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && "$(KUSTOMIZE)" edit set image controller=${CONTROLLER_IMG}
+	cd config/metaldata && "$(KUSTOMIZE)" edit set image metaldata=${METALDATA_IMG}
 	"$(KUSTOMIZE)" build config/e2e-metrics-validation | "$(KUBECTL)" apply -f -
 
 .PHONY: undeploy
@@ -397,15 +399,15 @@ $(YQ): $(LOCALBIN)
 # $2 - package url which can be installed
 # $3 - specific version of package
 define go-install-tool
-@[ -f "$(1)-$(3)" ] || { \
+@[ -f "$(1)-$(3)" ] && [ "$$(readlink -- "$(1)" 2>/dev/null)" = "$(1)-$(3)" ] || { \
 set -e; \
 package=$(2)@$(3) ;\
 echo "Downloading $${package}" ;\
-rm -f "$(1)" || true ;\
+rm -f "$(1)" ;\
 GOBIN="$(LOCALBIN)" go install "$${package}" ;\
-mv "$(1)" "$(1)-$(3)" ;\
+mv "$(LOCALBIN)/$$(basename "$(1)")" "$(1)-$(3)" ;\
 } ;\
-ln -sf "$(1)-$(3)" "$(1)"
+ln -sf "$$(realpath "$(1)-$(3)")" "$(1)"
 endef
 
 ## --------------------------------------

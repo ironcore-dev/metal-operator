@@ -8,7 +8,7 @@ import (
 	"fmt"
 
 	"github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/bmcutils"
+	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

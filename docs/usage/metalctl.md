@@ -49,7 +49,7 @@ A cordoned server will not receive new [`ServerClaim`](/concepts/serverclaims) b
 unaffected. See [Cordoning](/concepts/servers#cordoning) for details.
 
 ```bash
-metalctl cordon server my-server
+metalctl cordon my-server
 ```
 
 This is equivalent to `kubectl patch server my-server --type=merge -p '{"spec":{"unclaimable":true}}'` but provides a
@@ -61,7 +61,7 @@ The `metalctl uncordon` command reverses a cordon by setting `spec.unclaimable` 
 to the claimable pool so pending [`ServerClaim`](/concepts/serverclaims)s can bind to it again.
 
 ```bash
-metalctl uncordon server my-server
+metalctl uncordon my-server
 ```
 
 Both `cordon` and `uncordon` accept the standard `--kubeconfig` and `--context` flags to select the target cluster, and

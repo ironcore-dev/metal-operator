@@ -151,13 +151,13 @@ spec:
 Cordon a server for manual maintenance using [`metalctl`](../usage/metalctl.md#cordon):
 
 ```bash
-metalctl cordon server my-server
+metalctl cordon my-server
 ```
 
 Uncordon a server to return it to the claimable pool:
 
 ```bash
-metalctl uncordon server my-server
+metalctl uncordon my-server
 ```
 
 Both commands accept `--kubeconfig`/`--context` to select the target cluster and `--dry-run` to preview the patch

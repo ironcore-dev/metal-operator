@@ -21,53 +21,38 @@ var (
 	cordonDryRun      bool
 )
 
-// NewCordonCommand returns the `metalctl cordon` command that marks a resource as
+// NewCordonCommand returns the `metalctl cordon` command that marks a Server as
 // unclaimable, preventing new ServerClaims from binding to it.
 func NewCordonCommand() *cobra.Command {
-	cordonCmd := &cobra.Command{
-		Use:   "cordon",
-		Short: "Mark a resource as unclaimable",
-		Args:  cobra.NoArgs,
-	}
-	cordonCmd.AddCommand(newCordonServerCommand(true))
-
-	cordonCmd.PersistentFlags().StringVar(&cordonKubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
-	cordonCmd.PersistentFlags().StringVar(&cordonKubeContext, "context", "", "Name of the kubeconfig context to use.")
-	cordonCmd.PersistentFlags().BoolVar(&cordonDryRun, "dry-run", false,
-		"Only print the object that would be sent, without patching it.")
-	return cordonCmd
+	return newCordonServerCommand(true)
 }
 
-// NewUncordonCommand returns the `metalctl uncordon` command that marks a resource as
+// NewUncordonCommand returns the `metalctl uncordon` command that marks a Server as
 // claimable again, allowing new ServerClaims to bind to it.
 func NewUncordonCommand() *cobra.Command {
-	uncordonCmd := &cobra.Command{
-		Use:   "uncordon",
-		Short: "Mark a resource as claimable",
-		Args:  cobra.NoArgs,
-	}
-	uncordonCmd.AddCommand(newCordonServerCommand(false))
-
-	uncordonCmd.PersistentFlags().StringVar(&cordonKubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
-	uncordonCmd.PersistentFlags().StringVar(&cordonKubeContext, "context", "", "Name of the kubeconfig context to use.")
-	uncordonCmd.PersistentFlags().BoolVar(&cordonDryRun, "dry-run", false,
-		"Only print the object that would be sent, without patching it.")
-	return uncordonCmd
+	return newCordonServerCommand(false)
 }
 
 func newCordonServerCommand(unclaimable bool) *cobra.Command {
+	use := "uncordon SERVER_NAME"
 	short := "Mark a Server as claimable, allowing new ServerClaims to bind to it"
 	if unclaimable {
+		use = "cordon SERVER_NAME"
 		short = "Mark a Server as unclaimable, preventing new ServerClaims from binding to it"
 	}
-	return &cobra.Command{
-		Use:   "server SERVER_NAME",
+	cmd := &cobra.Command{
+		Use:   use,
 		Short: short,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runCordonServer(cmd.Context(), args[0], unclaimable)
 		},
 	}
+	cmd.PersistentFlags().StringVar(&cordonKubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
+	cmd.PersistentFlags().StringVar(&cordonKubeContext, "context", "", "Name of the kubeconfig context to use.")
+	cmd.PersistentFlags().BoolVar(&cordonDryRun, "dry-run", false,
+		"Only print the object that would be sent, without patching it.")
+	return cmd
 }
 
 func runCordonServer(ctx context.Context, serverName string, unclaimable bool) error {

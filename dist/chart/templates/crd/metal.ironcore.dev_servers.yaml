@@ -53,6 +53,10 @@ spec:
     - jsonPath: .status.state
       name: State
       type: string
+    - jsonPath: .spec.unclaimable
+      name: Unclaimable
+      priority: 100
+      type: boolean
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
@@ -296,6 +300,12 @@ spec:
                   - key
                   type: object
                 type: array
+              unclaimable:
+                default: false
+                description: |-
+                  Unclaimable, when true, prevents new ServerClaims from being bound to
+                  this Server. Already-bound claims are unaffected.
+                type: boolean
             required:
             - systemUUID
             type: object

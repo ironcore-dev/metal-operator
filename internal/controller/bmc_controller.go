@@ -81,8 +81,7 @@ type BMCReconciler struct {
 
 // sshResetRequest represents a BMC SSH reset work item
 type sshResetRequest struct {
-	bmcName      string
-	bmcNamespace string
+	bmcName string
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -612,22 +611,23 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 			// - Condition is cleared when connection succeeds (via handlePreviousBMCResetAnnotations)
 			select {
 			case r.sshResetQueue <- &sshResetRequest{
-				bmcName:      bmcObj.Name,
-				bmcNamespace: bmcObj.Namespace,
+				bmcName: bmcObj.Name,
 			}:
 				log.Info("Enqueued SSH-based BMC reset due to Redfish 5xx error", "BMC", bmcObj.Name)
 				return r.updateBMCStateToPending(ctx, bmcObj)
 			default:
 				log.Error(nil, "SSH reset queue was full; reset was not scheduled", "BMC", bmcObj.Name)
-				_ = r.updateConditions(ctx,
-					bmcObj,
-					false,
-					bmcResetConditionType,
-					corev1.ConditionFalse,
-					bmcUnknownErrorReason,
-					"SSH reset queue was full; reset not scheduled",
+				return errors.Join(
+					r.updateConditions(ctx,
+						bmcObj,
+						false,
+						bmcResetConditionType,
+						corev1.ConditionFalse,
+						bmcUnknownErrorReason,
+						"SSH reset queue was full; reset not scheduled",
+					),
+					fmt.Errorf("failed to enqueue SSH reset for BMC %s: queue full", bmcObj.Name),
 				)
-				return fmt.Errorf("failed to enqueue SSH reset for BMC %s: queue full", bmcObj.Name)
 			}
 		}
 		// 4xx or other status code - don't try SSH, clear condition

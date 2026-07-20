@@ -48,9 +48,9 @@ func newCordonServerCommand(unclaimable bool) *cobra.Command {
 			return runCordonServer(cmd.Context(), args[0], unclaimable)
 		},
 	}
-	cmd.PersistentFlags().StringVar(&cordonKubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
-	cmd.PersistentFlags().StringVar(&cordonKubeContext, "context", "", "Name of the kubeconfig context to use.")
-	cmd.PersistentFlags().BoolVar(&cordonDryRun, "dry-run", false,
+	cmd.Flags().StringVar(&cordonKubeconfig, "kubeconfig", "", "Path to a kubeconfig.")
+	cmd.Flags().StringVar(&cordonKubeContext, "context", "", "Name of the kubeconfig context to use.")
+	cmd.Flags().BoolVar(&cordonDryRun, "dry-run", false,
 		"Only print the object that would be sent, without patching it.")
 	return cmd
 }
@@ -74,7 +74,7 @@ func runCordonServer(ctx context.Context, serverName string, unclaimable bool) e
 	base := server.DeepCopy()
 	server.Spec.Unclaimable = unclaimable
 
-	patchOpts := []client.PatchOption{}
+	var patchOpts []client.PatchOption
 	if cordonDryRun {
 		patchOpts = append(patchOpts, client.DryRunAll)
 	}

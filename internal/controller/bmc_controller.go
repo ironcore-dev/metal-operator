@@ -41,15 +41,6 @@ const (
 
 	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
-
-	// BMC-specific condition and reason aliases for shared constants
-	bmcResetConditionType         = ConditionReset
-	bmcAutoResetReason            = ReasonAutoReset
-	bmcUserResetReason            = ReasonUserReset
-	bmcUnknownErrorReason         = ReasonUnknownError
-	bmcAuthenticationFailedReason = ReasonAuthenticationFailed
-	bmcConnectionFailedReason     = ReasonConnectionFailed
-	bmcInternalErrorReason        = ReasonInternalError
 )
 
 // BMCReconciler reconciles a BMC object
@@ -158,11 +149,11 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	if err != nil {
 		// Check if BMC reset is needed (either auto-reset or via annotation)
 		if r.shouldResetBMC(bmcObj) || r.hasResetAnnotation(bmcObj) {
-			resetReason, resetMessage := bmcAutoResetReason, bmcAutoResetMessage
+			resetReason, resetMessage := ReasonAutoReset, bmcAutoResetMessage
 			hasAnnotation := r.hasResetAnnotation(bmcObj)
 			if hasAnnotation {
 				log.V(1).Info("Reset annotation detected on unresponsive BMC", "BMC", bmcObj.Name)
-				resetReason, resetMessage = bmcUserResetReason, bmcUserResetMessage
+				resetReason, resetMessage = ReasonUserReset, bmcUserResetMessage
 			} else {
 				log.V(1).Info("BMC needs auto-reset", "BMC", bmcObj.Name)
 			}
@@ -429,7 +420,7 @@ func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, bmcObj *
 	switch value {
 	case schemas.ForceRestartResetType:
 		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
-		if err := r.resetBMC(ctx, bmcObj, bmcClient, nil, bmcUserResetReason, bmcUserResetMessage); err != nil {
+		if err := r.resetBMC(ctx, bmcObj, bmcClient, nil, ReasonUserReset, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.Info("Handled operation", "Operation", operation)
@@ -589,13 +580,13 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		log.Error(err, "Could not create BMC client, checking if SSH reset is possible", "BMC", bmcObj.Name)
 	} else {
 		// bmcClient is nil and no clientErr - cannot perform any reset
-		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "BMC reset did not start")
+		_ = r.updateConditions(ctx, bmcObj, false, ConditionReset, corev1.ConditionFalse, ReasonUnknownError, "BMC reset did not start")
 		return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: client unavailable"))
 	}
 
 	// Check if err is nil (should not happen, but guard against it)
 	if err == nil {
-		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "BMC reset did not start")
+		_ = r.updateConditions(ctx, bmcObj, false, ConditionReset, corev1.ConditionFalse, ReasonUnknownError, "BMC reset did not start")
 		return fmt.Errorf("cannot reset bmc: missing error context")
 	}
 
@@ -605,7 +596,7 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 	if errors.As(err, &httpErr) {
 		if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
 			// 5xx server error - enqueue SSH reset work
-			// The bmcResetConditionType condition (set to True above) acts as idempotency guard:
+			// The ConditionReset condition (set to True above) acts as idempotency guard:
 			// - waitForBMCReset() will prevent new resets during the delay period
 			// - After delay, we retry BMC connection
 			// - Condition is cleared when connection succeeds (via handlePreviousBMCResetAnnotations)
@@ -621,9 +612,9 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 					r.updateConditions(ctx,
 						bmcObj,
 						false,
-						bmcResetConditionType,
+						ConditionReset,
 						corev1.ConditionFalse,
-						bmcUnknownErrorReason,
+						ReasonUnknownError,
 						"SSH reset queue was full; reset not scheduled",
 					),
 					fmt.Errorf("failed to enqueue SSH reset for BMC %s: queue full", bmcObj.Name),
@@ -631,12 +622,12 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 			}
 		}
 		// 4xx or other status code - don't try SSH, clear condition
-		_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcAuthenticationFailedReason, "Cannot reset BMC via SSH for client errors")
+		_ = r.updateConditions(ctx, bmcObj, false, ConditionReset, corev1.ConditionFalse, ReasonAuthenticationFailed, "Cannot reset BMC via SSH for client errors")
 		return errors.Join(r.updateBMCStateToPending(ctx, bmcObj), fmt.Errorf("cannot reset bmc: %w", err))
 	}
 
 	// Unknown error type - clear condition
-	_ = r.updateConditions(ctx, bmcObj, false, bmcResetConditionType, corev1.ConditionFalse, bmcUnknownErrorReason, "Cannot classify error for SSH reset")
+	_ = r.updateConditions(ctx, bmcObj, false, ConditionReset, corev1.ConditionFalse, ReasonUnknownError, "Cannot classify error for SSH reset")
 	return fmt.Errorf("cannot reset bmc, unknown error: %w", err)
 }
 
@@ -653,7 +644,7 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	address, err := bmcutils.GetBMCAddressForBMC(ctx, r.Client, currentBMC)
 	if err != nil {
 		log.Error(err, "Failed to get BMC address for SSH reset")
-		if err := r.updateResetConditionByName(ctx, bmcName, bmcConnectionFailedReason, fmt.Sprintf("Failed to get BMC address: %v", err)); err != nil {
+		if err := r.updateResetConditionByName(ctx, bmcName, ReasonConnectionFailed, fmt.Sprintf("Failed to get BMC address: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
@@ -676,7 +667,7 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	}
 	if manufacturer == "" {
 		log.Error(nil, "BMC manufacturer not available for SSH reset (checked BMC and Server)")
-		if err := r.updateResetConditionByName(ctx, bmcName, bmcInternalErrorReason, "BMC manufacturer not available"); err != nil {
+		if err := r.updateResetConditionByName(ctx, bmcName, ReasonInternalError, "BMC manufacturer not available"); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
@@ -684,14 +675,14 @@ func (r *BMCReconciler) resetBMCViaSSH(ctx context.Context, bmcName string) {
 	username, password, err := bmcutils.GetBMCCredentialsForBMCSecretName(ctx, r.Client, currentBMC.Spec.BMCSecretRef.Name)
 	if err != nil {
 		log.Error(err, "Failed to get BMC credentials for SSH reset")
-		if err := r.updateResetConditionByName(ctx, bmcName, bmcAuthenticationFailedReason, fmt.Sprintf("Failed to get credentials: %v", err)); err != nil {
+		if err := r.updateResetConditionByName(ctx, bmcName, ReasonAuthenticationFailed, fmt.Sprintf("Failed to get credentials: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition")
 		}
 		return
 	}
 	if err := bmcutils.SSHResetBMCFunc(ctx, address, manufacturer, username, password, r.SSHResetTimeout); err != nil {
 		log.Error(err, "Failed to reset BMC via SSH")
-		if err := r.updateResetConditionByName(ctx, bmcName, bmcInternalErrorReason, fmt.Sprintf("SSH reset failed: %v", err)); err != nil {
+		if err := r.updateResetConditionByName(ctx, bmcName, ReasonInternalError, fmt.Sprintf("SSH reset failed: %v", err)); err != nil {
 			log.Error(err, "Failed to update Reset condition after SSH failure")
 		}
 		return
@@ -749,7 +740,7 @@ func (r *BMCReconciler) updateResetConditionByName(ctx context.Context, bmcName 
 	if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, currentBMC); err != nil {
 		return fmt.Errorf("failed to fetch BMC object: %w", err)
 	}
-	return r.updateConditions(ctx, currentBMC, true, bmcResetConditionType, corev1.ConditionFalse, reason, message)
+	return r.updateConditions(ctx, currentBMC, true, ConditionReset, corev1.ConditionFalse, reason, message)
 }
 
 func (r *BMCReconciler) handleEventSubscriptions(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) (bool, error) {

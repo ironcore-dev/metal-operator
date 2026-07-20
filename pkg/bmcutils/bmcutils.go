@@ -269,18 +269,6 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 // It allows tests to replace the SSH implementation with mocks.
 var SSHResetBMCFunc = SSHResetBMC
 
-// expandPath expands the tilde (~) in a file path to the user's home directory.
-func expandPath(path string) (string, error) {
-	if len(path) > 0 && path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", err
-		}
-		return filepath.Join(homeDir, path[1:]), nil
-	}
-	return path, nil
-}
-
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
 	log := ctrl.LoggerFrom(ctx)
 
@@ -288,18 +276,12 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	// Following the pattern from cmd/metalctl/app/console.go
 	var hostKeyCallback ssh.HostKeyCallback
 	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
-	expandedPath, err := expandPath(knownHostsPath)
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
 	if err != nil {
-		log.V(1).Info("Failed to expand known_hosts path, falling back to insecure mode", "error", err)
+		log.V(1).Info("Failed to load known_hosts file, falling back to insecure mode", "path", knownHostsPath, "error", err)
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	} else {
-		hostKeyCallback, err = knownhosts.New(expandedPath)
-		if err != nil {
-			log.V(1).Info("Failed to load known_hosts file, falling back to insecure mode", "path", expandedPath, "error", err)
-			hostKeyCallback = ssh.InsecureIgnoreHostKey()
-		} else {
-			log.V(1).Info("Using known_hosts for SSH host key verification", "path", expandedPath)
-		}
+		log.V(1).Info("Using known_hosts for SSH host key verification", "path", knownHostsPath)
 	}
 
 	config := &ssh.ClientConfig{

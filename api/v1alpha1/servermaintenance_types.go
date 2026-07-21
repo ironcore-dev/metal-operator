@@ -93,6 +93,7 @@ const (
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=sm
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 ServerMaintenance is deprecated"
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Policy",type="string",JSONPath=`.spec.policy`
 // +kubebuilder:printcolumn:name="BootConfiguration",type="string",JSONPath=`.spec.serverBootConfigurationTemplate.name`
@@ -102,6 +103,8 @@ const (
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // ServerMaintenance is the Schema for the ServerMaintenance API
+//
+// Deprecated: The ServerMaintenance resource is deprecated.
 type ServerMaintenance struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

@@ -50,7 +50,10 @@ func (v *BMCSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *me
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj)
+	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, obj); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -81,7 +84,10 @@ func (v *BMCSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj,
 	if err := v.Client.List(ctx, bmcSettingsList); err != nil {
 		return nil, fmt.Errorf("failed to list BMCSettings: %w", err)
 	}
-	return checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj)
+	if err := checkForDuplicateBMCSettingsRefToBMC(bmcSettingsList, newObj); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BMCSettings.
@@ -108,21 +114,22 @@ func (v *BMCSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *me
 	return nil, nil
 }
 
-func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) (admission.Warnings, error) {
+func checkForDuplicateBMCSettingsRefToBMC(settingsList *metalv1alpha1.BMCSettingsList, settings *metalv1alpha1.BMCSettings) error {
 	for _, bs := range settingsList.Items {
 		if settings.Name == bs.Name {
 			continue
 		}
 		if bs.Spec.BMCRef.Name == settings.Spec.BMCRef.Name {
-			err := fmt.Errorf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
+			fldErr := field.Duplicate(field.NewPath("spec").Child("BMCRef"), settings.Spec.BMCRef.Name)
+			fldErr.Detail = fmt.Sprintf("BMC (%s) referred in %s is duplicate of BMC (%s) referred in %s",
 				settings.Spec.BMCRef.Name,
 				settings.Name,
 				bs.Spec.BMCRef.Name,
 				bs.Name)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("bmcRef"), err)})
+				settings.GetName(), field.ErrorList{fldErr})
 		}
 	}
-	return nil, nil
+	return nil
 }

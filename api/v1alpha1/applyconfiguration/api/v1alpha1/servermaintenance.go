@@ -17,7 +17,9 @@ import (
 // ServerMaintenanceApplyConfiguration represents a declarative configuration of the ServerMaintenance type for use
 // with apply.
 //
-// ServerMaintenance is the Schema for the ServerMaintenance API
+// # ServerMaintenance is the Schema for the ServerMaintenance API
+//
+// Deprecated: The ServerMaintenance resource is deprecated.
 type ServerMaintenanceApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

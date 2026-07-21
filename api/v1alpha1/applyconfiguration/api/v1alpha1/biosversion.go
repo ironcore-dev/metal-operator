@@ -18,6 +18,8 @@ import (
 // with apply.
 //
 // BIOSVersion is the Schema for the biosversions API.
+//
+// Deprecated: The BIOSVersion resource is deprecated.
 type BIOSVersionApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

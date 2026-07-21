@@ -1,5 +1,7 @@
 # BIOSSettingsSet
 
+> **Deprecation Notice:** The `BIOSSettingsSet` resource is deprecated and will be removed in a future release.
+
 `BIOSSettingsSet` is the fleet-scoped controller input for creating and managing many `BIOSSettings` objects from one template.
 
 ## What It Does

@@ -18,6 +18,8 @@ import (
 // with apply.
 //
 // BIOSSettingsSet is the Schema for the biossettingssets API.
+//
+// Deprecated: The BIOSSettingsSet resource is deprecated.
 type BIOSSettingsSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

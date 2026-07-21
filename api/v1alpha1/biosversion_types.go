@@ -127,6 +127,7 @@ type Task struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster,shortName=biosv
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BIOSVersion is deprecated"
 // +kubebuilder:printcolumn:name="BIOSVersion",type=string,JSONPath=`.spec.version`
 // +kubebuilder:printcolumn:name="UpdatePolicy",type=string,JSONPath=`.spec.updatePolicy`
 // +kubebuilder:printcolumn:name="ServerRef",type=string,JSONPath=`.spec.serverRef.name`
@@ -138,6 +139,8 @@ type Task struct {
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
 
 // BIOSVersion is the Schema for the biosversions API.
+//
+// Deprecated: The BIOSVersion resource is deprecated.
 type BIOSVersion struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

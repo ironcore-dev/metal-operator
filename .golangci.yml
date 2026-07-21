@@ -50,6 +50,13 @@ linters:
           - lll
           - goconst
         path: bmc/*
+      # ServerMaintenance, BMCSettings, BMCVersion, BIOSVersion, BIOSSettings and their
+      # Set variants are deprecated. The operator still serves and reconciles the
+      # existing resources, so these legacy consumers reference the types until they
+      # are fully removed.
+      - linters:
+          - staticcheck
+        text: "SA1019.*metalv1alpha1\\.(ServerMaintenance|BMCSettingsSet|BMCSettings|BMCVersionSet|BMCVersion|BIOSVersionSet|BIOSVersion|BIOSSettingsSet|BIOSSettings)\\b"
       # The Endpoint resource is deprecated (see issue #1018). The operator still
       # serves existing Endpoint objects and the endpointRef access path, so these
       # legacy consumers reference the type until the resource is fully removed.

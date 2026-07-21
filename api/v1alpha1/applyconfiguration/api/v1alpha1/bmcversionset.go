@@ -18,6 +18,8 @@ import (
 // with apply.
 //
 // BMCVersionSet is the Schema for the bmcversionsets API.
+//
+// Deprecated: The BMCVersionSet resource is deprecated.
 type BMCVersionSetApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

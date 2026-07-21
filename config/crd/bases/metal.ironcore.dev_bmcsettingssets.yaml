@@ -39,10 +39,15 @@ spec:
     - jsonPath: .metadata.creationTimestamp
       name: Age
       type: date
+    deprecated: true
+    deprecationWarning: metal.ironcore.dev/v1alpha1 BMCSettingsSet is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: BMCSettingsSet is the Schema for the bmcsettingssets API.
+        description: |-
+          BMCSettingsSet is the Schema for the bmcsettingssets API.
+
+          Deprecated: The BMCSettingsSet resource is deprecated.
         properties:
           apiVersion:
             description: |-

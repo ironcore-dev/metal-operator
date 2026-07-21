@@ -1,5 +1,7 @@
 # BMCVersionSet
 
+> **Deprecation Notice:** The `BMCVersionSet` resource is deprecated and will be removed in a future release.
+
 `BMCVersionSet` performs BMC firmware rollout for multiple BMCs selected by labels.
 
 ## What It Does

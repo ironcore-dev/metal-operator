@@ -48,7 +48,10 @@ func (v *BIOSSettingsCustomValidator) ValidateCreate(ctx context.Context, obj *m
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, obj)
+	if err := checkForDuplicateBIOSSettingsRefToServer(settingsList, obj); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -74,7 +77,10 @@ func (v *BIOSSettingsCustomValidator) ValidateUpdate(ctx context.Context, oldObj
 		return nil, fmt.Errorf("failed to list BIOSSettings: %w", err)
 	}
 
-	return checkForDuplicateBIOSSettingsRefToServer(settingsList, newObj)
+	if err := checkForDuplicateBIOSSettingsRefToServer(settingsList, newObj); err != nil {
+		return nil, err
+	}
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type BIOSSettings.
@@ -95,21 +101,22 @@ func (v *BIOSSettingsCustomValidator) ValidateDelete(ctx context.Context, obj *m
 	return nil, nil
 }
 
-func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) (admission.Warnings, error) {
+func checkForDuplicateBIOSSettingsRefToServer(settingsList *metalv1alpha1.BIOSSettingsList, settings *metalv1alpha1.BIOSSettings) error {
 	for _, bs := range settingsList.Items {
 		if settings.Name == bs.Name {
 			continue
 		}
 		if settings.Spec.ServerRef.Name == bs.Spec.ServerRef.Name {
-			err := fmt.Errorf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
+			fldErr := field.Duplicate(field.NewPath("spec").Child("serverRef"), settings.Spec.ServerRef.Name)
+			fldErr.Detail = fmt.Sprintf("server (%s) referred in %s is duplicate of server (%s) referred in %s",
 				settings.Spec.ServerRef.Name,
 				settings.Name,
 				bs.Spec.ServerRef.Name,
 				bs.Name)
-			return nil, apierrors.NewInvalid(
+			return apierrors.NewInvalid(
 				schema.GroupKind{Group: settings.GroupVersionKind().Group, Kind: settings.Kind},
-				settings.GetName(), field.ErrorList{field.Duplicate(field.NewPath("spec").Child("serverRef"), err)})
+				settings.GetName(), field.ErrorList{fldErr})
 		}
 	}
-	return nil, nil
+	return nil
 }

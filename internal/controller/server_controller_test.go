@@ -880,12 +880,17 @@ var _ = Describe("Server Controller", func() {
 			server.Status.PowerState = metalv1alpha1.ServerOffPowerState
 		})).Should(Succeed())
 
+		// Snapshot A: what the maintenance controller would see right
+		// before calling updateServerRef. It carries the stale claim ref
+		// that will shortly be cleared by the ServerReconciler.
 		maintenanceView := &metalv1alpha1.Server{}
 		Expect(k8sClient.Get(ctx, client.ObjectKeyFromObject(server), maintenanceView)).To(Succeed())
 		Expect(maintenanceView.Spec.ServerClaimRef).NotTo(BeNil(),
 			"pre-condition: the maintenance controller observes the stale ref before it's cleared")
 
 		By("ServerReconciler.handleReservedState clears the stale serverClaimRef (Recycle branch)")
+		// server_controller.go:501-505 does exactly this on Recycle when
+		// the referenced ServerClaim is NotFound.
 		Eventually(Update(server, func() {
 			server.Spec.ServerClaimRef = nil
 		})).Should(Succeed())
@@ -895,6 +900,9 @@ var _ = Describe("Server Controller", func() {
 		Expect(fresh.Spec.ServerClaimRef).To(BeNil())
 
 		By("ServerMaintenanceReconciler.updateServerRef fires with its stale in-memory snapshot")
+		// servermaintenance_controller.go:338-345: mutate the in-memory
+		// Server (set ServerMaintenanceRef) and call r.Update. The
+		// snapshot still carries the stale ServerClaimRef from Snapshot A.
 		maintenanceView.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{
 			Namespace: ns.Name,
 			Name:      "some-maintenance",
@@ -903,7 +911,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("The stale Update must be rejected by optimistic concurrency")
 		Expect(err).To(HaveOccurred(),
-			"BUG: full-object Update on stale snapshot silently succeeded; the stale ServerClaimRef has now been restored on the API server")
+			"BUG: full-object Update on stale snapshot silently succeeded; the stale ServerClaimRef has now been restored on the API server, reproducing the production stuck state")
 		Expect(apierrors.IsConflict(err)).To(BeTrue(),
 			"expected a Conflict error, got: %v", err)
 
@@ -916,12 +924,16 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 	})
 
-	// Before this fix, ensureServerPoweredOffWithoutBootConfig short-circuited
-	// on Spec.Power=Off alone without checking the observed Status.PowerState.
-	// A Server could therefore be released even if the BMC never confirmed the
-	// host was off. These specs assert the corrected behaviour: the ServerClaim
-	// sticks until Status.PowerState=Off is observed.
-	It("should not release a Recycle Server while the BMC has not confirmed PowerState=Off", func(ctx SpecContext) {
+	// When the BMC cannot confirm PowerState=Off (e.g. it reports "Unknown"
+	// indefinitely), a claimed Server stays bound to a host we cannot prove is
+	// powered down. This test asserts the two invariants the fix upholds:
+	//   1. While the BMC has not confirmed PowerState=Off, the Server carries a
+	//      WaitingForPowerOff condition and its serverClaimRef stays set.
+	//   2. Once the BMC confirms Off, the Server self-heals: serverClaimRef is
+	//      cleared, state returns to Available, and a fresh ServerClaim binds.
+	// The wedge is reproduced by pinning the mock Redfish PowerState via
+	// MockServer.ForcePowerState.
+	It("should surface a WaitingForPowerOff condition when the BMC cannot confirm PowerState=Off, and self-heal once it can", func(ctx SpecContext) {
 		By("Creating a BMCSecret and Server (default Recycle policy)")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -976,26 +988,45 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
-		By("Pinning the BMC at PowerState=Unknown and deleting claim A")
+		By("Simulating a post-maintenance BMC stuck at PowerState=Unknown")
+		// The mock's data path for the default system:
 		const systemPath = "data/Systems/437XR1138R2/index.json"
+		// Pin the served PowerState so that neither a real PowerOff nor any
+		// subsequent read can flip the value to Off. Any subsequent doPowerOff
+		// becomes a no-op — modelling the unhealthy iLO seen on node002/005-bb088.
 		Expect(mockServers[0].ForcePowerState(systemPath, "Unknown")).To(Succeed())
-		DeferCleanup(func() { _ = mockServers[0].ForcePowerState(systemPath, "") })
+		DeferCleanup(func() {
+			// Belt-and-braces: make sure the pin is released even if the test
+			// fails partway through, so other specs get a healthy mock again.
+			_ = mockServers[0].ForcePowerState(systemPath, "")
+		})
+
+		By("Deleting claim A while the BMC is stuck")
 		Expect(k8sClient.Delete(ctx, claimA)).To(Succeed())
 		Eventually(Get(claimA)).Should(Satisfy(apierrors.IsNotFound))
 
-		By("The serverClaimRef must stick while the BMC cannot confirm PowerState=Off")
-		Consistently(Object(srv)).Should(HaveField("Spec.ServerClaimRef", Not(BeNil())))
+		By("The Server must surface a WaitingForPowerOff condition")
+		Eventually(Object(srv)).Should(HaveField("Status.Conditions",
+			ContainElement(SatisfyAll(
+				HaveField("Type", ConditionWaitingForPowerOff),
+				HaveField("Status", metav1.ConditionTrue),
+				HaveField("Reason", ReasonWaitingForPowerOff),
+			))))
 
-		By("Releasing the stuck BMC")
+		By("The stale serverClaimRef must stick while the BMC cannot confirm PowerState=Off")
+		Consistently(Object(srv)).Should(
+			HaveField("Spec.ServerClaimRef", Not(BeNil())))
+
+		By("Releasing the stuck BMC — it now behaves normally")
 		Expect(mockServers[0].ForcePowerState(systemPath, "")).To(Succeed())
 
-		By("The Server self-heals: serverClaimRef cleared and state returns to Available")
+		By("The Server self-heals: serverClaimRef is cleared and state returns to Available")
 		Eventually(Object(srv)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		))
 
-		By("A fresh ServerClaim binds the Server")
+		By("A fresh ServerClaim binds the Server without human intervention")
 		claimB := &metalv1alpha1.ServerClaim{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:    ns.Name,
@@ -1078,10 +1109,15 @@ var _ = Describe("Server Controller", func() {
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 
 		By("The Server must not reach Released while power-off is unconfirmed")
+		Eventually(Object(srv)).Should(HaveField("Status.Conditions",
+			ContainElement(SatisfyAll(
+				HaveField("Type", ConditionWaitingForPowerOff),
+				HaveField("Status", metav1.ConditionTrue),
+			))))
 		Consistently(Object(srv)).Should(
 			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateReleased))))
 
-		By("Once the BMC confirms Off, the Server moves to Released")
+		By("Once the BMC confirms Off, the Server moves to Released (Retain keeps the ref)")
 		Expect(mockServers[0].ForcePowerState(systemPath, "")).To(Succeed())
 		Eventually(Object(srv)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReleased))
 

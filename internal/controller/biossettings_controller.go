@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"sort"
 	"strconv"
@@ -1173,9 +1174,16 @@ func (r *BIOSSettingsReconciler) getSettingsDiff(ctx context.Context, bmcClient 
 				floatValue, err := strconv.ParseFloat(value, 64)
 				if err != nil {
 					errs = append(errs, fmt.Errorf("failed to check type for name %s; value %s; error: %w", key, value, err))
+					continue
 				}
 				if data != floatValue {
-					diff[key] = floatValue
+					// JSON numbers decode as float64, but integer attributes must be
+					// applied as a Go int so BMC validation (checkAttributes) passes.
+					if floatValue == math.Trunc(floatValue) {
+						diff[key] = int(floatValue)
+					} else {
+						diff[key] = floatValue
+					}
 				}
 			}
 		} else {

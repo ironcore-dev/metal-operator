@@ -27,6 +27,23 @@
         "WriteOnly": false
       },
       {
+        "AttributeName": "MaxCores",
+        "CurrentValue": null,
+        "DisplayName": "Maximum Number of Cores",
+        "DisplayOrder": 250,
+        "HelpText": "Indicates the maximum number of enabled processor cores.",
+        "Hidden": false,
+        "Immutable": false,
+        "MenuPath": "./ProcSettingsRef",
+        "LowerBound": 0,
+        "UpperBound": 256,
+        "ReadOnly": false,
+        "ResetRequired": false,
+        "Type": "Integer",
+        "ValueExpression": null,
+        "WriteOnly": false
+      },
+      {
         "AttributeName": "BootMode",
         "CurrentValue": null,
         "DisplayName": "Boot Mode",

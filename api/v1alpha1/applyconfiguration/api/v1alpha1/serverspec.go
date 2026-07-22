@@ -20,6 +20,16 @@ type ServerSpecApplyConfiguration struct {
 	// SystemURI is the unique URI for the server resource in REDFISH API.
 	SystemURI *string `json:"systemURI,omitempty"`
 	// Power specifies the desired power state of the server.
+	//
+	// Deprecated: This field is an internal actuator variable exposed as
+	// user-facing API. It is written almost exclusively by controllers
+	// (the ServerReconciler while traversing the state machine, and the
+	// ServerClaim/ServerMaintenance reconcilers as surrogate input), and
+	// every write patches the Server object, racing with its actual owner.
+	// The desired power state is expressed more precisely through
+	// ServerClaim, ServerMaintenance, and the server state machine itself;
+	// the genuinely observed value is status.powerState. Do not set this
+	// field on new Server resources; it will be removed in a future release.
 	Power *apiv1alpha1.Power `json:"power,omitempty"`
 	// IndicatorLED specifies the desired state of the server's indicator LED.
 	IndicatorLED *apiv1alpha1.IndicatorLED `json:"indicatorLED,omitempty"`

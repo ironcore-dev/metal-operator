@@ -492,6 +492,16 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			return modified, err
 		}
 
+		// Do not release the Server until the BMC has confirmed PowerState=Off.
+		// Releasing before confirmation would hand an unproven-off host to the
+		// next tenant (Recycle) or expose it for manual reclaim (Retain).
+		if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
+			return false, fmt.Errorf(
+				"cannot reclaim ServerClaim %s: BMC has not confirmed PowerState=Off (current: %q)",
+				claimKey, server.Status.PowerState,
+			)
+		}
+
 		switch server.Spec.ReclaimPolicy {
 		case metalv1alpha1.ServerReclaimPolicyRetain:
 			log.V(1).Info("Transitioning server to released state")
@@ -534,7 +544,12 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 }
 
 func (r *ServerReconciler) ensureServerPoweredOffWithoutBootConfig(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (modified bool, err error) {
-	if server.Spec.Power == metalv1alpha1.PowerOff && server.Spec.BootConfigurationRef == nil {
+	// Short-circuit only once the spec is settled AND the BMC has confirmed
+	// PowerState=Off. Trusting Spec.Power alone can release a Server whose
+	// host never actually powered down (e.g. BMC stuck at Unknown).
+	if server.Spec.Power == metalv1alpha1.PowerOff &&
+		server.Spec.BootConfigurationRef == nil &&
+		server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
 		return false, nil
 	}
 

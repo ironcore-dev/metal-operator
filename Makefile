@@ -2,7 +2,6 @@
 # Image URL to use all building/pushing image targets
 CONTROLLER_IMG ?= controller:latest
 METALPROBE_IMG ?= metalprobe:latest
-BMCTOOLS_IMG   ?= bmctools:latest
 METALDATA_IMG  ?= metaldata:latest
 
 # Docker image name for the mkdocs based local development setup
@@ -191,10 +190,6 @@ docker-build-controller-manager: ## Build controller-manager.
 docker-build-metalprobe: ## Build metalprobe.
 	docker build --target probe -t ${METALPROBE_IMG} .
 
-.PHONY: docker-build-bmctools
-docker-build-bmctools: ## Build bmctools.
-	docker build --target bmctools -t ${BMCTOOLS_IMG} .
-
 .PHONY: docker-build-metaldata
 docker-build-metaldata: ## Build metaldata.
 	docker build --target metaldata -t ${METALDATA_IMG} .
@@ -203,7 +198,6 @@ docker-build-metaldata: ## Build metaldata.
 docker-push: ## Push docker image with the manager.
 	$(CONTAINER_TOOL) push ${CONTROLLER_IMG}
 	$(CONTAINER_TOOL) push ${METALPROBE_IMG}
-	$(CONTAINER_TOOL) push ${BMCTOOLS_IMG}
 	$(CONTAINER_TOOL) push ${METALDATA_IMG}
 
 # PLATFORMS defines the target platforms for the manager image be built to provide support to multiple

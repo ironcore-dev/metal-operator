@@ -8,12 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"slices"
 	"time"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -261,15 +265,30 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmcObj.Name, "system", index)
 }
 
+// SSHResetBMCFunc is a function variable that defaults to SSHResetBMC.
+// It allows tests to replace the SSH implementation with mocks.
+var SSHResetBMCFunc = SSHResetBMC
+
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
-	// If Redfish reset fails, try SSH-based reset for known manufacturers
+	log := ctrl.LoggerFrom(ctx)
+
+	// Set up secure host key verification with fallback to insecure mode
+	// Following the pattern from cmd/metalctl/app/console.go
+	var hostKeyCallback ssh.HostKeyCallback
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		log.V(1).Info("Failed to load known_hosts file, falling back to insecure mode", "path", knownHostsPath, "error", err)
+		hostKeyCallback = ssh.InsecureIgnoreHostKey()
+	} else {
+		log.V(1).Info("Using known_hosts for SSH host key verification", "path", knownHostsPath)
+	}
+
 	config := &ssh.ClientConfig{
-		User: username,
-		Auth: []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-			return nil
-		},
-		Timeout: timeout,
+		User:            username,
+		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         timeout,
 	}
 	resetCMD := ""
 	switch manufacturer {
@@ -297,7 +316,7 @@ func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password strin
 	defer func() {
 		_ = session.Close()
 	}()
-	// cancel reset cmd after 5 minutes
+	// cancel reset cmd after timeout
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	done := make(chan error, 1)

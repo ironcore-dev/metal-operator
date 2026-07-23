@@ -31,6 +31,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -489,8 +490,13 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			return false, fmt.Errorf("getting server claim %s: %w", claimKey, err)
 		}
 
-		if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
-			return modified, err
+		// Don't release the server until the BMC has confirmed it's off.
+		off, err := r.ensureServerPoweredOff(ctx, bmcClient, server)
+		if err != nil {
+			return false, err
+		}
+		if !off {
+			return true, nil
 		}
 
 		switch server.Spec.ReclaimPolicy {
@@ -534,30 +540,83 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	return true, nil
 }
 
-func (r *ServerReconciler) ensureServerPoweredOffWithoutBootConfig(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (modified bool, err error) {
-	if server.Spec.Power == metalv1alpha1.PowerOff && server.Spec.BootConfigurationRef == nil {
-		return false, nil
+func (r *ServerReconciler) ensureServerPoweredOff(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (off bool, err error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if server.Spec.Power != metalv1alpha1.PowerOff || server.Spec.BootConfigurationRef != nil {
+		base := server.DeepCopy()
+		// TODO: drop the spec.power write — it's deprecated (#1042) and only
+		// kept here to carry the desired state until the field is removed.
+		server.Spec.Power = metalv1alpha1.PowerOff
+		server.Spec.BootConfigurationRef = nil
+		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+			return false, fmt.Errorf("failed to patch spec.power / spec.bootConfigurationRef: %w", err)
+		}
+		log.V(1).Info("Requested power off and cleared boot configuration")
 	}
 
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Server claim is gone, powering off server and removing boot configuration")
-	base := server.DeepCopy()
-	server.Spec.Power = metalv1alpha1.PowerOff
-	server.Spec.BootConfigurationRef = nil
-	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-		return false, fmt.Errorf("failed to update server power state: %w", err)
+	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+		if err := r.clearWaitingForPowerOffCondition(ctx, server); err != nil {
+			log.V(1).Info("Could not clear WaitingForPowerOff condition", "error", err)
+		}
+		return true, nil
 	}
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-		return true, fmt.Errorf("failed to power off server after claim deletion: %w", err)
+
+	// Don't block here: updateServerStatus refreshes the power state on every
+	// reconcile, so we'll pick up the transition on the next resync.
+	if err := bmcClient.PowerOff(ctx, server.Spec.SystemURI); err != nil {
+		return false, fmt.Errorf("failed to power off server: %w", err)
 	}
-	return true, nil
+
+	if err := r.setWaitingForPowerOffCondition(ctx, server); err != nil {
+		log.V(1).Info("Could not set WaitingForPowerOff condition", "error", err)
+	}
+	return false, nil
+}
+
+func (r *ServerReconciler) setWaitingForPowerOffCondition(ctx context.Context, server *metalv1alpha1.Server) error {
+	original := server.DeepCopy()
+	msg := fmt.Sprintf("Waiting for BMC to confirm power off (current: %q)", server.Status.PowerState)
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		ConditionWaitingForPowerOff,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason(ReasonWaitingForPowerOff),
+		conditionutils.UpdateMessage(msg),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return fmt.Errorf("failed to update WaitingForPowerOff condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
+}
+
+func (r *ServerReconciler) clearWaitingForPowerOffCondition(ctx context.Context, server *metalv1alpha1.Server) error {
+	if meta.FindStatusCondition(server.Status.Conditions, ConditionWaitingForPowerOff) == nil {
+		return nil
+	}
+	original := server.DeepCopy()
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		ConditionWaitingForPowerOff,
+		conditionutils.UpdateStatus(metav1.ConditionFalse),
+		conditionutils.UpdateReason(ReasonPowerOffConfirmed),
+		conditionutils.UpdateMessage("BMC confirmed PowerState=Off"),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return fmt.Errorf("failed to update WaitingForPowerOff condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }
 
 func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
-		return modified, err
+	off, err := r.ensureServerPoweredOff(ctx, bmcClient, server)
+	if err != nil {
+		return false, err
+	}
+	if !off {
+		return true, nil
 	}
 
 	if serverClaimRef := server.Spec.ServerClaimRef; serverClaimRef != nil {

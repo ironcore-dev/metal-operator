@@ -463,13 +463,30 @@ func (r *RedfishBaseBMC) GetBiosAttributeValues(ctx context.Context, systemURI s
 	}
 	result := make(schemas.SettingsAttributes, len(attributes))
 	for _, name := range attributes {
-		if _, ok := filteredAttr[name]; ok {
-			result[name] = bios.Attributes[name]
-		} else if _, ok := readOnlyAttr[name]; ok {
-			result[name] = bios.Attributes[name]
+		entry, ok := filteredAttr[name]
+		if !ok {
+			entry, ok = readOnlyAttr[name]
 		}
+		if !ok {
+			continue
+		}
+		result[name] = coerceRegistryValue(entry.Type, bios.Attributes[name])
 	}
 	return result, err
+}
+
+// coerceRegistryValue converts a raw JSON-decoded BIOS attribute value to the Go
+// type expected by checkAttributes, based on the registry attribute Type.
+// JSON numbers decode into any as float64, but integer attributes must be a Go
+// int for the type assertion in checkAttributes to succeed.
+func coerceRegistryValue(attrType string, raw any) any {
+	switch strings.ToLower(attrType) {
+	case "integer":
+		if f, ok := raw.(float64); ok {
+			return int(f)
+		}
+	}
+	return raw
 }
 
 func (r *RedfishBaseBMC) GetBMCAttributeValues(_ context.Context, _ string, attributes map[string]string) (schemas.SettingsAttributes, error) {

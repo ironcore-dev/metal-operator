@@ -309,6 +309,65 @@ var _ = Describe("BIOSSettings Controller", func() {
 		)
 	})
 
+	It("should apply an integer-typed bios setting provided as a string", func(ctx SpecContext) {
+		// MaxCores is mocked as an Integer-typed attribute (ResetRequired false) at
+		// metal-operator/bmc/mock/server/data/Registries/BiosAttributeRegistry.v1_0_0.json
+		// with a current value of 64 at
+		// metal-operator/bmc/mock/server/data/Systems/437XR1138R2/Bios/index.json.
+		// The CRD stores settings as strings, so "128" must be coerced to an int
+		// before being sent to the BMC, otherwise validation rejects it.
+		biosSetting := make(map[string]string)
+		biosSetting["MaxCores"] = "128"
+
+		By("Creating a BIOSSetting")
+		biosSettings := &metalv1alpha1.BIOSSettings{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-integer-setting",
+			},
+			Spec: metalv1alpha1.BIOSSettingsSpec{
+				BIOSSettingsTemplate: metalv1alpha1.BIOSSettingsTemplate{
+					Version: mockUpServerBiosVersion,
+					SettingsFlow: []metalv1alpha1.SettingsFlowItem{{
+						Settings: biosSetting,
+						Priority: 1,
+						Name:     "one",
+					}},
+					ServerMaintenancePolicy: metalv1alpha1.ServerMaintenancePolicyEnforced,
+				},
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+			},
+		}
+		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the Server has the bios setting ref")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.BIOSSettingsRef.Name", biosSettings.Name),
+		)
+
+		By("Ensuring the integer setting is applied and not rejected as invalid")
+		Eventually(Object(biosSettings)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.BIOSSettingsStateApplied),
+			HaveField("Status.LastAppliedTime.IsZero()", false),
+		))
+
+		Consistently(Object(biosSettings)).Should(
+			HaveField("Status.Conditions", Not(ContainElement(
+				HaveField("Reason", ReasonSettingsValidationFailed),
+			))),
+		)
+
+		By("Deleting the BIOSSettings")
+		Expect(k8sClient.Delete(ctx, biosSettings)).To(Succeed())
+
+		By("Ensuring that the bios ref is empty")
+		Eventually(Object(server)).Should(
+			HaveField("Spec.BIOSSettingsRef", BeNil()),
+		)
+		Eventually(Object(server)).Should(
+			HaveField("Status.State", Not(Equal(metalv1alpha1.ServerStateMaintenance))),
+		)
+	})
+
 	It("should request maintenance when changing power status of server, even if bios settings update does not need it", func(ctx SpecContext) {
 		biosSetting := make(map[string]string)
 		// settings mocked at

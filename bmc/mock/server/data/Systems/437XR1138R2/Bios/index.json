@@ -7,6 +7,7 @@
         "AdminPhone": "",
         "BootMode": "Uefi",
         "EmbeddedSata": "Raid",
+        "MaxCores": 64,
         "NicBoot1": "Enabled",
         "NicBoot2": "Disabled",
         "PowerProfile": "MaxPerf",

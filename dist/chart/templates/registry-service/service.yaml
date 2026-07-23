@@ -6,12 +6,12 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   ports:
-  - name: registry
-    port: {{ .Values.registry.port }}
-    protocol: TCP
-    targetPort: {{ .Values.registry.port }}
+    - name: registry
+      port: {{ .Values.registry.port }}
+      protocol: TCP
+      targetPort: {{ .Values.registry.port }}
   selector:
     control-plane: controller-manager
-    {{- include "chart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/name: {{ include "metal-operator.name" . }}
   type: ClusterIP
 {{ end }}

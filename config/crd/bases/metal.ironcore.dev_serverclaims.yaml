@@ -4,6 +4,8 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.21.0
+  labels:
+    clusterctl.cluster.x-k8s.io: ""
   name: serverclaims.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev

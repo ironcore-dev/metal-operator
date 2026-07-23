@@ -69,6 +69,7 @@ type ServerClaimStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=scl
+// +kubebuilder:metadata:labels="clusterctl.cluster.x-k8s.io="
 // +kubebuilder:printcolumn:name="Server",type="string",JSONPath=".spec.serverRef.name"
 // +kubebuilder:printcolumn:name="Ignition",type="string",JSONPath=".spec.ignitionSecretRef.name"
 // +kubebuilder:printcolumn:name="Image",type="string",JSONPath=".spec.image"

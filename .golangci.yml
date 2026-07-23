@@ -75,6 +75,13 @@ linters:
       - linters:
           - staticcheck
         text: "SA1019.*\\.EndpointRef is deprecated"
+      # Server.spec.power is deprecated. The field is an internal
+      # actuator variable that controllers still write while traversing the state machine
+      # and as surrogate input from ServerClaim/ServerMaintenance. Legacy access remains
+      # until the field is fully removed in a future release.
+      - linters:
+          - staticcheck
+        text: "SA1019.*server\\.Spec\\.Power is deprecated"
     paths:
       - third_party$
       - builtin$

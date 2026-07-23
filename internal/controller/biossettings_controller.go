@@ -4,13 +4,13 @@
 package controller
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"maps"
 	"math"
 	"slices"
-	"sort"
 	"strconv"
 	"time"
 
@@ -482,8 +482,8 @@ func (r *BIOSSettingsReconciler) handleSettingInProgressState(ctx context.Contex
 
 	settingsFlow := append([]metalv1alpha1.SettingsFlowItem{}, settings.Spec.SettingsFlow...)
 
-	sort.Slice(settingsFlow, func(i, j int) bool {
-		return settingsFlow[i].Priority <= settingsFlow[j].Priority
+	slices.SortFunc(settingsFlow, func(a, b metalv1alpha1.SettingsFlowItem) int {
+		return cmp.Compare(a.Priority, b.Priority)
 	})
 
 	// loop through all the sequence in priority order and verify/Apply the settings

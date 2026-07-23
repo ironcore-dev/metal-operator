@@ -8,7 +8,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -44,7 +44,7 @@ func (m *stringMapFlag) String() string {
 	for k := range *m {
 		keys = append(keys, k)
 	}
-	sort.Strings(keys)
+	slices.Sort(keys)
 	pairs := make([]string, 0, len(keys))
 	for _, k := range keys {
 		pairs = append(pairs, k+"="+(*m)[k])

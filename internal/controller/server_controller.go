@@ -434,9 +434,21 @@ func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient b
 		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
 
 		if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+			// PowerOff was issued but the BMC has not confirmed
+			// PowerState=Off within the polling timeout. Record the wait as
+			// a condition so it is visible via kubectl describe server, then
+			// return the error to requeue with backoff.
+			if condErr := r.setWaitingForPowerOffCondition(ctx, server, err); condErr != nil {
+				log.V(1).Info("Failed to set WaitingForPowerOff condition", "error", condErr)
+			}
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		log.V(1).Info("Server state set to power off")
+	}
+	// PowerOff confirmed (or already confirmed on entry): clear any prior
+	// WaitingForPowerOff condition.
+	if err := r.clearWaitingForPowerOffCondition(ctx, server); err != nil {
+		log.V(1).Info("Failed to clear WaitingForPowerOff condition", "error", err)
 	}
 
 	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
@@ -489,8 +501,20 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			return false, fmt.Errorf("getting server claim %s: %w", claimKey, err)
 		}
 
-		if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
-			return modified, err
+		// Safety: do not release the Server (Recycle) or move it to
+		// Released (Retain) until the BMC has confirmed PowerState=Off.
+		// ensureServerPoweredOffObserved issues an idempotent PowerOff and
+		// reports whether the BMC has confirmed the target state; it never
+		// blocks waiting for confirmation.
+		readyForRelease, err := r.ensureServerPoweredOffObserved(ctx, bmcClient, server)
+		if err != nil {
+			return false, err
+		}
+		if !readyForRelease {
+			// The WaitingForPowerOff condition is set by the helper. Return
+			// without an error so controller-runtime requeues on the normal
+			// ResyncInterval cadence rather than hot-looping on backoff.
+			return true, nil
 		}
 
 		switch server.Spec.ReclaimPolicy {
@@ -503,6 +527,9 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 			server.Spec.ServerClaimRef = nil
 			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 				return false, fmt.Errorf("failed to remove ServerClaimRef: %w", err)
+			}
+			if err := r.clearWaitingForPowerOffCondition(ctx, server); err != nil {
+				log.V(1).Info("Failed to clear WaitingForPowerOff condition", "error", err)
 			}
 			return false, nil
 		default:
@@ -534,30 +561,61 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 	return true, nil
 }
 
-func (r *ServerReconciler) ensureServerPoweredOffWithoutBootConfig(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (modified bool, err error) {
-	if server.Spec.Power == metalv1alpha1.PowerOff && server.Spec.BootConfigurationRef == nil {
-		return false, nil
+// ensureServerPoweredOffObserved ensures Spec.Power=PowerOff and
+// Spec.BootConfigurationRef=nil, then reports whether the BMC has confirmed
+// Status.PowerState=Off.
+//
+// It never blocks in WaitForServerPowerState: the observed power state is
+// re-read from the BMC by updateServerStatus at the top of every reconcile,
+// so this only issues an idempotent PowerOff command and returns. When the
+// observed state is not yet Off the WaitingForPowerOff condition is set and
+// the caller must not release the ServerClaim; the next resync re-evaluates.
+func (r *ServerReconciler) ensureServerPoweredOffObserved(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (readyForRelease bool, err error) {
+	log := ctrl.LoggerFrom(ctx)
+
+	if server.Spec.Power != metalv1alpha1.PowerOff || server.Spec.BootConfigurationRef != nil {
+		base := server.DeepCopy()
+		server.Spec.Power = metalv1alpha1.PowerOff
+		server.Spec.BootConfigurationRef = nil
+		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+			return false, fmt.Errorf("failed to patch spec.power / spec.bootConfigurationRef: %w", err)
+		}
+		log.V(1).Info("Requested PowerOff and cleared BootConfigurationRef")
 	}
 
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Server claim is gone, powering off server and removing boot configuration")
-	base := server.DeepCopy()
-	server.Spec.Power = metalv1alpha1.PowerOff
-	server.Spec.BootConfigurationRef = nil
-	if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-		return false, fmt.Errorf("failed to update server power state: %w", err)
+	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
+		if err := r.clearWaitingForPowerOffCondition(ctx, server); err != nil {
+			log.V(1).Info("Failed to clear WaitingForPowerOff condition", "error", err)
+		}
+		return true, nil
 	}
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-		return true, fmt.Errorf("failed to power off server after claim deletion: %w", err)
+
+	// Issue an idempotent PowerOff but do NOT block waiting for confirmation;
+	// blocking would hold a controller worker for up to PowerPollingTimeout on
+	// an unhealthy BMC. The next reconcile refreshes Status.PowerState via
+	// updateServerStatus and we re-evaluate.
+	if err := bmcClient.PowerOff(ctx, server.Spec.SystemURI); err != nil {
+		return false, fmt.Errorf("failed to issue PowerOff to BMC: %w", err)
 	}
-	return true, nil
+	waitErr := fmt.Errorf(
+		"BMC has not confirmed PowerState=Off; current PowerState=%q",
+		server.Status.PowerState,
+	)
+	if condErr := r.setWaitingForPowerOffCondition(ctx, server, waitErr); condErr != nil {
+		log.V(1).Info("Failed to set WaitingForPowerOff condition", "error", condErr)
+	}
+	return false, nil
 }
 
 func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	if modified, err := r.ensureServerPoweredOffWithoutBootConfig(ctx, bmcClient, server); err != nil || modified {
-		return modified, err
+	readyForRelease, err := r.ensureServerPoweredOffObserved(ctx, bmcClient, server)
+	if err != nil {
+		return false, err
+	}
+	if !readyForRelease {
+		return true, nil
 	}
 
 	if serverClaimRef := server.Spec.ServerClaimRef; serverClaimRef != nil {
@@ -1190,6 +1248,61 @@ func (r *ServerReconciler) updatePowerOnCondition(ctx context.Context, server *m
 	)
 	if err != nil {
 		return fmt.Errorf("failed to update powering on condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
+}
+
+// setWaitingForPowerOffCondition records on the Server that the reconciler
+// has asked the BMC to power the host off but has not yet observed
+// Status.PowerState=Off. Presence with Status=True means "waiting"; absence
+// or Status=False means "not waiting". This makes the wait visible via
+// kubectl describe server so an operator can distinguish an unhealthy BMC
+// from a wedged controller.
+func (r *ServerReconciler) setWaitingForPowerOffCondition(ctx context.Context, server *metalv1alpha1.Server, cause error) error {
+	original := server.DeepCopy()
+	msg := fmt.Sprintf(
+		"Waiting for BMC to confirm PowerState=Off; current PowerState=%q: %v",
+		server.Status.PowerState, cause,
+	)
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		ConditionWaitingForPowerOff,
+		conditionutils.UpdateStatus(metav1.ConditionTrue),
+		conditionutils.UpdateReason(ReasonWaitingForPowerOff),
+		conditionutils.UpdateMessage(msg),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return fmt.Errorf("failed to update WaitingForPowerOff condition: %w", err)
+	}
+	return r.Status().Patch(ctx, server, client.MergeFrom(original))
+}
+
+// clearWaitingForPowerOffCondition flips the WaitingForPowerOff condition to
+// Status=False with reason=PowerOffConfirmed once the BMC has confirmed
+// PowerState=Off. It is a no-op when no such condition was previously set
+// on this Server, so this helper does not stamp the condition onto Servers
+// that never experienced a wait.
+func (r *ServerReconciler) clearWaitingForPowerOffCondition(ctx context.Context, server *metalv1alpha1.Server) error {
+	found := false
+	for _, c := range server.Status.Conditions {
+		if c.Type == ConditionWaitingForPowerOff {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return nil
+	}
+	original := server.DeepCopy()
+	if err := r.Conditions.UpdateSlice(
+		&server.Status.Conditions,
+		ConditionWaitingForPowerOff,
+		conditionutils.UpdateStatus(metav1.ConditionFalse),
+		conditionutils.UpdateReason(ReasonPowerOffConfirmed),
+		conditionutils.UpdateMessage("BMC confirmed PowerState=Off"),
+		conditionutils.UpdateObserved(server),
+	); err != nil {
+		return fmt.Errorf("failed to clear WaitingForPowerOff condition: %w", err)
 	}
 	return r.Status().Patch(ctx, server, client.MergeFrom(original))
 }

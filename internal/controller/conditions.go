@@ -31,6 +31,12 @@ const (
 	ConditionReady = "Ready"
 	// ConditionRetryOfFailedResourceIssued indicates a retry of a failed resource has been issued.
 	ConditionRetryOfFailedResourceIssued = "RetryOfFailedResourceIssued"
+	// ConditionWaitingForPowerOff indicates that the ServerReconciler has
+	// asked the BMC to power the host off but has not yet observed
+	// Status.PowerState=Off. While this condition is present with
+	// Status=True the Server cannot safely be released from its current
+	// ServerClaim.
+	ConditionWaitingForPowerOff = "WaitingForPowerOff"
 )
 
 // Shared reason strings used across multiple controllers.
@@ -79,4 +85,14 @@ const (
 	ReasonMaintenanceApproved = "ServerMaintenanceApproval"
 	// ReasonRetryOfFailedResourceIssued indicates a retry of a failed resource has been issued.
 	ReasonRetryOfFailedResourceIssued = "RetryOfFailedResourceIssued"
+	// ReasonWaitingForPowerOff indicates the Server is waiting for the BMC
+	// to confirm the target Status.PowerState=Off after a PowerOff command
+	// was issued. Emitted when WaitForServerPowerState (or a subsequent
+	// observation) has not yet seen the transition to Off, for example
+	// when the BMC reports "Unknown" indefinitely.
+	ReasonWaitingForPowerOff = "WaitingForPowerOff"
+	// ReasonPowerOffConfirmed marks the terminal state of the
+	// WaitingForPowerOff condition once the BMC has confirmed
+	// Status.PowerState=Off.
+	ReasonPowerOffConfirmed = "PowerOffConfirmed"
 )

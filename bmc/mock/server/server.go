@@ -158,6 +158,11 @@ type MockServer struct {
 	actionHandlers    []actionHandler       // ordered POST action dispatch table (first match wins)
 	onCreate          map[string]memberHook // collection URL suffix → hook called after a member is added
 	onDelete          map[string]memberHook // collection URL suffix → hook called before a member is removed
+	// stuckPowerState pins the PowerState of a given system path to a specific
+	// value. Subsequent doPowerOff / doPowerOn / doPowerReset invocations on
+	// that path leave PowerState untouched, modelling an unhealthy BMC that
+	// accepts reset commands but never converges to the requested state.
+	stuckPowerState map[string]string
 }
 
 // loadAccountsFromEmbedded seeds the authentication store by reading the
@@ -200,6 +205,7 @@ func NewMockServer(log logr.Logger, addr string, opts ...Option) *MockServer {
 		overrides:         make(map[string]any),
 		upgradedResources: make(map[string]string),
 		accounts:          loadAccountsFromEmbedded(),
+		stuckPowerState:   make(map[string]string),
 		// onCreate hooks run after a new collection member is stored.
 		// Add an entry here to handle side-effects for additional collection types.
 		onCreate: map[string]memberHook{
@@ -839,6 +845,12 @@ func (s *MockServer) doPowerOff(systemPath string) {
 	defer s.mu.Unlock()
 
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		if stuck, pinned := s.stuckPowerState[systemPath]; pinned {
+			base["PowerState"] = stuck
+			s.setLocked(base, false)
+			s.log.Info("Simulated unhealthy BMC ignoring PowerOff", "PowerState", stuck)
+			return
+		}
 		base["PowerState"] = PowerOffState
 		s.setLocked(base, false)
 		s.log.Info("Powered off the system")
@@ -849,6 +861,13 @@ func (s *MockServer) doPowerOn(systemPath, basePath string) {
 	time.Sleep(150 * time.Millisecond)
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		if stuck, pinned := s.stuckPowerState[systemPath]; pinned {
+			base["PowerState"] = stuck
+			s.setLocked(base, false)
+			s.log.Info("Simulated unhealthy BMC ignoring PowerOn", "PowerState", stuck)
+			s.mu.Unlock()
+			return
+		}
 		base["PowerState"] = PowerOnState
 		s.setLocked(base, false)
 		s.log.Info("Powered on the system")
@@ -864,6 +883,13 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 	time.Sleep(150 * time.Millisecond)
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
+		if stuck, pinned := s.stuckPowerState[systemPath]; pinned {
+			base["PowerState"] = stuck
+			s.setLocked(base, false)
+			s.log.Info("Simulated unhealthy BMC ignoring Reset", "PowerState", stuck)
+			s.mu.Unlock()
+			return
+		}
 		base["PowerState"] = PowerOffState
 		s.log.Info("Powered off the system")
 	}
@@ -882,6 +908,53 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 	if err := s.applyPendingBiosSettings(basePath); err != nil {
 		s.log.Error(err, "Failed to apply pending BIOS settings")
 	}
+}
+
+// ForcePowerState pins the served PowerState of the system at systemPath to
+// powerState and prevents subsequent PowerOff / PowerOn / Reset actions from
+// changing it. Passing an empty powerState removes the pin and resets only
+// PowerState back to the embedded default (other overridden fields are kept),
+// so subsequent power actions behave normally again. Callers do not have to
+// trigger a Redfish read to observe the change.
+//
+// systemPath is the on-disk-style path used by the mock (e.g.
+// "data/Systems/437XR1138R2/index.json").
+//
+// It models an unhealthy BMC that accepts power commands but never converges
+// to the requested state.
+func (s *MockServer) ForcePowerState(systemPath, powerState string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if powerState == "" {
+		delete(s.stuckPowerState, systemPath)
+		// Reset only PowerState back to the embedded default so subsequent
+		// power actions behave normally again, without discarding other
+		// fields a test may have PATCHed into the override.
+		if override, ok := s.overrides[systemPath].(map[string]any); ok {
+			embedded, err := dataFS.ReadFile(systemPath)
+			if err != nil {
+				return fmt.Errorf("ForcePowerState: %w", err)
+			}
+			var base map[string]any
+			if err := json.Unmarshal(embedded, &base); err != nil {
+				return fmt.Errorf("ForcePowerState: %w", err)
+			}
+			override["PowerState"] = base["PowerState"]
+		}
+		s.log.Info("Cleared forced PowerState", "systemPath", systemPath)
+		return nil
+	}
+
+	base, err := s.loadResourceLocked(systemPath)
+	if err != nil {
+		return fmt.Errorf("ForcePowerState: %w", err)
+	}
+	base["PowerState"] = powerState
+	s.overrides[systemPath] = base
+	s.stuckPowerState[systemPath] = powerState
+	s.log.Info("Forced PowerState", "systemPath", systemPath, "PowerState", powerState)
+	return nil
 }
 
 func (s *MockServer) doBMCReset(bmcPath string) {

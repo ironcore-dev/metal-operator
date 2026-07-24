@@ -831,7 +831,7 @@ var _ = Describe("ServerMaintenance Controller", func() {
 			HaveField("Finalizers", ContainElement(serverMaintenanceFinalizer)),
 		)
 
-		By("Setting ignore-reconciliation annotation to prevent the reconciler from re-adding the finalizer")
+		By("Setting ignore operation annotation to prevent the reconciler from re-adding the finalizer")
 		Eventually(Update(serverMaintenance, func() {
 			metav1.SetMetaDataAnnotation(&serverMaintenance.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationIgnore)
 		})).Should(Succeed())

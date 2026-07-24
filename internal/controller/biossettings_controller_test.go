@@ -879,7 +879,7 @@ var _ = Describe("BIOSSettings Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-from-server-avail",
 				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
 				},
 			},
 			Spec: metalv1alpha1.BIOSSettingsSpec{

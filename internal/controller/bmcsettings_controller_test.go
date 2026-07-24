@@ -474,7 +474,7 @@ var _ = Describe("BMCSettings Controller", func() {
 
 		Eventually(Update(settings, func() {
 			settings.Annotations = map[string]string{
-				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
 			}
 		})).Should(Succeed())
 
@@ -626,7 +626,7 @@ var _ = Describe("BMCSettings Controller", func() {
 				Namespace:    ns.Name,
 				GenerateName: "test-bmc-upgrade",
 				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
 				},
 			},
 			Spec: metalv1alpha1.BMCSettingsSpec{

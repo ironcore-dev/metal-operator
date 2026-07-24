@@ -9,51 +9,65 @@ import (
 	"github.com/stmcginnis/gofish/schemas"
 )
 
-// establishing general rule for constants naming for Annotations
-// "Key" for Annotation constants should be named OperationAnnotation.
-// we do not want to handle multiple annotation keys for outside the spec flow operations.
-// "Value" for Annotation constants should be named as OperationAnnotation<ActionType>
+// Establishing the general rule for constants naming for Annotations:
+//   - "Key" for Annotation constants should be named OperationAnnotation.
+//     We do not want to handle multiple annotation keys for operations performed
+//     outside the spec-defined flow.
+//   - "Value" for Annotation constants should be named as OperationAnnotation<ActionType>.
+//
+// Values follow the grammar: <verb>[-child]
+// where <verb> is one of: ignore | retry
 // e.g.
-// OperationAnnotationIgnore
-// OperationAnnotationIgnoreChild
-// OperationAnnotationIgnoreChildAndSelf
-// OperationAnnotationRetry
+//
+//	OperationAnnotationIgnore  -> "ignore"
+//	OperationAnnotationRetry   -> "retry"
 
 const (
-	// OperationAnnotation indicates operation should be performed outside the current spec definition flow.
-	// This annotation performs Operation on the Server.
+	// OperationAnnotation is the annotation key selecting an out-of-band operation to perform on
+	// a resource, i.e. an action driven by the annotation value rather than by spec reconciliation.
+	// Its value must be one of the OperationAnnotation* constants below.
 	OperationAnnotation = "metal.ironcore.dev/operation"
 
-	// OperationAnnotationIgnore skips the reconciliation of a resource if OperationAnnotation is set to this.
-	OperationAnnotationIgnore = "ignore-reconciliation"
+	// OperationAnnotationIgnore makes the reconciler skip a resource entirely when set on it.
+	OperationAnnotationIgnore = "ignore"
 
-	// OperationAnnotationIgnorePropagated skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
-	OperationAnnotationIgnorePropagated = "ignore-reconciliation-propagated"
+	// OperationAnnotationIgnorePropagated is set by the controller on a child resource to make the
+	// child's reconciler skip it, after the parent requested ignoring its children via ignore-child
+	// or ignore-child-and-self. It is controller-set state, not user-facing input.
+	OperationAnnotationIgnorePropagated = "ignore-propagated"
 
-	// OperationAnnotationIgnoreChild skips the reconciliation of a resource's Child if OperationAnnotation is set to this.
-	OperationAnnotationIgnoreChild = "ignore-child-reconciliation"
-	// OperationAnnotationIgnoreChildAndSelf skips the reconciliation of a resource's Child ans self if OperationAnnotation is set to this.
-	OperationAnnotationIgnoreChildAndSelf = "ignore-child-and-self-reconciliation"
-	// OperationAnnotationRetryChild restarts the reconciliation of a resource's Child if OperationAnnotation is set to this, from failed state -> initial state.
-	OperationAnnotationRetryChild = "retry-child-reconciliation"
-	// OperationAnnotationRetryChildAndSelf restarts the reconciliation of a resource's Child ans self if OperationAnnotation is set to this, from failed state -> initial state..
-	OperationAnnotationRetryChildAndSelf = "retry-child-and-self-reconciliation"
+	// OperationAnnotationIgnoreChild makes the controller skip reconciling a parent resource's
+	// children while still reconciling the parent itself.
+	OperationAnnotationIgnoreChild = "ignore-child"
+	// OperationAnnotationIgnoreChildAndSelf makes the controller skip reconciling both a parent
+	// resource's children and the parent itself.
+	OperationAnnotationIgnoreChildAndSelf = "ignore-child-and-self"
+	// OperationAnnotationRetryChild restarts the reconciliation of a parent resource's children
+	// from failed state back to initial state.
+	OperationAnnotationRetryChild = "retry-child"
+	// OperationAnnotationRetryChildAndSelf restarts the reconciliation of both a parent resource's
+	// children and the parent itself from failed state back to initial state.
+	OperationAnnotationRetryChildAndSelf = "retry-child-and-self"
 
-	// AnnotationInstanceType is used to specify the type of Server.
-	AnnotationInstanceType = "metal.ironcore.dev/instance-type"
-
-	// OperationAnnotationForceUpdateOrDeleteInProgress allows update/Delete of a resource even if it is in progress.
+	// OperationAnnotationForceUpdateOrDeleteInProgress allows a resource to be deleted even while an
+	// operation is still in progress.
 	OperationAnnotationForceUpdateOrDeleteInProgress = "allow-in-progress-delete"
-	// OperationAnnotationForceUpdateInProgress allows update of a resource even if it is in progress.
+	// OperationAnnotationForceUpdateInProgress allows a resource to be updated even while an operation
+	// is still in progress.
 	OperationAnnotationForceUpdateInProgress = "allow-in-progress-update"
 
-	// OperationAnnotationRetryFailed restarts the reconciliation of a resource from failed state -> initial state.
-	OperationAnnotationRetryFailed = "retry-failed-state-resource"
+	// OperationAnnotationRetry restarts a resource's reconciliation from failed state back to
+	// initial state when set on it.
+	OperationAnnotationRetry = "retry"
 
-	// OperationAnnotationRetryFailedPropagated restarts the reconciliation of a resource's child from failed state -> initial state.
-	OperationAnnotationRetryFailedPropagated = "retry-failed-state-resource-propagated"
+	// OperationAnnotationRetryPropagated is set by the controller on a child resource to restart
+	// the child's reconciliation from failed state back to initial state, after the parent requested
+	// retrying its children via retry-child or retry-child-and-self. It is controller-set state, not
+	// user-facing input.
+	OperationAnnotationRetryPropagated = "retry-propagated"
 
-	// OperationAnnotationRotateCredentials is used to indicate that credentials should be rotated.
+	// OperationAnnotationRotateCredentials indicates that a resource's credentials should be rotated
+	// when set on it.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 
 	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
@@ -73,18 +87,17 @@ const (
 const SecretTypeUserData v1.SecretType = "metal.ironcore.dev/user-data"
 
 const (
-	// GracefulShutdownServerPower indicates to gracefully restart the baremetal server power.
+	// GracefulRestartServerPower indicates to gracefully restart the baremetal server power.
 	GracefulRestartServerPower = "graceful-restart-server"
 	// HardRestartServerPower indicates to hard restart the baremetal server power.
 	HardRestartServerPower = "hard-restart-server"
-	// PowerOffServerPower indicates to power cycle the baremetal server.
+	// PowerCycleServerPower indicates to power cycle the baremetal server.
 	PowerCycleServerPower = "power-cycle-server"
 	// ForceOffServerPower indicates to force powerOff the baremetal server power.
 	ForceOffServerPower = "force-off-server"
 	// ForceOnServerPower indicates to force powerOn the baremetal server power.
 	ForceOnServerPower = "force-on-server"
-
-	// GracefulShutdownBMC indicates to gracefully restart the baremetal server's BMC's power.
+	// GracefulRestartBMC indicates to gracefully restart the baremetal server's BMC's power.
 	GracefulRestartBMC = "graceful-restart-bmc"
 )
 

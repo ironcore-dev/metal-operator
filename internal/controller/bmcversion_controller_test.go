@@ -368,7 +368,7 @@ var _ = Describe("BMCVersion Controller", func() {
 			ObjectMeta: metav1.ObjectMeta{
 				GenerateName: "test-",
 				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetryFailed,
+					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationRetry,
 				},
 			},
 			Spec: metalv1alpha1.BMCVersionSpec{

@@ -624,7 +624,7 @@ func (r *BIOSSettingsReconciler) applySettingUpdate(ctx context.Context, bmcClie
 				turnOnServer,
 				conditionutils.UpdateStatus(corev1.ConditionTrue),
 				conditionutils.UpdateReason(ReasonSettingsServerPoweredOn),
-				conditionutils.UpdateMessage("Server is powered On to start the biosUpdate process"),
+				conditionutils.UpdateMessage("Server is powered On to start the bios settings update process"),
 			); err != nil {
 				return false, fmt.Errorf("failed to update power on server condition: %w", err)
 			}

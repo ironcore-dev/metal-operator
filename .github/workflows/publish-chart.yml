@@ -83,8 +83,8 @@ jobs:
       - name: Set container image repository and tag
         run: |
           IMAGE_TAG=sha-$(echo ${{ github.sha }} | cut -c1-7)
-          yq -i '.controllerManager.manager.image.repository = "ghcr.io/ironcore-dev/metal-operator-controller-manager"' dist/chart/values.yaml
-          yq -i '.controllerManager.manager.image.tag = "'$IMAGE_TAG'"' dist/chart/values.yaml
+          yq -i '.manager.image.repository = "ghcr.io/ironcore-dev/metal-operator-controller-manager"' dist/chart/values.yaml
+          yq -i '.manager.image.tag = "'$IMAGE_TAG'"' dist/chart/values.yaml
 
       - name: Package Helm chart with crds folder in template
         run: |

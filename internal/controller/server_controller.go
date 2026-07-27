@@ -476,6 +476,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil || modified {
 			return true, err
 		}
+		return true, nil
 	}
 
 	log = log.WithValues("ServerClaimRef", serverClaimRef)
@@ -1390,6 +1391,9 @@ func (r *ServerReconciler) handleAnnotationOperations(ctx context.Context, bmcCl
 }
 
 func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, server *metalv1alpha1.Server) bool {
+	if len(server.ManagedFields) == 0 {
+		return false
+	}
 	length := len(server.ManagedFields) - 1
 	if server.ManagedFields[length].Operation == "Update" {
 		if server.ManagedFields[length].Subresource == "status" {

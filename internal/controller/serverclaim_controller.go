@@ -74,7 +74,7 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1
 	if err := r.cleanupAndShutdownServer(ctx, claim); err != nil {
 		return ctrl.Result{}, err
 	}
-	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, serverClaimFinalizer); !apierrors.IsNotFound(err) || modified {
+	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
@@ -296,35 +296,28 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 	}
 
 	var selectedServer *metalv1alpha1.Server
+	selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
+	if err != nil {
+		return nil, err
+	}
 	for _, server := range serverList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
-		if err != nil {
-			return nil, err
-		}
 		switch {
 		case claim.Spec.ServerRef != nil:
-			// server reference is provided, we should only consider this server
 			if server.Name != claim.Spec.ServerRef.Name {
-				// server reference not matching
 				continue
 			}
-			// server reference matches, now check for selector if provided
 			if claim.Spec.ServerSelector != nil && !selector.Matches(labels.Set(server.Labels)) {
-				log.V(1).Info("Specified server matches ServerRef But does not match label selector", "Server", server.Name, "Claim", claim.Name)
+				log.V(1).Info("Specified server matches ServerRef but does not match label selector", "Server", server.Name, "Claim", claim.Name)
 				continue
 			}
 		case claim.Spec.ServerSelector != nil:
-			// server selector is provided, we should only consider servers matching the selector
 			if !selector.Matches(labels.Set(server.Labels)) {
 				log.V(1).Info("Specified server does not match label selector", "Server", server.Name, "Claim", claim.Name)
 				continue
 			}
 		}
 
-		// server has to passed all the checks for free server
-		// always select the first matching server
-		// we continue through the loop to find if previously claimed server is also present
-		if selectedServer == nil && r.isServerClaimable(ctx, &server, claim) {
+		if r.isServerClaimable(ctx, &server, claim) {
 			selectedServer = &server
 			break
 		}
@@ -347,8 +340,7 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 
 	// ensureObjectRefForServer uses optimistic locking on the patch, so it will
 	// not overwrite a claim that was set between our re-fetch and the write.
-	err := r.ensureObjectRefForServer(ctx, claim, selectedServer)
-	if err != nil {
+	if err = r.ensureObjectRefForServer(ctx, claim, selectedServer); err != nil {
 		return nil, err
 	}
 	// If another reconciler won the optimistic-lock race, the ref will point to
@@ -366,7 +358,7 @@ func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, ser
 		log.V(1).Info("Server in or entering Maintenance, Hence can not be claimed")
 		return true, nil
 	}
-	// check if the current available state is a temerary state between multiple Maintenances states.
+	// check if the current available state is a temporary state between multiple Maintenances states.
 	// We do not want to claim server while it is undergoing series of Maintenance in sequence.
 	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
 	if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {

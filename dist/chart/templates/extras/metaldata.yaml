@@ -26,7 +26,10 @@ spec:
       containers:
       - command:
         - /metaldata
-        image: metaldata:latest
+        image: "{{ .Values.metaldata.image.repository }}:{{ .Values.metaldata.image.tag | default .Chart.AppVersion }}"
+        {{- with .Values.metaldata.image.pullPolicy }}
+        imagePullPolicy: {{ . }}
+        {{- end }}
         livenessProbe:
           httpGet:
             path: /healthz

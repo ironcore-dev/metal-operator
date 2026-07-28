@@ -200,3 +200,11 @@ image: metalprobe:latest
 flags: ""
 sshPublicKey: ""
 passwordHash: ""
+
+## Configure the metaldata DaemonSet
+##
+metaldata:
+  image:
+    repository: ghcr.io/ironcore-dev/metaldata
+    # tag: ""
+    pullPolicy: IfNotPresent

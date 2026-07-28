@@ -262,6 +262,18 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 .PHONY: helm
 helm: manifests kubebuilder
 	"$(KUBEBUILDER)" edit --plugins=helm/v2-alpha
+	@sed -i '/^        imagePullPolicy: /d' \
+	  dist/chart/templates/extras/metaldata.yaml
+	@grep -qF '        image: metaldata:latest' \
+	  dist/chart/templates/extras/metaldata.yaml || { \
+	  echo "unexpected metaldata template; image patch not applied" >&2; exit 1; }
+	@sed -i \
+	  's|image: metaldata:latest|image: "{{ .Values.metaldata.image.repository }}:{{ .Values.metaldata.image.tag \| default .Chart.AppVersion }}"\n        {{- with .Values.metaldata.image.pullPolicy }}\n        imagePullPolicy: {{ . }}\n        {{- end }}|' \
+	  dist/chart/templates/extras/metaldata.yaml
+	@awk '/^metaldata:/{f=1} f && /^[ \t]+image:/{found=1; exit} END{exit !found}' \
+	  dist/chart/values.yaml || \
+	  printf '\n## Configure the metaldata DaemonSet\n##\nmetaldata:\n  image:\n    repository: ghcr.io/ironcore-dev/metaldata\n    # tag: ""\n    pullPolicy: IfNotPresent\n' \
+	  >> dist/chart/values.yaml
 
 ##@ Dependencies
 

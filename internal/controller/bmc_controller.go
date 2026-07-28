@@ -124,8 +124,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	}
 	if r.waitForBMCReset(bmcObj, r.BMCResetWaitTime) {
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
-		err := r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
-		if err != nil {
+		if err := r.patchBMCStatePending(ctx, bmcObj); err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{
@@ -144,10 +143,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 				RequeueAfter: r.BMCClientRetryInterval,
 			}, nil
 		}
-		err = r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
+		return ctrl.Result{RequeueAfter: r.BMCClientRetryInterval}, r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
 	}
 	defer bmcClient.Logout()
 
@@ -227,6 +223,7 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bm
 	if err != nil {
 		return fmt.Errorf("failed to get manager details for BMC %s: %w", bmcObj.Name, err)
 	}
+	// GetManager returns (nil, err) on failure, so manager is non-nil here.
 	// parse time to metav1.Time: ISO 8601 format
 	lastResetTime := &metav1.Time{}
 	if manager.LastResetTime != "" {
@@ -235,27 +232,23 @@ func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bm
 			lastResetTime = &metav1.Time{Time: t}
 		}
 	}
-	if manager != nil {
-		bmcBase := bmcObj.DeepCopy()
-		bmcObj.Status.Manufacturer = manager.Manufacturer
-		bmcObj.Status.State = metalv1alpha1.BMCState(string(manager.Status.State))
-		// Set power state, or unknown if not available from BMC
-		if manager.PowerState != "" {
-			bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(string(manager.PowerState))
-		} else {
-			bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
-			log.V(1).Info("Power state not reported by BMC, setting to unknown", "BMC", bmcObj.Name)
-		}
-		bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
-		bmcObj.Status.SerialNumber = manager.SerialNumber
-		bmcObj.Status.SKU = manager.PartNumber
-		bmcObj.Status.Model = manager.Model
-		bmcObj.Status.LastResetTime = lastResetTime
-		if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
-			return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)
-		}
+	bmcBase = bmcObj.DeepCopy()
+	bmcObj.Status.Manufacturer = manager.Manufacturer
+	bmcObj.Status.State = metalv1alpha1.BMCState(manager.Status.State)
+	// Set power state, or unknown if not available from BMC
+	if manager.PowerState != "" {
+		bmcObj.Status.PowerState = metalv1alpha1.BMCPowerState(manager.PowerState)
 	} else {
-		log.V(1).Info("Manager details not available for BMC", "BMC", bmcObj.Name)
+		bmcObj.Status.PowerState = metalv1alpha1.UnknownPowerState
+		log.V(1).Info("Power state not reported by BMC, setting to unknown", "BMC", bmcObj.Name)
+	}
+	bmcObj.Status.FirmwareVersion = manager.FirmwareVersion
+	bmcObj.Status.SerialNumber = manager.SerialNumber
+	bmcObj.Status.SKU = manager.PartNumber
+	bmcObj.Status.Model = manager.Model
+	bmcObj.Status.LastResetTime = lastResetTime
+	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
+		return fmt.Errorf("failed to patch manager details for BMC %s: %w", bmcObj.Name, err)
 	}
 	return nil
 }
@@ -291,7 +284,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("errors occurred during server discovery: %v", errs)
+		return fmt.Errorf("errors occurred during server discovery: %w", errors.Join(errs...))
 	}
 	return nil
 }
@@ -478,12 +471,12 @@ func (r *BMCReconciler) shouldResetBMC(bmcObj *metalv1alpha1.BMC) bool {
 	return false
 }
 
-func (r *BMCReconciler) updateBMCState(ctx context.Context, bmcObj *metalv1alpha1.BMC, state metalv1alpha1.BMCState) error {
-	if bmcObj.Status.State == state {
+func (r *BMCReconciler) patchBMCStatePending(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+	if bmcObj.Status.State == metalv1alpha1.BMCStatePending {
 		return nil
 	}
 	bmcBase := bmcObj.DeepCopy()
-	bmcObj.Status.State = state
+	bmcObj.Status.State = metalv1alpha1.BMCStatePending
 	if err := r.Status().Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 		return fmt.Errorf("failed to patch BMC state to Pending: %w", err)
 	}
@@ -495,23 +488,29 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 	if err := r.updateConditions(ctx, bmcObj, true, ConditionReset, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
-	var err error
-	if bmcClient != nil {
-		if err = bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType); err == nil {
-			log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
-			return r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending)
-		}
+	if bmcClient == nil {
+		// No client connection at all (e.g. auto-reset reached with a nil
+		// client from GetBMCClientFromBMC). No Redfish call possible — surface
+		// it instead of logging a nil error.
+		return errors.Join(
+			r.patchBMCStatePending(ctx, bmcObj),
+			fmt.Errorf("could not reset BMC %s: no client connection", bmcObj.Name),
+		)
 	}
-	// BMC Unavailable, currently can not perform reset. try to reset with ssh when available
-	log.Error(err, "Failed to reset BMC via Redfish, falling back to reset via SSH", "BMC", bmcObj.Name)
-	if httpErr, ok := err.(*schemas.Error); ok {
-		// only handle 5xx errors
-		if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-			return errors.Join(r.updateBMCState(ctx, bmcObj, metalv1alpha1.BMCStatePending), fmt.Errorf("could not reset BMC: %w", err))
-		}
+	if err := bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType); err == nil {
+		log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
+		return r.patchBMCStatePending(ctx, bmcObj)
 	} else {
-		return fmt.Errorf("could not reset BMC, unknown error: %w", err)
+		if httpErr, ok := errors.AsType[*schemas.Error](err); ok {
+			// only retryable on 5xx; anything else is a permanent failure for this attempt
+			if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
+				return errors.Join(r.patchBMCStatePending(ctx, bmcObj), fmt.Errorf("could not reset BMC: %w", err))
+			}
+		} else {
+			return fmt.Errorf("could not reset BMC, unknown error: %w", err)
+		}
 	}
+	log.V(1).Info("BMC reset returned a retryable 5xx, leaving reset condition set", "BMC", bmcObj.Name)
 	return nil
 }
 

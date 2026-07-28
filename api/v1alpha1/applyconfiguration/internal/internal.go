@@ -592,7 +592,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCState
-      default: Pending
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUser
   map:
     fields:

@@ -130,7 +130,7 @@ func main() { // nolint: gocyclo
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
 		"Reset the BMC after this duration of consecutive failures. 0 to disable.")
 	flag.DurationVar(&bmcResetResyncInterval, "bmc-reset-resync-interval", 2*time.Minute,
-		"Defines the interval at which the bmc is polled when bmc reset is in-progress.")
+		"Defines the interval at which the BMC is requeued after a connection failure or while a reset is in progress.")
 	flag.DurationVar(&bmcResetWaitingInterval, "bmc-reset-waiting-interval", 2*time.Minute,
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
@@ -425,18 +425,18 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:                 mgr.GetClient(),
-		Scheme:                 mgr.GetScheme(),
-		DefaultProtocol:        effectiveProtocol,
-		SkipCertValidation:     effectiveSkipCert,
-		BMCFailureResetDelay:   bmcFailureResetDelay,
-		BMCResetWaitTime:       bmcResetWaitingInterval,
-		BMCClientRetryInterval: bmcResetResyncInterval,
-		ManagerNamespace:       managerNamespace,
-		EventURL:               eventURL,
-		DNSRecordTemplate:      dnsRecordTemplate,
-		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
+		Client:              mgr.GetClient(),
+		Scheme:              mgr.GetScheme(),
+		DefaultProtocol:     effectiveProtocol,
+		SkipCertValidation:  effectiveSkipCert,
+		FailureResetDelay:   bmcFailureResetDelay,
+		ResetWaitTime:       bmcResetWaitingInterval,
+		ClientRetryInterval: bmcResetResyncInterval,
+		ManagerNamespace:    managerNamespace,
+		EventURL:            eventURL,
+		DNSRecordTemplate:   dnsRecordTemplate,
+		Conditions:          conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Options: bmc.Options{
 			BasicAuth: true,
 		},
 	}).SetupWithManager(mgr); err != nil {

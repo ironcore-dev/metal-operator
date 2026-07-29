@@ -5952,6 +5952,9 @@ spec:
         - --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
         command:
         - /manager
+        env:
+        - name: ENABLE_WEBHOOKS
+          value: "true"
         image: controller:latest
         livenessProbe:
           httpGet:

@@ -260,7 +260,7 @@ undeploy: kustomize ## Undeploy controller from the K8s cluster specified in ~/.
 	"$(KUSTOMIZE)" build config/default | "$(KUBECTL)" delete --ignore-not-found=$(ignore-not-found) -f -
 
 .PHONY: helm
-helm: manifests kubebuilder
+helm: manifests kubebuilder yq
 	"$(KUBEBUILDER)" edit --plugins=helm/v2-alpha
 	@sed -i '/^        imagePullPolicy: /d' \
 	  dist/chart/templates/extras/metaldata.yaml
@@ -274,6 +274,14 @@ helm: manifests kubebuilder
 	  dist/chart/values.yaml || \
 	  printf '\n## Configure the metaldata DaemonSet\n##\nmetaldata:\n  image:\n    repository: ghcr.io/ironcore-dev/metaldata\n    # tag: ""\n    pullPolicy: IfNotPresent\n' \
 	  >> dist/chart/values.yaml
+	@# Patch metaldata pod template to support additional labels via values
+	@grep -qF '        app.kubernetes.io/managed-by: {{ .Release.Service }}' \
+	  dist/chart/templates/extras/metaldata.yaml || { \
+	  echo "unexpected metaldata template; additionalLabels patch not applied" >&2; exit 1; }
+	@sed -i \
+	  's|        app.kubernetes.io/managed-by: {{ .Release.Service }}$$|        app.kubernetes.io/managed-by: {{ .Release.Service }}\n        {{- with .Values.metaldata.additionalLabels }}\n        {{- toYaml . \| nindent 8 }}\n        {{- end }}|' \
+	  dist/chart/templates/extras/metaldata.yaml
+	@"$(YQ)" -i '.metaldata.additionalLabels = (.metaldata.additionalLabels // {})' dist/chart/values.yaml
 
 ##@ Dependencies
 

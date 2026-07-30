@@ -100,7 +100,7 @@ func main() { // nolint: gocyclo
 		discoveryTimeout                   time.Duration
 		biosSettingsApplyTimeout           time.Duration
 		bmcFailureResetDelay               time.Duration
-		bmcResetResyncInterval             time.Duration
+		bmcReconnectInterval               time.Duration
 		bmcResetWaitingInterval            time.Duration
 		serverMaxConcurrentReconciles      int
 		serverClaimMaxConcurrentReconciles int
@@ -129,7 +129,7 @@ func main() { // nolint: gocyclo
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
 		"Reset the BMC after this duration of consecutive failures. 0 to disable.")
-	flag.DurationVar(&bmcResetResyncInterval, "bmc-reset-resync-interval", 2*time.Minute,
+	flag.DurationVar(&bmcReconnectInterval, "bmc-reconnect-interval", 2*time.Minute,
 		"Defines the interval at which the BMC is requeued after a connection failure or while a reset is in progress.")
 	flag.DurationVar(&bmcResetWaitingInterval, "bmc-reset-waiting-interval", 2*time.Minute,
 		"Defines the duration which the bmc waits before reconciling again when bmc has been reset.")
@@ -425,17 +425,17 @@ func main() { // nolint: gocyclo
 		os.Exit(1)
 	}
 	if err = (&controller.BMCReconciler{
-		Client:              mgr.GetClient(),
-		Scheme:              mgr.GetScheme(),
-		DefaultProtocol:     effectiveProtocol,
-		SkipCertValidation:  effectiveSkipCert,
-		FailureResetDelay:   bmcFailureResetDelay,
-		ResetWaitTime:       bmcResetWaitingInterval,
-		ClientRetryInterval: bmcResetResyncInterval,
-		ManagerNamespace:    managerNamespace,
-		EventURL:            eventURL,
-		DNSRecordTemplate:   dnsRecordTemplate,
-		Conditions:          conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
+		Client:             mgr.GetClient(),
+		Scheme:             mgr.GetScheme(),
+		DefaultProtocol:    effectiveProtocol,
+		SkipCertValidation: effectiveSkipCert,
+		FailureResetDelay:  bmcFailureResetDelay,
+		ResetWaitTime:      bmcResetWaitingInterval,
+		ReconnectInterval:  bmcReconnectInterval,
+		ManagerNamespace:   managerNamespace,
+		EventURL:           eventURL,
+		DNSRecordTemplate:  dnsRecordTemplate,
+		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		Options: bmc.Options{
 			BasicAuth: true,
 		},

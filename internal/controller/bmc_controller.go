@@ -45,17 +45,17 @@ const (
 // BMCReconciler reconciles a BMC object
 type BMCReconciler struct {
 	client.Client
-	Scheme              *runtime.Scheme
-	DefaultProtocol     metalv1alpha1.ProtocolScheme
-	SkipCertValidation  bool
-	FailureResetDelay   time.Duration
-	Options             bmc.Options
-	ManagerNamespace    string
-	EventURL            string
-	ResetWaitTime       time.Duration
-	ClientRetryInterval time.Duration
-	DNSRecordTemplate   string
-	Conditions          *conditionutils.Accessor
+	Scheme             *runtime.Scheme
+	DefaultProtocol    metalv1alpha1.ProtocolScheme
+	SkipCertValidation bool
+	FailureResetDelay  time.Duration
+	Options            bmc.Options
+	ManagerNamespace   string
+	EventURL           string
+	ResetWaitTime      time.Duration
+	ReconnectInterval  time.Duration
+	DNSRecordTemplate  string
+	Conditions         *conditionutils.Accessor
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=endpoints,verbs=get;list;watch
@@ -120,15 +120,15 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 		return ctrl.Result{}, nil
 	}
 
-	switch r.resetWaitState(bmcObj, r.ResetWaitTime) {
+	switch r.resetWaitState(bmcObj) {
 	case resetWaitPending:
 		log.V(1).Info("Skipped BMC reconciliation while waiting for BMC reset to complete")
-		return ctrl.Result{RequeueAfter: r.ClientRetryInterval}, nil
+		return ctrl.Result{RequeueAfter: r.ReconnectInterval}, nil
 	case resetWaitExpired:
 		// The reset wait window elapsed but ConditionReset is still True. Clear
 		// it so shouldResetBMC can schedule future auto-resets; otherwise the
 		// stuck True condition blocks all recovery while the BMC stays down.
-		if err := r.clearResetCondition(ctx, bmcObj); err != nil {
+		if err := r.clearResetCondition(ctx, bmcObj, ReasonResetTimeout, "BMC reset timed out waiting for reconnect"); err != nil {
 			return ctrl.Result{}, err
 		}
 	}
@@ -142,10 +142,10 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			}
 			log.V(1).Info("BMC reset initiated", "BMC", bmcObj.Name)
 			return ctrl.Result{
-				RequeueAfter: r.ClientRetryInterval,
+				RequeueAfter: r.ReconnectInterval,
 			}, nil
 		}
-		return ctrl.Result{RequeueAfter: r.ClientRetryInterval}, r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
+		return ctrl.Result{RequeueAfter: r.ReconnectInterval}, r.updateReadyConditionOnBMCFailure(ctx, bmcObj, err)
 	}
 	defer bmcClient.Logout()
 
@@ -426,14 +426,14 @@ const (
 	resetWaitExpired                       // ConditionReset is True but the wait window has elapsed
 )
 
-func (r *BMCReconciler) resetWaitState(bmcObj *metalv1alpha1.BMC, delay time.Duration) resetWaitState {
+func (r *BMCReconciler) resetWaitState(bmcObj *metalv1alpha1.BMC) resetWaitState {
 	condition := &metav1.Condition{}
 	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, ConditionReset, condition)
 	if err != nil || !found || condition.Status != metav1.ConditionTrue {
 		return resetWaitNone
 	}
 	// give bmc some time to start the reset process
-	if time.Since(condition.LastTransitionTime.Time) < delay {
+	if time.Since(condition.LastTransitionTime.Time) < r.ResetWaitTime {
 		return resetWaitPending
 	}
 	return resetWaitExpired
@@ -465,35 +465,34 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
 	if bmcClient == nil {
-		return errors.Join(
-			r.clearResetCondition(ctx, bmcObj),
-			fmt.Errorf("could not reset BMC %s: no client connection", bmcObj.Name),
-		)
+		return r.failReset(ctx, bmcObj, fmt.Errorf("could not reset BMC %s: no client connection", bmcObj.Name))
 	}
-	if err := bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType); err == nil {
+	err := bmcClient.ResetManager(ctx, bmcObj.Spec.BMCUUID, schemas.GracefulRestartResetType)
+	if err == nil {
 		log.Info("Successfully reset BMC via Redfish", "BMC", bmcObj.Name)
 		return nil
-	} else {
-		if httpErr, ok := errors.AsType[*schemas.Error](err); ok {
-			// only retryable on 5xx; anything else is a permanent failure for this attempt
-			if httpErr.HTTPReturnedStatusCode < 500 || httpErr.HTTPReturnedStatusCode >= 600 {
-				return errors.Join(
-					r.clearResetCondition(ctx, bmcObj),
-					fmt.Errorf("could not reset BMC: %w", err),
-				)
-			}
-		} else {
-			return errors.Join(
-				r.clearResetCondition(ctx, bmcObj),
-				fmt.Errorf("could not reset BMC, unknown error: %w", err),
-			)
-		}
 	}
-	log.V(1).Info("BMC reset returned a retryable 5xx, leaving reset condition set", "BMC", bmcObj.Name)
-	return nil
+	if httpErr, ok := errors.AsType[*schemas.Error](err); ok {
+		// only retryable on 5xx; anything else is a permanent failure for this attempt
+		if httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
+			log.V(1).Info("BMC reset returned a retryable 5xx, leaving reset condition set", "BMC", bmcObj.Name)
+			return nil
+		}
+		return r.failReset(ctx, bmcObj, fmt.Errorf("could not reset BMC: %w", err))
+	}
+	return r.failReset(ctx, bmcObj, fmt.Errorf("could not reset BMC, unknown error: %w", err))
 }
 
-func (r *BMCReconciler) clearResetCondition(ctx context.Context, bmcObj *metalv1alpha1.BMC) error {
+// failReset clears the in-flight reset condition and joins the clearing error
+// with the reset failure.
+func (r *BMCReconciler) failReset(ctx context.Context, bmcObj *metalv1alpha1.BMC, err error) error {
+	return errors.Join(
+		r.clearResetCondition(ctx, bmcObj, ReasonResetFailed, "BMC reset failed"),
+		err,
+	)
+}
+
+func (r *BMCReconciler) clearResetCondition(ctx context.Context, bmcObj *metalv1alpha1.BMC, reason, message string) error {
 	found, err := r.Conditions.FindSlice(bmcObj.Status.Conditions, ConditionReset, &metav1.Condition{})
 	if err != nil {
 		return fmt.Errorf("failed to find condition %s: %w", ConditionReset, err)
@@ -501,7 +500,7 @@ func (r *BMCReconciler) clearResetCondition(ctx context.Context, bmcObj *metalv1
 	if !found {
 		return nil
 	}
-	return r.patchCondition(ctx, bmcObj, ConditionReset, corev1.ConditionFalse, ReasonResetFailed, "BMC reset failed")
+	return r.patchCondition(ctx, bmcObj, ConditionReset, corev1.ConditionFalse, reason, message)
 }
 
 func (r *BMCReconciler) patchCondition(ctx context.Context, bmcObj *metalv1alpha1.BMC, conditionType string, status corev1.ConditionStatus, reason, message string) error {

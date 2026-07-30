@@ -58,6 +58,9 @@ const (
 	ReasonResetComplete = "ResetComplete"
 	// ReasonResetFailed indicates a reset attempt failed.
 	ReasonResetFailed = "ResetFailed"
+	// ReasonResetTimeout indicates a reset was issued but the BMC did not
+	// reconnect within the reset wait window.
+	ReasonResetTimeout = "ResetTimeout"
 	// ReasonResetRequired indicates a reset is needed but not yet issued.
 	ReasonResetRequired = "ResetRequired"
 	// ReasonNoResetRequired indicates no reset is needed for this apply cycle.

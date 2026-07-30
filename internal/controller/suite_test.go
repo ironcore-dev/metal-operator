@@ -178,16 +178,16 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		Expect(err).NotTo(HaveOccurred())
 
 		Expect((&BMCReconciler{
-			Client:              k8sManager.GetClient(),
-			Scheme:              k8sManager.GetScheme(),
-			DefaultProtocol:     metalv1alpha1.HTTPProtocolScheme,
-			SkipCertValidation:  true,
-			ManagerNamespace:    ns.Name,
-			ResetWaitTime:       400 * time.Millisecond,
-			ClientRetryInterval: 25 * time.Millisecond,
-			EventURL:            "http://localhost:8008",
-			DNSRecordTemplate:   dnsTemplate,
-			Conditions:          accessor,
+			Client:             k8sManager.GetClient(),
+			Scheme:             k8sManager.GetScheme(),
+			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
+			SkipCertValidation: true,
+			ManagerNamespace:   ns.Name,
+			ResetWaitTime:      400 * time.Millisecond,
+			ReconnectInterval:  25 * time.Millisecond,
+			EventURL:           "http://localhost:8008",
+			DNSRecordTemplate:  dnsTemplate,
+			Conditions:         accessor,
 			Options: bmc.Options{
 				PowerPollingInterval: 50 * time.Millisecond,
 				PowerPollingTimeout:  200 * time.Millisecond,

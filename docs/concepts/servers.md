@@ -67,7 +67,19 @@ A server undergoes the following phases:
     - Servers in the `Available` state can transition to `Maintenance`.
     - Maintenance tasks such as BIOS updates or hardware repairs are performed.
 
-7. **Error**:
+7. **Parked**:
+    - An overlay state a server enters when it is **parked** out of the `ServerClaim` lifecycle so an
+      external component can run an out-of-band **day-2 operation** (a firmware or BIOS/BMC update,
+      hardware rework, diagnostics, or low-level storage reconfiguration) that must not be fought by
+      the reconcilers.
+    - While parked, both the `Server` and `ServerClaim` reconcilers stand down: the server is powered
+      off, no boot is performed, and no power state is healed, so an intermediate restart during the
+      procedure cannot boot the claim's image.
+    - Only servers in the `Available` or `Reserved` state can be parked. A park request on a server in
+      any other state is deferred until it reaches a parkable state.
+    - See [Parking](#parking) below.
+
+8. **Error**:
     - The server has encountered an error.
     - Requires intervention to resolve issues before it can return to `Available`.
 
@@ -86,6 +98,10 @@ stateDiagram-v2
     Released --> Available : serverClaimRef cleared manually
     Available --> Maintenance : Maintenance initiated
     Maintenance --> Initial : Maintenance complete
+    Available --> Parked : Park requested
+    Reserved --> Parked : Park requested
+    Parked --> Available : Parked annotation removed (no ServerClaimRef)
+    Parked --> Reserved : Parked annotation removed (ServerClaimRef present)
     Available --> Error : Error detected
     Reserved --> Error : Error detected
     Discovery --> Error : Error detected
@@ -175,6 +191,96 @@ kubectl patch server my-server --type=merge -p '{"spec":{"unclaimable":false}}'
 ```
 
 Any subject with `update` permission on the `Server` resource can toggle `spec.unclaimable`, typically operators/admins for manual maintenance and automated maintenance controllers.
+
+## Parking
+
+Parking takes a `Server` out of the `ServerClaim` lifecycle so an external component can run an
+out-of-band **day-2 operation**, a firmware or BIOS/BMC update, hardware rework, diagnostics, or
+low-level storage reconfiguration, without the reconcilers interfering. Parking is what powers the
+server down: as part of reaching the `Parked` state the operator powers the server **off** itself,
+then stands down so an external component can perform the procedure. While a server is parked, both
+the `Server` and `ServerClaim` reconcilers stand down: no boot is performed and no power state is
+healed, so an intermediate restart during the procedure cannot boot the claim's image. The bound
+`ServerClaim` stays in place (bound), so on recovery the claim controller can take over again
+without re-scheduling.
+
+Parking uses two annotations with distinct roles:
+
+- `metal.ironcore.dev/operation: park`: a **transient request** set by the external actor. The
+  `Server` reconciler removes it again as soon as the server has reached the `Parked` state.
+- `metal.ironcore.dev/parked: "true"`: a **durable, controller-set marker** the operator writes
+  when it parks the server and removes when it un-parks it. It is the source of truth for the parked
+  state: if `status.state` is ever lost or reset, the reconcilers reconstruct the parked status from
+  this annotation and keep standing down across operator restarts.
+
+### Lifecycle
+
+1. **Request.** The external actor sets the `operation` annotation to `park`:
+
+   ```yaml
+   metadata:
+     annotations:
+       metal.ironcore.dev/operation: park
+   ```
+
+   This is a one-shot request; it does **not** itself persist the parked state.
+2. **Park.** The `Server` reconciler observes the request and, if the server is in a parkable state
+   (`Available` or `Reserved`):
+   - powers the server **off** (idempotent; only if not already off),
+   - records the parked state by setting the internal `metal.ironcore.dev/parked: "true"` annotation,
+   - sets `status.state = Parked`,
+   - **removes** the `metal.ironcore.dev/operation: park` request annotation again.
+3. **Stand down.** While the `metal.ironcore.dev/parked` annotation is present:
+   - the `Server` reconciler returns early, before any power healing, boot, or state-machine
+     progression,
+   - the `ServerClaim` reconciler returns early, so the claim does not re-apply the boot
+     configuration or revert power. The `ServerClaim` stays bound; its phase is unchanged.
+   - If `status.state` is ever lost or reset, the reconcilers reconstruct the parked status from the
+     annotation and keep standing down.
+4. **Resume.** The external actor brings the server back by removing the internal
+   `metal.ironcore.dev/parked` annotation (or clearing its value). The next reconciliation re-enters
+   the normal flow:
+   - the `Server` reconciler refreshes system info (hardware or firmware state may have changed
+     during the procedure),
+   - transitions back to the pre-parking state: `Reserved` if the server has a `ServerClaimRef`,
+     otherwise `Available`,
+   - the `ServerClaim` reconciler takes over again and re-applies the boot configuration and power
+     state as before.
+
+   Removing the `metal.ironcore.dev/operation` annotation is **not** the resume signal: that
+   annotation was already consumed during parking. Resume is driven by the requestor removing the
+   internal `parked` annotation.
+
+### Admission control
+
+Parking is admitted only from the `Available` and `Reserved` states, the in-use states. A `park`
+request on a server in any other state (`Initial`, `Discovery`, `Released`, `Maintenance`, `Error`)
+is **deferred**: the request annotation is left in place and retried on the next resync, so a server
+that is still discovering (or otherwise not yet parkable) is parked automatically once it reaches a
+parkable state, without the requestor having to re-issue the request.
+
+### Interaction with deletion
+
+The `parked` annotation does **not** gate the deletion path. A `Server` that is deleted while parked
+is still cleaned up normally: the finalizer is removed and the boot configuration deleted. Parking and
+deletion are independent.
+
+### Example
+
+Park a reserved server to run a firmware update out of band:
+
+```bash
+kubectl annotate server my-server metal.ironcore.dev/operation=park
+```
+
+Once the server has reached `Parked` (and the request annotation is consumed), perform the procedure.
+When done, bring the server back by removing the parked marker:
+
+```bash
+kubectl annotate server my-server metal.ironcore.dev/parked-
+```
+
+The server powers back on and the bound `ServerClaim` resumes ownership without re-scheduling.
 
 ## Interaction with BMC
 

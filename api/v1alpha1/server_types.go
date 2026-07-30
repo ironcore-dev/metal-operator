@@ -199,6 +199,11 @@ const (
 
 	// ServerStateMaintenance indicates that the server is in maintenance.
 	ServerStateMaintenance ServerState = "Maintenance"
+
+	// ServerStateParked indicates that the server is parked out of the ServerClaim lifecycle so an
+	// external component can run out-of-band day-2 operations. Parked is an overlay state: while
+	// active, normal state-machine progression, boot, and power healing are suspended.
+	ServerStateParked ServerState = "Parked"
 )
 
 // IndicatorLED represents LED indicator states

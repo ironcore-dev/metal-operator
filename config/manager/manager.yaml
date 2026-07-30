@@ -64,6 +64,9 @@ spec:
         - /manager
         args:
         - --leader-elect
+        env:
+        - name: ENABLE_WEBHOOKS
+          value: "true"
         image: controller:latest
         name: manager
         ports:

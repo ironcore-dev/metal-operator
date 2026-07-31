@@ -751,8 +751,8 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring the server is powered off while parked")
 		Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState))
 
-		By("Asserting the claim reconciler does not revert spec.power to On while parked")
-		Consistently(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOff))
+		By("Asserting spec.power is left untouched while parked")
+		Consistently(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
 
 		By("Resuming the server")
 		Eventually(Update(server, func() {

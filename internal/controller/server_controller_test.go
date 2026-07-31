@@ -1503,6 +1503,93 @@ passwd:
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		})
 
+		It("should not power off a parked server that the external actor powered on", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			park(server)
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			mockPowerState := func() string {
+				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("http://%s:%d%s", MockServerIP, MockServerPort, server.Spec.SystemURI), nil)
+				Expect(err).NotTo(HaveOccurred())
+				req.SetBasicAuth("foo", "bar")
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					return ""
+				}
+				defer func() { _ = resp.Body.Close() }()
+				out := struct {
+					PowerState string `json:"PowerState"`
+				}{}
+				Expect(json.NewDecoder(resp.Body).Decode(&out)).To(Succeed())
+				return out.PowerState
+			}
+
+			By("Simulating the external actor powering the server on out of band")
+			resetReq, err := http.NewRequest(http.MethodPost,
+				fmt.Sprintf("http://%s:%d%s/Actions/ComputerSystem.Reset", MockServerIP, MockServerPort, server.Spec.SystemURI),
+				bytes.NewBufferString(`{"ResetType":"On"}`),
+			)
+			Expect(err).NotTo(HaveOccurred())
+			resetReq.SetBasicAuth("foo", "bar")
+			resetReq.Header.Set("Content-Type", "application/json")
+			resp, err := http.DefaultClient.Do(resetReq)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(resp.StatusCode).To(Equal(http.StatusAccepted))
+			Expect(resp.Body.Close()).To(Succeed())
+			Eventually(mockPowerState).Should(Equal("On"))
+
+			By("Nudging a reconciliation while parked (dummy annotation)")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, "metal.ironcore.dev/parked-tickle", "true")
+			})).Should(Succeed())
+
+			By("Ensuring the operator does not power the parked server back off")
+			Consistently(mockPowerState, "2s", "100ms").Should(Equal("On"))
+
+			By("Resuming the server")
+			Eventually(Update(server, func() {
+				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should stay parked when a ServerMaintenanceRef appears while parked", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			park(server)
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			By("Attaching a ServerMaintenanceRef while parked")
+			Eventually(Update(server, func() {
+				server.Spec.ServerMaintenanceRef = &metalv1alpha1.ObjectReference{Name: "parked-maintenance"}
+			})).Should(Succeed())
+
+			By("Ensuring the server stays parked and does not flap to Maintenance")
+			Consistently(Object(server), "2s", "100ms").Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			By("Resuming the server after clearing the maintenance ref")
+			Eventually(Update(server, func() {
+				server.Spec.ServerMaintenanceRef = nil
+				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
 		It("should defer a park request on a non-parkable state and park once parkable", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 

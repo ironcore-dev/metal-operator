@@ -72,9 +72,11 @@ A server undergoes the following phases:
       external component can run an out-of-band **day-2 operation** (a firmware or BIOS/BMC update,
       hardware rework, diagnostics, or low-level storage reconfiguration) that must not be fought by
       the reconcilers.
-    - While parked, both the `Server` and `ServerClaim` reconcilers stand down: the server is powered
-      off, no boot is performed, and no power state is healed, so an intermediate restart during the
-      procedure cannot boot the claim's image.
+    - Entering the state powers the server **off**. While parked, both the `Server` and `ServerClaim`
+      reconcilers stand down: no boot is performed and no power state is healed, so the external actor
+      owns power control (e.g. the power cycles a firmware update needs). Boot behavior during the
+      procedure is the external actor's responsibility: it must ensure a correct boot order so the box
+      does not boot the claim's image.
     - Only servers in the `Available` or `Reserved` state can be parked. A park request on a server in
       any other state is deferred until it reaches a parkable state.
     - See [Parking](#parking) below.
@@ -209,7 +211,8 @@ Parking uses two annotations with distinct roles:
 - `metal.ironcore.dev/operation: park`: a **transient request** set by the external actor. The
   `Server` reconciler removes it again as soon as the server has reached the `Parked` state.
 - `metal.ironcore.dev/parked: "true"`: a **durable, controller-set marker** the operator writes
-  when it parks the server and removes when it un-parks it. It is the source of truth for the parked
+  when it parks the server. The external actor removes it again to end parking. It is the source of
+  truth for the parked
   state: if `status.state` is ever lost or reset, the reconcilers reconstruct the parked status from
   this annotation and keep standing down across operator restarts.
 
@@ -226,7 +229,8 @@ Parking uses two annotations with distinct roles:
    This is a one-shot request; it does **not** itself persist the parked state.
 2. **Park.** The `Server` reconciler observes the request and, if the server is in a parkable state
    (`Available` or `Reserved`):
-   - powers the server **off** (idempotent; only if not already off),
+   - powers the server **off** via the BMC (idempotent; only if not already off; `spec.power` is
+     left untouched),
    - records the parked state by setting the internal `metal.ironcore.dev/parked: "true"` annotation,
    - sets `status.state = Parked`,
    - **removes** the `metal.ironcore.dev/operation: park` request annotation again.
@@ -280,7 +284,7 @@ When done, bring the server back by removing the parked marker:
 kubectl annotate server my-server metal.ironcore.dev/parked-
 ```
 
-The server powers back on and the bound `ServerClaim` resumes ownership without re-scheduling.
+The bound `ServerClaim` resumes ownership without re-scheduling, and its reconciler reapplies the claim's requested power state, including `Off` when the claim requests it.
 
 ## Interaction with BMC
 

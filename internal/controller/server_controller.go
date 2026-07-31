@@ -244,8 +244,8 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, err
 	}
 
-	if modified, err := r.handleParkedState(ctx, bmcClient, server); err != nil || modified {
-		return ctrl.Result{}, err
+	if result, handled, err := r.handleParkedState(ctx, bmcClient, server); err != nil || handled {
+		return result, err
 	}
 
 	if modified, err := r.handleAnnotationOperations(ctx, bmcClient, server); err != nil || modified {
@@ -731,7 +731,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 	return false, nil
 }
 
-func (r *ServerReconciler) handleParkedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) handleParkedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	parked := isServerParked(server)
@@ -742,43 +742,38 @@ func (r *ServerReconciler) handleParkedState(ctx context.Context, bmcClient bmc.
 		prePark := r.resolvePreParkState(server)
 		log.Info("Resuming Server from Parked state", "preParkState", prePark)
 		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
-			return false, fmt.Errorf("failed to refresh server system info on resume: %w", err)
+			return ctrl.Result{}, false, fmt.Errorf("failed to refresh server system info on resume: %w", err)
 		}
 		if modified, err := r.patchServerState(ctx, server, prePark); err != nil || modified {
-			return modified, err
+			return ctrl.Result{}, modified, err
 		}
-		return false, nil
+		return ctrl.Result{}, false, nil
 	}
 
-	// 2. Stay parked: the annotation is the source of truth.
+	// 2. Stay parked: the annotation is the source of truth. Stand down entirely: no power
+	// healing, no boot order, no state-machine progression. The external actor owns the server
+	// (including power) until the parked annotation is removed, which re-triggers reconciliation.
 	if parked {
 		if server.Status.State != metalv1alpha1.ServerStateParked {
 			log.Info("Reconciling Parked state from parked annotation", "currentState", server.Status.State)
 			if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateParked); err != nil || modified {
-				return modified, err
+				return ctrl.Result{}, modified, err
 			}
 		}
-		if server.Status.PowerState != metalv1alpha1.ServerOffPowerState &&
-			server.Status.PowerState != metalv1alpha1.ServerPoweringOffPowerState {
-			log.V(1).Info("Server is parked but not off, powering off")
-			if err := r.ensureParkedServerPoweredOff(ctx, bmcClient, server); err != nil {
-				return false, err
-			}
-		}
-		return false, nil
+		return ctrl.Result{}, true, nil
 	}
 
 	// 3. Park request: not parked yet.
 	if hasParkRequest {
 		if !isParkableState(server.Status.State) {
 			log.V(1).Info("Server is not in a parkable state, deferring park request", "currentState", server.Status.State)
-			return false, nil
+			return ctrl.Result{}, false, nil
 		}
 		log.V(1).Info("Park requested, parking server")
 		return r.parkServer(ctx, bmcClient, server)
 	}
 
-	return false, nil
+	return ctrl.Result{}, false, nil
 }
 
 func isParkableState(state metalv1alpha1.ServerState) bool {
@@ -789,61 +784,42 @@ func isParkableState(state metalv1alpha1.ServerState) bool {
 	return false
 }
 
-// parkServer powers the server off (idempotent), records the parked annotation,
-// sets status.state = Parked, and removes the transient operation: park request annotation.
-func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
+// parkServer powers the server off via the BMC (idempotent, spec.power is left untouched),
+// records the parked annotation, sets status.state = Parked, and removes the transient
+// operation: park request annotation.
+func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	if err := r.ensureParkedServerPoweredOff(ctx, bmcClient, server); err != nil {
-		return false, err
+	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
+		return ctrl.Result{}, false, fmt.Errorf("failed to update server status: %w", err)
+	}
+
+	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState &&
+		server.Status.PowerState != metalv1alpha1.ServerPoweringOffPowerState {
+		if err := bmcClient.PowerOff(ctx, server.Spec.SystemURI); err != nil {
+			return ctrl.Result{}, false, fmt.Errorf("failed to power off server for parking: %w", err)
+		}
+		log.V(1).Info("Requested power off for parking")
 	}
 
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
-		return true, nil
+		// Wait for the power off to take effect; requeue explicitly since a BMC-side power
+		// transition might not produce a watch event.
+		return ctrl.Result{RequeueAfter: r.ResyncInterval}, true, nil
 	}
 
 	serverBase := server.DeepCopy()
 	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)
 	metautils.DeleteAnnotation(server, metalv1alpha1.OperationAnnotation)
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch parked annotations: %w", err)
+		return ctrl.Result{}, false, fmt.Errorf("failed to patch parked annotations: %w", err)
 	}
 
 	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateParked); err != nil {
-		return false, err
+		return ctrl.Result{}, false, err
 	}
 	log.Info("Parked Server")
-	return true, nil
-}
-
-// ensureParkedServerPoweredOff sets spec.Power = PowerOff and powers the server.
-func (r *ServerReconciler) ensureParkedServerPoweredOff(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
-	log := ctrl.LoggerFrom(ctx)
-
-	if server.Spec.Power != metalv1alpha1.PowerOff {
-		serverBase := server.DeepCopy()
-		// TODO: drop the spec.power write — it's deprecated (#1042) and only kept here to carry
-		// the desired state until the field is removed.
-		server.Spec.Power = metalv1alpha1.PowerOff
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return fmt.Errorf("failed to patch spec.power: %w", err)
-		}
-		log.V(1).Info("Requested power off for parked server")
-	}
-
-	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
-		return fmt.Errorf("failed to update server status: %w", err)
-	}
-
-	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState ||
-		server.Status.PowerState == metalv1alpha1.ServerPoweringOffPowerState {
-		return nil
-	}
-
-	if err := bmcClient.PowerOff(ctx, server.Spec.SystemURI); err != nil {
-		return fmt.Errorf("failed to power off parked server: %w", err)
-	}
-	return nil
+	return ctrl.Result{}, true, nil
 }
 
 func (r *ServerReconciler) resolvePreParkState(server *metalv1alpha1.Server) metalv1alpha1.ServerState {

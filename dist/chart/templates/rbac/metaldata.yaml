@@ -17,6 +17,6 @@ metadata:
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  name: metal-operator-metaldata
+  name: {{ include "metal-operator.resourceName" (dict "suffix" "metaldata" "context" $) }}
   namespace: {{ .Release.Namespace }}
 {{- end }}

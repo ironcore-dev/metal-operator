@@ -282,6 +282,13 @@ helm: manifests kubebuilder yq
 	  's|        app.kubernetes.io/managed-by: {{ .Release.Service }}$$|        app.kubernetes.io/managed-by: {{ .Release.Service }}\n        {{- with .Values.metaldata.additionalLabels }}\n        {{- toYaml . \| nindent 8 }}\n        {{- end }}|' \
 	  dist/chart/templates/extras/metaldata.yaml
 	@"$(YQ)" -i '.metaldata.additionalLabels = (.metaldata.additionalLabels // {})' dist/chart/values.yaml
+	@# Fix metaldata ServiceAccount name
+	@grep -qF '  name: metal-operator-metaldata' \
+	  dist/chart/templates/rbac/metaldata.yaml || { \
+	  echo "unexpected metaldata SA template; name patch not applied" >&2; exit 1; }
+	@sed -i \
+	  's|  name: metal-operator-metaldata$$|  name: {{ include "metal-operator.resourceName" (dict "suffix" "metaldata" "context" $$) }}|' \
+	  dist/chart/templates/rbac/metaldata.yaml
 
 ##@ Dependencies
 

@@ -99,6 +99,11 @@ const (
 	ForceOnServerPower = "force-on-server"
 	// GracefulRestartBMC indicates to gracefully restart the baremetal server's BMC's power.
 	GracefulRestartBMC = "graceful-restart-bmc"
+
+	// ForceSSHResetBMC is set internally by the BMCReconciler on the OperationAnnotation when a
+	// Redfish reset fails with a 5xx error. On the next reconcile the controller detects this
+	// annotation and performs the SSH reset directly.
+	ForceSSHResetBMC = "force-ssh-reset-bmc"
 )
 
 var AnnotationToRedfishMapping = map[string]schemas.ResetType{

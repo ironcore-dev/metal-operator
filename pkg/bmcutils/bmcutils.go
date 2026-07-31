@@ -261,6 +261,10 @@ func GetServerNameFromBMCandIndex(index int, bmcObj *metalv1alpha1.BMC) string {
 	return fmt.Sprintf("%s-%s-%d", bmcObj.Name, "system", index)
 }
 
+// SSHResetBMCFunc is the function used to perform SSH-based BMC resets.
+// It can be replaced in tests to inject a mock implementation.
+var SSHResetBMCFunc = SSHResetBMC
+
 func SSHResetBMC(ctx context.Context, ip, manufacturer, username, password string, timeout time.Duration) error {
 	// If Redfish reset fails, try SSH-based reset for known manufacturers
 	config := &ssh.ClientConfig{

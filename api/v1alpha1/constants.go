@@ -70,6 +70,12 @@ const (
 	// when set on it.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 
+	// ShardLabel assigns a resource to an operator shard. An operator instance
+	// started with --shard=<name> only watches and reconciles resources carrying
+	// this label with value <name>. An instance without --shard only handles
+	// resources that do not carry the label at all.
+	ShardLabel = "metal.ironcore.dev/shard"
+
 	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
 	// whose suffix is exposed via the metaldata service to the booted server.
 	MetadataKeyPrefix = "metadata.metal.ironcore.dev/"

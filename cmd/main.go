@@ -28,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -90,6 +91,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
+		shard                              string
 		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
@@ -159,6 +161,9 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
+	flag.StringVar(&shard, "shard", "",
+		"Name of the shard this instance owns. Only resources labeled "+metalv1alpha1.ShardLabel+"=<name> "+
+			"are watched and reconciled. If empty, only resources without the shard label are handled.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -378,13 +383,27 @@ func main() { // nolint: gocyclo
 		})
 	}
 
+	shardSelector, err := metalv1alpha1.ShardSelector(shard)
+	if err != nil {
+		setupLog.Error(err, "Invalid shard name", "shard", shard)
+		os.Exit(1)
+	}
+	leaderElectionID := "f26702e4.ironcore.dev"
+	if shard != "" {
+		setupLog.Info("Running in sharded mode", "shard", shard)
+		leaderElectionID = fmt.Sprintf("%s-%s", shard, leaderElectionID)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cache.Options{DefaultLabelSelector: shardSelector},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "f26702e4.ironcore.dev",
+		// The election ID is prefixed with the shard name so that instances
+		// owning different shards do not compete for the same lease.
+		LeaderElectionID: leaderElectionID,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

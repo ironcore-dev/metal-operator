@@ -739,12 +739,12 @@ var _ = Describe("BMC SSH Reset", func() {
 		Eventually(func(g Gomega) {
 			list := &metalv1alpha1.BMCList{}
 			g.Expect(k8sClient.List(ctx, list)).To(Succeed())
-			g.Expect(list.Items).To(HaveLen(0))
+			g.Expect(list.Items).To(BeEmpty())
 		}).WithTimeout(30 * time.Second).Should(Succeed())
 		Eventually(func(g Gomega) {
 			list := &metalv1alpha1.ServerList{}
 			g.Expect(k8sClient.List(ctx, list)).To(Succeed())
-			g.Expect(list.Items).To(HaveLen(0))
+			g.Expect(list.Items).To(BeEmpty())
 		}).WithTimeout(30 * time.Second).Should(Succeed())
 	})
 

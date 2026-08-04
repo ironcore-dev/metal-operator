@@ -8,7 +8,7 @@ running inside an isolated network (per-AZ traffic, non-routable
 console/provisioning networks) never generates BMC/Redfish traffic for
 resources owned elsewhere.
 
-The watch filter is label based and applies uniformly to every resource type
+The watch filter is label-based and applies uniformly to every resource type
 the operator watches (`Server`, `ServerClaim`, `BMC`, `BMCSecret`, `Endpoint`,
 `ServerBootConfiguration`, ...). There is no automatic assignment, hashing or
 rebalancing: the label expresses ownership, nothing more.
@@ -77,22 +77,18 @@ namePrefix: experimental-
 
 patches:
   - path: manager_watchfilter_patch.yaml
+    target:
+      kind: Deployment
+      name: controller-manager
 ```
 
 ```yaml
 # overlays/watch-filter-experimental/manager_watchfilter_patch.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: controller-manager
-spec:
-  template:
-    spec:
-      containers:
-        - name: manager
-          args: # replaces the args list, keep flags from the base
-            - --leader-elect
-            - --watch-filter=experimental
+# JSON6902 append: adds only the watch-filter flag, all base args
+# (--leader-elect, --metrics-cert-path, --webhook-cert-path, ...) stay intact
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --watch-filter=experimental
 ```
 
 Deploy both against the same API server:

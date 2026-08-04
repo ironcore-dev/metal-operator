@@ -153,7 +153,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)
-			if err := r.resetBMC(ctx, bmcObj, bmcClient, ReasonAutoReset, bmcAutoResetMessage); err != nil {
+			if err := r.resetBMC(ctx, bmcObj, bmcClient, nil, ReasonAutoReset, bmcAutoResetMessage); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to reset BMC: %w", err)
 			}
 			log.V(1).Info("BMC reset initiated", "BMC", bmcObj.Name)
@@ -170,7 +170,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			if err := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to remove operation annotation: %w", err)
 			}
-			if err := r.resetBMCWithErr(ctx, bmcObj, bmcClient, connErr, ReasonUserReset, bmcUserResetMessage); err != nil {
+			if err := r.resetBMC(ctx, bmcObj, bmcClient, connErr, ReasonUserReset, bmcUserResetMessage); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to reset BMC: %w", err)
 			}
 			return ctrl.Result{RequeueAfter: r.BMCClientRetryInterval}, nil
@@ -394,7 +394,7 @@ func (r *BMCReconciler) handleAnnotationOperations(ctx context.Context, bmcObj *
 	switch value {
 	case schemas.GracefulRestartResetType:
 		log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", value)
-		if err := r.resetBMC(ctx, bmcObj, bmcClient, ReasonUserReset, bmcUserResetMessage); err != nil {
+		if err := r.resetBMC(ctx, bmcObj, bmcClient, nil, ReasonUserReset, bmcUserResetMessage); err != nil {
 			return false, fmt.Errorf("failed to reset BMC: %w", err)
 		}
 		log.Info("Handled operation", "Operation", operation)
@@ -516,11 +516,7 @@ func (r *BMCReconciler) patchBMCStatePending(ctx context.Context, bmcObj *metalv
 	return nil
 }
 
-func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC, reason, message string) error {
-	return r.resetBMCWithErr(ctx, bmcObj, bmcClient, nil, reason, message)
-}
-
-func (r *BMCReconciler) resetBMCWithErr(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC, clientErr error, reason, message string) error {
+func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC, bmcClient bmc.BMC, clientErr error, reason, message string) error {
 	log := ctrl.LoggerFrom(ctx)
 	if err := r.updateConditions(ctx, bmcObj, true, ConditionReset, corev1.ConditionTrue, reason, message); err != nil {
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)

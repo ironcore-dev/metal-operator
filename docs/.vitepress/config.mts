@@ -74,7 +74,7 @@ export default withMermaid({
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
-          { text: 'Sharding', link: '/concepts/sharding' },
+          { text: 'Watch Filter', link: '/concepts/watch-filter' },
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
           { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },

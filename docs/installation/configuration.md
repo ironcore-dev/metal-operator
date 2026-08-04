@@ -4,11 +4,11 @@ The metal-operator manager is configured via command line flags. When deploying
 with Helm or Kustomize, flags are passed as container args of the manager
 Deployment.
 
-## Sharding
+## Watch filter
 
 | Flag | Default | Description |
 |---|---|---|
-| `--shard` | `""` | Name of the shard this instance owns. Only resources labeled `metal.ironcore.dev/shard=<name>` are watched and reconciled. If empty, only resources *without* the shard label are handled. See [Sharding](/concepts/sharding). |
+| `--watch-filter` | `""` | Watch filter value selecting the resources this instance owns. Only resources labeled `metal.ironcore.dev/watch-filter=<value>` are watched and reconciled. If empty, only resources *without* the watch-filter label are handled. See [Watch Filter](/concepts/watch-filter). |
 
 ## Server reconciliation
 
@@ -18,7 +18,7 @@ Deployment.
 | `--server-claim-max-concurrent-reconciles` | `5` | Maximum number of concurrent ServerClaim reconciles. |
 | `--server-resync-interval` | `2m` | Interval at which a Server is polled. |
 | `--enforce-first-boot` | `false` | Enforce first boot probing of a Server even if it is powered on in the Initial state. |
-| `--enforce-power-off` | `false` | Enforce power off of a Server when graceful shutdown fails. |
+| `--enforce-power-off` | `false` | Forcibly power off a Server when graceful shutdown fails. |
 | `--default-failed-auto-retry-count` | `0` | Default number of auto retries for a CR when it fails. `0` for no retries. |
 | `--maintenance-resync-interval` | `2m` | Interval at which the CR performing maintenance is polled. |
 | `--dns-record-template-path` | `""` | Path to the DNS record template file used for creating DNS records for Servers. |

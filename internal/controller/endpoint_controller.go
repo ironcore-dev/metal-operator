@@ -194,7 +194,7 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, en
 	bmcObj := &metalv1alpha1.BMC{}
 	bmcObj.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcObj, func() error {
-		metalv1alpha1.PropagateShardLabel(bmcObj, endpoint)
+		metalv1alpha1.PropagateWatchFilterLabel(bmcObj, endpoint)
 		spec := &bmcObj.Spec
 		spec.EndpointRef = &corev1.LocalObjectReference{Name: endpoint.Name}
 		spec.BMCSecretRef = corev1.LocalObjectReference{Name: secret.Name}
@@ -225,7 +225,7 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metal
 	bmcSecret := &metalv1alpha1.BMCSecret{}
 	bmcSecret.Name = endpoint.Name
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bmcSecret, func() error {
-		metalv1alpha1.PropagateShardLabel(bmcSecret, endpoint)
+		metalv1alpha1.PropagateWatchFilterLabel(bmcSecret, endpoint)
 		bmcSecret.Data = map[string][]byte{
 			metalv1alpha1.BMCSecretUsernameKeyName: []byte(m.DefaultCredentials[0].Username),
 			metalv1alpha1.BMCSecretPasswordKeyName: []byte(m.DefaultCredentials[0].Password),

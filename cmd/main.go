@@ -91,7 +91,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
-		shard                              string
+		watchFilter                        string
 		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
@@ -161,9 +161,10 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
-	flag.StringVar(&shard, "shard", "",
-		"Name of the shard this instance owns. Only resources labeled "+metalv1alpha1.ShardLabel+"=<name> "+
-			"are watched and reconciled. If empty, only resources without the shard label are handled.")
+	flag.StringVar(&watchFilter, "watch-filter", "",
+		"Watch filter value selecting the resources this instance owns. Only resources labeled "+
+			""+metalv1alpha1.WatchFilterLabel+"=<value> are watched and reconciled. If empty, only resources without "+
+			"the label are handled.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -383,26 +384,26 @@ func main() { // nolint: gocyclo
 		})
 	}
 
-	shardSelector, err := metalv1alpha1.ShardSelector(shard)
+	watchFilterSelector, err := metalv1alpha1.WatchFilterSelector(watchFilter)
 	if err != nil {
-		setupLog.Error(err, "Invalid shard name", "shard", shard)
+		setupLog.Error(err, "Invalid watch filter value", "watchFilter", watchFilter)
 		os.Exit(1)
 	}
 	leaderElectionID := "f26702e4.ironcore.dev"
-	if shard != "" {
-		setupLog.Info("Running in sharded mode", "shard", shard)
-		leaderElectionID = fmt.Sprintf("%s-%s", shard, leaderElectionID)
+	if watchFilter != "" {
+		setupLog.Info("Running with watch filter", "watchFilter", watchFilter)
+		leaderElectionID = fmt.Sprintf("%s-%s", watchFilter, leaderElectionID)
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
-		Cache:                  cache.Options{DefaultLabelSelector: shardSelector},
+		Cache:                  cache.Options{DefaultLabelSelector: watchFilterSelector},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		// The election ID is prefixed with the shard name so that instances
-		// owning different shards do not compete for the same lease.
+		// The election ID is prefixed with the watch filter value so that
+		// instances owning different filters do not compete for the same lease.
 		LeaderElectionID: leaderElectionID,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the

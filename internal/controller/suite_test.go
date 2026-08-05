@@ -43,7 +43,7 @@ import (
 const (
 	pollingInterval      = 50 * time.Millisecond
 	eventuallyTimeout    = 5 * time.Second
-	consistentlyDuration = 1 * time.Second
+	consistentlyDuration = 300 * time.Millisecond
 	MockServerIP         = "127.0.0.1"
 )
 

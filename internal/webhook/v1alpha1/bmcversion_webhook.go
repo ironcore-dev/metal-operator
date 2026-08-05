@@ -101,8 +101,11 @@ func (v *BMCVersionCustomValidator) ValidateDelete(ctx context.Context, obj *met
 }
 
 func checkForDuplicateBMCVersionsRefToBMC(versionList *metalv1alpha1.BMCVersionList, version *metalv1alpha1.BMCVersion) error {
+	if version.Spec.BMCRef == nil {
+		return nil
+	}
 	for _, v := range versionList.Items {
-		if version.Name == v.Name {
+		if version.Name == v.Name || v.Spec.BMCRef == nil {
 			continue
 		}
 		if v.Spec.BMCRef.Name == version.Spec.BMCRef.Name {

@@ -598,19 +598,35 @@ func (r *BMCReconciler) deleteEventSubscription(ctx context.Context, bmcClient b
 }
 
 func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Object) []ctrl.Request {
-	return []ctrl.Request{
-		{
-			NamespacedName: types.NamespacedName{Name: obj.(*metalv1alpha1.Endpoint).Name},
-		},
+	log := ctrl.LoggerFrom(ctx)
+	bmcList := &metalv1alpha1.BMCList{}
+	if err := r.List(ctx, bmcList); err != nil {
+		log.Error(err, "Failed to list BMCs for Endpoint watch", "endpoint", obj.GetName())
+		return nil
 	}
+	var reqs []ctrl.Request
+	for _, bmcObj := range bmcList.Items {
+		if bmcObj.Spec.EndpointRef != nil && bmcObj.Spec.EndpointRef.Name == obj.GetName() {
+			reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: bmcObj.Name}})
+		}
+	}
+	return reqs
 }
 
 func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Object) []ctrl.Request {
-	return []ctrl.Request{
-		{
-			NamespacedName: types.NamespacedName{Name: obj.(*metalv1alpha1.BMCSecret).Name},
-		},
+	log := ctrl.LoggerFrom(ctx)
+	bmcList := &metalv1alpha1.BMCList{}
+	if err := r.List(ctx, bmcList); err != nil {
+		log.Error(err, "Failed to list BMCs for BMCSecret watch", "bmcSecret", obj.GetName())
+		return nil
 	}
+	var reqs []ctrl.Request
+	for _, bmcObj := range bmcList.Items {
+		if bmcObj.Spec.BMCSecretRef.Name == obj.GetName() {
+			reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: bmcObj.Name}})
+		}
+	}
+	return reqs
 }
 
 // SetupWithManager sets up the controller with the Manager.

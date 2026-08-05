@@ -1222,20 +1222,13 @@ func (r *BMCVersionReconciler) enqueueBMCVersionByBMCRefs(ctx context.Context, o
 	}
 
 	for _, bmcVersion := range bmcVersionList.Items {
-		if bmcVersion.Spec.BMCRef != nil && bmcVersion.Spec.BMCRef.Name == bmcObj.Name {
-			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateCompleted || bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed {
-				return nil
-			}
-			return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
+		if bmcVersion.Spec.BMCRef == nil || bmcVersion.Spec.BMCRef.Name != bmcObj.Name {
+			continue
 		}
 		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateCompleted || bmcVersion.Status.State == metalv1alpha1.BMCVersionStateFailed {
 			continue
 		}
-		if bmcVersion.Spec.BMCRef == nil {
-			if referredBMC, err := r.getBMCFromBMCVersion(ctx, &bmcVersion); err != nil && referredBMC != nil && referredBMC.Name == bmcObj.Name {
-				return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
-			}
-		}
+		return []ctrl.Request{{NamespacedName: types.NamespacedName{Namespace: bmcVersion.Namespace, Name: bmcVersion.Name}}}
 	}
 	return nil
 }

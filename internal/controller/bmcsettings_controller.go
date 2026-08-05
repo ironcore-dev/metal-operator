@@ -1292,6 +1292,9 @@ func (r *BMCSettingsReconciler) enqueueBMCSettingsByBMCVersion(ctx context.Conte
 		return nil
 	}
 
+	if BMCVersion.Spec.BMCRef == nil {
+		return nil
+	}
 	var requests []ctrl.Request
 	for _, settings := range BMCSettingsList.Items {
 		if settings.Spec.BMCRef != nil && settings.Spec.BMCRef.Name == BMCVersion.Spec.BMCRef.Name {

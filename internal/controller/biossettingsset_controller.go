@@ -394,7 +394,9 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 
 	// Get all BIOSSettingsSets and check if the Server matches their selectors
 	setList := &metalv1alpha1.BIOSSettingsSetList{}
-	if err := r.List(ctx, setList); err == nil {
+	if err := r.List(ctx, setList); err != nil {
+		log.Error(err, "Failed to list BIOSSettingsSets", "server", server.GetName())
+	} else {
 		for _, set := range setList.Items {
 			sel, _ := metav1.LabelSelectorAsSelector(&set.Spec.ServerSelector)
 			if sel.Matches(labels.Set(server.GetLabels())) {
@@ -407,11 +409,9 @@ func (r *BIOSSettingsSetReconciler) enqueueByServer(ctx context.Context, obj cli
 	if server.Spec.BIOSSettingsRef != nil {
 		settings := &metalv1alpha1.BIOSSettings{}
 		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.BIOSSettingsRef.Name}, settings); err != nil {
-			log.Error(err, "Failed to get BIOSSettings referenced by Server", "Server", server.Name, "BIOSSettings", server.Spec.BIOSSettingsRef.Name)
-			return nil
-		}
-		owner := metav1.GetControllerOf(settings)
-		if owner != nil && owner.Kind == "BIOSSettingsSet" {
+			// Fall through: keep the selector-based requests already collected
+			log.Error(err, "Failed to get BIOSSettings referenced by Server", "server", server.Name, "biosSettings", server.Spec.BIOSSettingsRef.Name)
+		} else if owner := metav1.GetControllerOf(settings); owner != nil && owner.Kind == "BIOSSettingsSet" {
 			reqs[client.ObjectKey{Namespace: settings.Namespace, Name: owner.Name}] = true
 		}
 	}

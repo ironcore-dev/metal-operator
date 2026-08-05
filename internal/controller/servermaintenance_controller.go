@@ -511,13 +511,9 @@ func (r *ServerMaintenanceReconciler) enqueueMaintenanceByServerRefs() handler.E
 		}
 
 		var req []reconcile.Request
-		if server.Status.State == metalv1alpha1.ServerStateInitial {
-			return nil
-		}
-
 		if server.Spec.ServerMaintenanceRef != nil {
 			req = append(req, reconcile.Request{
-				NamespacedName: types.NamespacedName{Namespace: server.Namespace, Name: server.Spec.ServerMaintenanceRef.Name},
+				NamespacedName: types.NamespacedName{Namespace: server.Spec.ServerMaintenanceRef.Namespace, Name: server.Spec.ServerMaintenanceRef.Name},
 			})
 		}
 

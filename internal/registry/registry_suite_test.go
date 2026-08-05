@@ -5,6 +5,7 @@ package registry_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -15,12 +16,17 @@ import (
 
 var (
 	server         *registry.Server
-	testServerURL  = "http://localhost:30002"
-	testServerAddr = ":30002"
+	testServerURL  string
+	testServerAddr string
 )
 
 func TestRegistry(t *testing.T) {
 	RegisterFailHandler(Fail)
+	// Offset the port per parallel ginkgo process to avoid bind collisions.
+	// Flags are parsed at this point, so GinkgoParallelProcess is reliable.
+	port := 30002 + GinkgoParallelProcess()
+	testServerURL = fmt.Sprintf("http://localhost:%d", port)
+	testServerAddr = fmt.Sprintf(":%d", port)
 	RunSpecs(t, "Registry Suite")
 }
 

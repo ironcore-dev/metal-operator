@@ -45,14 +45,17 @@ const (
 	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 1 * time.Second
 	MockServerIP         = "127.0.0.1"
-	MockServerPort       = 8000
 )
 
 var (
-	cfg                     *rest.Config
-	k8sClient               client.Client
-	testEnv                 *envtest.Environment
-	registryURL             = "http://localhost:30000"
+	cfg       *rest.Config
+	k8sClient client.Client
+	testEnv   *envtest.Environment
+	// MockServerPort and RegistryPort are offset per parallel ginkgo
+	// process so suites running concurrently do not collide on ports.
+	MockServerPort          int32
+	RegistryPort            int
+	registryURL             string
 	mockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
 	mockUpServerBMCVersion  = "1.45.455b66-rev4"
 	mockServers             []*server.MockServer
@@ -64,6 +67,11 @@ func TestControllers(t *testing.T) {
 	SetDefaultEventuallyTimeout(eventuallyTimeout)
 	SetDefaultConsistentlyDuration(consistentlyDuration)
 	RegisterFailHandler(Fail)
+
+	// Flags are parsed at this point, so GinkgoParallelProcess is reliable.
+	RegistryPort = 30000 + GinkgoParallelProcess()
+	MockServerPort = int32(8000 + (GinkgoParallelProcess()-1)*10)
+	registryURL = fmt.Sprintf("http://localhost:%d", RegistryPort)
 
 	RunSpecs(t, "Controller Suite")
 }
@@ -346,7 +354,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		By("Starting the registry server")
 		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, ":30000", k8sManager.GetClient())
+			registryServer := registry.NewServer(GinkgoLogr, fmt.Sprintf(":%d", RegistryPort), k8sManager.GetClient())
 			if err := registryServer.Start(ctx); err != nil {
 				return fmt.Errorf("failed to start registry server: %w", err)
 			}

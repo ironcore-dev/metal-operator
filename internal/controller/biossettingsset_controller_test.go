@@ -5,7 +5,6 @@ package controller
 
 import (
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -703,17 +702,24 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 			}
 		})).Should(Succeed())
 
+		// Note: the retried Pending state is transient and can be missed by the
+		// Eventually poll when the whole retry cycle completes quickly.
+		// Assert on the persistent retry condition instead.
 		By("Ensuring that the BIOSSetting02 has been retried ")
-		Eventually(Object(biosSettings02)).WithPolling(1 * time.Millisecond).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(biosSettings02)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BIOSSetting03 has been retried")
-		Eventually(Object(biosSettings03)).WithPolling(10 * time.Millisecond).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSSettingsStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(biosSettings03)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BIOSSetting02 has failed again")
 		Eventually(Object(biosSettings02)).Should(SatisfyAll(

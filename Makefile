@@ -77,10 +77,13 @@ vet: ## Run go vet against code.
 .PHONY: check-gen
 check-gen: generate manifests docs helm fmt ## Run code generation, manifests generation, documentation generation, helm plugin setup, and formatting checks.
 
+# Number of CPU cores for parallel test execution (portable across Linux/macOS).
+NPROC ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+
 .PHONY: test-only
 test-only: setup-envtest ginkgo ## Run tests without generating manifests or code.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" \
-	"$(GINKGO)" --fail-fast --cover --coverprofile=cover.out --skip-package=e2e ./...
+	"$(GINKGO)" --fail-fast --cover --coverprofile=cover.out --skip-package=e2e --procs=$(NPROC) ./...
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest test-only ## Run tests.

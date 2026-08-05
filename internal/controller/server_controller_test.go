@@ -288,7 +288,7 @@ var _ = Describe("Server Controller", func() {
 			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 			ignition.Config{
 				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				Flags:        fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
 				PasswordHash: passwordHash,
 			},
@@ -483,7 +483,7 @@ var _ = Describe("Server Controller", func() {
 			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 			ignition.Config{
 				Image:        "foo:latest",
-				Flags:        "--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				Flags:        fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
 				PasswordHash: passwordHash,
 			},
@@ -1106,7 +1106,7 @@ passwd:
 
 			By("Generating ignition data with custom file")
 			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
@@ -1134,7 +1134,7 @@ passwd:
 
 			By("Generating ignition data (should fail)")
 			_, err := reconciler.generateDefaultIgnitionDataForServer(
-				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
@@ -1170,7 +1170,7 @@ systemd:
 
 			By("Generating ignition data (should fail)")
 			_, err = reconciler.generateDefaultIgnitionDataForServer(
-				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
@@ -1219,7 +1219,7 @@ passwd:
 
 			By("Generating ignition data (should use default template)")
 			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				"--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834",
+				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)
@@ -1277,7 +1277,7 @@ passwd:
 
 			By("Generating ignition data with custom template")
 			ignitionData, err := customReconciler.generateDefaultIgnitionDataForServer(
-				"--registry-url=http://localhost:30000 --server-uuid=e2e-test-12345",
+				fmt.Sprintf("--registry-url=%s --server-uuid=e2e-test-12345", registryURL),
 				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
 				[]byte("testpassword"),
 			)

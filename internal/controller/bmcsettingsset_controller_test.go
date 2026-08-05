@@ -748,11 +748,16 @@ var _ = Describe("BMCSettingsSet Controller", func() {
 			}
 		})).Should(Succeed())
 
+		// Note: the retried Pending state is transient and can be missed by the
+		// Eventually poll when the whole retry cycle completes quickly.
+		// Assert on the persistent retry condition instead.
 		By("Ensuring that the BMCSetting01 has been retried ")
-		Eventually(Object(bmcSettings01)).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCSettingsStateFailed))),
-			HaveField("Status.FailedAttempts", Equal(int32(0))),
-		))
+		Eventually(Object(bmcSettings01)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BMCSetting01 has failed again")
 		Eventually(Object(bmcSettings01)).Should(SatisfyAll(

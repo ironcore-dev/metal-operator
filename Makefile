@@ -83,7 +83,7 @@ NPROC ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 .PHONY: test-only
 test-only: setup-envtest ginkgo ## Run tests without generating manifests or code.
 	KUBEBUILDER_ASSETS="$(shell "$(ENVTEST)" use $(ENVTEST_K8S_VERSION) --bin-dir "$(LOCALBIN)" -p path)" \
-	"$(GINKGO)" --fail-fast --cover --coverprofile=cover.out --skip-package=e2e --procs=$(NPROC) ./...
+	"$(GINKGO)" --cover --coverprofile=cover.out --skip-package=e2e --procs=$(NPROC) ./...
 
 .PHONY: test
 test: manifests generate fmt vet setup-envtest test-only ## Run tests.

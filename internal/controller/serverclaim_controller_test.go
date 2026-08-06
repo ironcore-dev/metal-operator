@@ -655,11 +655,14 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerClaimRef", BeNil()),
 		)
 
-		By("Ensuring the claim stays unbound")
-		Consistently(Object(claim)).Should(SatisfyAll(
+		By("Ensuring the claim is registered and stays unbound")
+		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
 		))
+		Consistently(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
+		)
 
 		By("Removing the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())

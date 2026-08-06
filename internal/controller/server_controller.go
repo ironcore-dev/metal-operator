@@ -670,6 +670,22 @@ func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *m
 
 func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
+	if ref := server.Spec.ServerMaintenanceRef; ref != nil {
+		// A maintenance holding the ref may have been deleted out of band
+		// (e.g. finalizer removed). Clear the dangling ref so the server can
+		// leave Maintenance state; pending maintenances take over afterwards.
+		if _, err := GetServerMaintenanceForObjectReference(ctx, r.Client, ref); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("failed to get ServerMaintenance referenced by Server: %w", err)
+			}
+			log.V(1).Info("ServerMaintenanceRef points to a deleted ServerMaintenance, clearing ref", "Server", server.Name, "ServerMaintenance", ref.Name)
+			serverBase := server.DeepCopy()
+			server.Spec.ServerMaintenanceRef = nil
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return false, fmt.Errorf("failed to clear dangling ServerMaintenance ref: %w", err)
+			}
+		}
+	}
 	if server.Spec.ServerMaintenanceRef == nil {
 		hasPending, err := r.hasPendingMaintenances(ctx, server)
 		if err != nil {

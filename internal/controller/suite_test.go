@@ -19,6 +19,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -398,15 +399,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	return ns
 }
 
-// EnsureCleanState ensures that all ServerClaims and cluster scoped objects are removed from the API server.
-func EnsureCleanState() {
+// EnsureCleanState removes leftover
+func EnsureCleanState(ctx context.Context) {
 	GinkgoHelper()
 
 	objectLists := []client.ObjectList{
 		&metalv1alpha1.EndpointList{},
 		&metalv1alpha1.BMCList{},
-		&metalv1alpha1.BMCSecretList{},
-		&metalv1alpha1.ServerClaimList{},
 		&metalv1alpha1.BMCSettingsSetList{},
 		&metalv1alpha1.BMCSettingsList{},
 		&metalv1alpha1.BMCVersionSetList{},
@@ -414,11 +413,19 @@ func EnsureCleanState() {
 		&metalv1alpha1.BIOSVersionList{},
 		&metalv1alpha1.BIOSSettingsSetList{},
 		&metalv1alpha1.BIOSSettingsList{},
+		&metalv1alpha1.ServerClaimList{},
 		&metalv1alpha1.ServerMaintenanceList{},
 		&metalv1alpha1.ServerList{},
+		&metalv1alpha1.BMCSecretList{},
 	}
 
 	for _, list := range objectLists {
+		Expect(k8sClient.List(ctx, list)).To(Succeed())
+		items, err := meta.ExtractList(list)
+		Expect(err).NotTo(HaveOccurred())
+		for _, item := range items {
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, item.(client.Object)))).To(Succeed())
+		}
 		Eventually(ObjectList(list)).Should(HaveField("Items", HaveLen(0)))
 	}
 }

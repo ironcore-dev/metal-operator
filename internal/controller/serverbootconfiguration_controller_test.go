@@ -35,7 +35,7 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {

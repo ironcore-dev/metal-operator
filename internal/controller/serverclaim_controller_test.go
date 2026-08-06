@@ -68,7 +68,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully claim a server in available state", func(ctx SpecContext) {
@@ -755,7 +755,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, claimWithSelector)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should deny if the ServerRef changes", func() {
@@ -893,7 +893,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for _, server := range serverList.Items {
 			Expect(k8sClient.Delete(ctx, &server)).To(Succeed())
 		}
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should bind four out of ten servers for four best effort claims", func(ctx SpecContext) {

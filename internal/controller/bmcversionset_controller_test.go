@@ -185,7 +185,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		for _, ms := range mockServers {
 			ms.ResetUpgradeTask()
 		}

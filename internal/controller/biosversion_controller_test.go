@@ -76,7 +76,7 @@ var _ = Describe("BIOSVersion Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		mockServers[0].ResetUpgradeTask(server.Spec.SystemURI)
 	})
 
@@ -476,7 +476,7 @@ var _ = Describe("BIOSVersion Controller with BMCRef BMC", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		mockServers[0].ResetUpgradeTask(server.Spec.SystemURI)
 	})
 	It("should successfully Start and monitor Upgrade task to completion", func(ctx SpecContext) {

@@ -124,7 +124,7 @@ var _ = Describe("BIOSSettingsSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		for _, ms := range mockServers {
 			ms.ResetBIOSSettings("437XR1138R2")
 		}

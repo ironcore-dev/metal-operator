@@ -90,7 +90,7 @@ var _ = Describe("BMCSettings Controller", func() {
 		})).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		mockServers[0].ResetBMCSettings("BMC")
 	})
 

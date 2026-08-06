@@ -34,7 +34,7 @@ var _ = Describe("Server Controller", func() {
 	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should transition a server to released state and back to available", func(ctx SpecContext) {

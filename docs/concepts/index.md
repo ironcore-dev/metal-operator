@@ -17,4 +17,5 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**BMCSettings**](/concepts/bmcsettings): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCSettingsSet**](/concepts/bmcsettingsset): Handles creation of multiple `BMCSettings` by selecting BMCs through labels.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.
-- [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
+- [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMCs through labels.
+- [**BMCUser**](/concepts/bmcusers): Deprecated. Manages user accounts on a BMC, including credential management and password rotation.

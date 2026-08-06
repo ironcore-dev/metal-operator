@@ -708,6 +708,8 @@ _Appears in:_
 
 BMCUser is the Schema for the bmcusers API.
 
+Deprecated: The BMCUser resource is deprecated.
+
 
 
 

@@ -18,6 +18,8 @@ import (
 // with apply.
 //
 // BMCUser is the Schema for the bmcusers API.
+//
+// Deprecated: The BMCUser resource is deprecated.
 type BMCUserApplyConfiguration struct {
 	v1.TypeMetaApplyConfiguration    `json:",inline"`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`

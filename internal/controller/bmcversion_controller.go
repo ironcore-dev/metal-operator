@@ -84,8 +84,11 @@ func (r *BMCVersionReconciler) shouldDelete(ctx context.Context, bmcVersion *met
 		if bmcVersion.Status.State != metalv1alpha1.BMCVersionStateInProgress {
 			return false, nil
 		}
-		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
-			return false, nil
+		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); err != nil {
+			if apierrors.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
 		}
 		return metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 	}
@@ -100,7 +103,9 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 	}
 
 	if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
+		_, err := r.getBMCFromBMCVersion(ctx, bmcVersion)
+		switch {
+		case apierrors.IsNotFound(err):
 			// The BMC is gone: its state can no longer be observed and the
 			// maintenance cleanup path (which requires the BMC client) can never
 			// run. Remove our owned ServerMaintenances here, otherwise this
@@ -109,7 +114,9 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 			if err := r.removeServerMaintenances(ctx, bmcVersion); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to remove ServerMaintenances of orphaned BMCVersion: %w", err)
 			}
-		} else {
+		case err != nil:
+			return ctrl.Result{}, fmt.Errorf("failed to get BMC for BMCVersion deletion: %w", err)
+		default:
 			active, merr := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
 			if merr != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", merr)

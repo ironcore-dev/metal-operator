@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -165,21 +166,21 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		Eventually(UpdateStatus(server01, func() {
 			server01.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc01))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
 		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
 
 		Eventually(UpdateStatus(server02, func() {
 			server02.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc02)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc02))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
 
 		Eventually(UpdateStatus(server03, func() {
 			server03.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc03)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc03))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 

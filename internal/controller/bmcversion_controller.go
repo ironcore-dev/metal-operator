@@ -100,13 +100,24 @@ func (r *BMCVersionReconciler) delete(ctx context.Context, bmcVersion *metalv1al
 	}
 
 	if len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-		active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", err)
-		}
-		if active {
-			log.V(1).Info("Skipping delete as BMCVersion is under active maintenance")
-			return r.reconcile(ctx, bmcVersion)
+		if _, err := r.getBMCFromBMCVersion(ctx, bmcVersion); apierrors.IsNotFound(err) {
+			// The BMC is gone: its state can no longer be observed and the
+			// maintenance cleanup path (which requires the BMC client) can never
+			// run. Remove our owned ServerMaintenances here, otherwise this
+			// BMCVersion would be stuck terminating forever.
+			log.V(1).Info("Referenced BMC does not exist, removing owned ServerMaintenances", "BMCRef", bmcVersion.Spec.BMCRef.Name)
+			if err := r.removeServerMaintenances(ctx, bmcVersion); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to remove ServerMaintenances of orphaned BMCVersion: %w", err)
+			}
+		} else {
+			active, merr := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+			if merr != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to check maintenance state: %w", merr)
+			}
+			if active {
+				log.V(1).Info("Skipping delete as BMCVersion is under active maintenance")
+				return r.reconcile(ctx, bmcVersion)
+			}
 		}
 	}
 
@@ -262,8 +273,12 @@ func (r *BMCVersionReconciler) ensureBMCVersionStateTransition(ctx context.Conte
 			return ctrl.Result{}, nil
 		}
 
-		if ok, err := r.resetBMC(ctx, bmcVersion, bmcObj, ConditionResetIssued); !ok || err != nil {
+		ok, err := r.resetBMC(ctx, bmcVersion, bmcObj, ConditionResetIssued)
+		if err != nil {
 			return ctrl.Result{}, fmt.Errorf("failed to reset bmc %s: %w", client.ObjectKeyFromObject(bmcObj), err)
+		}
+		if !ok {
+			return ctrl.Result{}, nil
 		}
 
 		return r.handleUpgradeInProgressState(ctx, bmcVersion, bmcClient, bmcObj)

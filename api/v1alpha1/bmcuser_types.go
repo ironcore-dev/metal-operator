@@ -57,8 +57,11 @@ type BMCUserStatus struct {
 // +kubebuilder:printcolumn:name="LastRotation",type=date,JSONPath=`.status.lastRotation`
 // +kubebuilder:printcolumn:name="PasswordExpiration",type=date,JSONPath=`.status.passwordExpiration`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.metadata.creationTimestamp`
+// +kubebuilder:deprecatedversion:warning="metal.ironcore.dev/v1alpha1 BMCUser is deprecated"
 
 // BMCUser is the Schema for the bmcusers API.
+//
+// Deprecated: The BMCUser resource is deprecated.
 type BMCUser struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

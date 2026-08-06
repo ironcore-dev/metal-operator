@@ -28,8 +28,7 @@ jobs:
 
       - name: Running Tests
         run: |
-          sudo --preserve-env=GOROOT,GOPATH,PATH go mod tidy
-          sudo --preserve-env=GOROOT,GOPATH,PATH make test-only
+          sudo --preserve-env=HOME,GOROOT,GOPATH,PATH make test-only
 
   test-alerts:
     name: Test Prometheus alert rules

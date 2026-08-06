@@ -681,7 +681,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 			log.V(1).Info("ServerMaintenanceRef points to a deleted ServerMaintenance, clearing ref", "Server", server.Name, "ServerMaintenance", ref.Name)
 			serverBase := server.DeepCopy()
 			server.Spec.ServerMaintenanceRef = nil
-			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
 				return false, fmt.Errorf("failed to clear dangling ServerMaintenance ref: %w", err)
 			}
 		}

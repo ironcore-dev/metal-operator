@@ -853,7 +853,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	countUniqueBoundServers := func(ctx context.Context, serverCount int) func(Gomega) int {
 		return func(g Gomega) int {
 			var serverList metalv1alpha1.ServerList
-			g.Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
+			g.Expect(k8sClient.List(ctx, &serverList, client.MatchingLabels{"foo": "bar"})).To(Succeed())
 			g.Expect(serverList.Items).To(HaveLen(serverCount))
 			claimNames := make(map[string]struct{})
 			for _, server := range serverList.Items {
@@ -868,7 +868,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	countUniqueBoundClaims := func(ctx context.Context) func(Gomega) int {
 		return func(g Gomega) int {
 			var claimList metalv1alpha1.ServerClaimList
-			g.Expect(k8sClient.List(ctx, &claimList)).To(Succeed())
+			g.Expect(k8sClient.List(ctx, &claimList, client.InNamespace(ns.Name))).To(Succeed())
 			serverNames := make(map[string]struct{})
 			for _, claim := range claimList.Items {
 				if claim.Spec.ServerRef != nil {

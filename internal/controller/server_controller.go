@@ -1155,7 +1155,7 @@ func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1
 	}
 	serverBase := server.DeepCopy()
 	server.Status.State = state
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+	if err := r.Status().Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
 		return false, fmt.Errorf("failed to patch server state: %w", err)
 	}
 	return true, nil

@@ -10,6 +10,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	v1 "k8s.io/api/core/v1"
@@ -539,32 +540,23 @@ var _ = Describe("BMCSettings Controller", func() {
 			}
 			return err
 		}).Should(Succeed())
+
 		By("check if maintenance has been created on the server and delete if its present")
 		var serverMaintenanceList metalv1alpha1.ServerMaintenanceList
-		Eventually(func() error {
-			_, err := ObjectList(&serverMaintenanceList)()
-			if err != nil {
-				return err
+		Expect(k8sClient.List(ctx, &serverMaintenanceList)).To(Succeed())
+		for i := range serverMaintenanceList.Items {
+			item := &serverMaintenanceList.Items[i]
+			if !metav1.IsControlledBy(item, settings) {
+				continue
 			}
-			if len(serverMaintenanceList.Items) > 0 {
-				for _, item := range serverMaintenanceList.Items {
-					if len(item.OwnerReferences) > 0 && item.OwnerReferences[0].UID == settings.UID {
-						By(fmt.Sprintf("Deleting the ServerMaintenance created by BMCSettings %v", item.Name))
-						Expect(k8sClient.Delete(ctx, &item)).To(Succeed())
-						Eventually(func() error {
-							err := Update(&item, func() {
-								item.Finalizers = []string{}
-							})()
-							if apierrors.IsNotFound(err) {
-								return nil
-							}
-							return err
-						}).Should(Succeed())
-					}
-				}
-			}
-			return nil
-		}).Should(Succeed())
+			By(fmt.Sprintf("Deleting the ServerMaintenance created by BMCSettings %v", item.Name))
+			// the BMCSettings controller's deletion path may have already deleted
+			// the ServerMaintenance, so tolerate NotFound here.
+			Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, item))).To(Succeed())
+			Eventually(Update(item, func() {
+				item.Finalizers = nil
+			})).Should(Or(Succeed(), Satisfy(apierrors.IsNotFound)))
+		}
 
 		By("creation of new BMCSettings with same spec")
 		bmcSettings2 := &metalv1alpha1.BMCSettings{

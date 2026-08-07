@@ -21,7 +21,7 @@ var _ = Describe("BMC Controller", func() {
 	ns := SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully reconcile a BMC resource", func(ctx SpecContext) {
@@ -295,7 +295,7 @@ var _ = Describe("BMC Controller", func() {
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -341,7 +341,7 @@ var _ = Describe("BMC Controller", func() {
 
 var _ = Describe("BMC Validation", func() {
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
@@ -511,7 +511,7 @@ var _ = Describe("BMC Reset", func() {
 	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should reset the BMC", func(ctx SpecContext) {
@@ -578,7 +578,7 @@ var _ = Describe("BMC Conditions", func() {
 	_ = SetupTest(nil)
 
 	AfterEach(func(ctx SpecContext) {
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should create ready conditions when there are BMC connection errors", func(ctx SpecContext) {

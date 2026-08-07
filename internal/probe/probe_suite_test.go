@@ -5,6 +5,7 @@ package probe_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -19,13 +20,21 @@ var (
 	probeAgent     *probe.Agent
 	registryServer *registry.Server
 
-	registryAddr = ":30001"
-	registryURL  = "http://localhost:30001"
-	systemUUID   = "1234-5678"
+	systemUUID = "1234-5678"
+)
+
+var (
+	registryAddr string
+	registryURL  string
 )
 
 func TestRegistry(t *testing.T) {
 	RegisterFailHandler(Fail)
+	// Offset the port per parallel ginkgo process to avoid bind collisions.
+	// Flags are parsed at this point, so GinkgoParallelProcess is reliable.
+	port := 30001 + GinkgoParallelProcess()
+	registryAddr = fmt.Sprintf(":%d", port)
+	registryURL = fmt.Sprintf("http://localhost:%d", port)
 	RunSpecs(t, "Probe Suite")
 }
 

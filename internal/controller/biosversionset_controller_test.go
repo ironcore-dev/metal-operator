@@ -124,7 +124,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		for _, ms := range mockServers {
 			ms.ResetUpgradeTask()
 		}
@@ -485,17 +485,24 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 			}
 		})).Should(Succeed())
 
+		// Note: the retried Pending state is transient and can be missed by the
+		// Eventually poll when the whole retry cycle completes quickly.
+		// Assert on the persistent retry condition instead.
 		By("Ensuring that the BIOSVersion 02 has been retried ")
-		Eventually(Object(biosVersion02)).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(biosVersion02)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BIOSVersion 03 has been retried")
-		Eventually(Object(biosVersion03)).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BIOSVersionStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(biosVersion03)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BIOSVersion 02 has failed again")
 		Eventually(Object(biosVersion02)).Should(SatisfyAll(

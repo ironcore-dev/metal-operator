@@ -136,6 +136,11 @@ func (r *BIOSSettingsReconciler) delete(ctx context.Context, settings *metalv1al
 	}
 	log.V(1).Info("Ensured references were removed")
 
+	if err := r.removeServerMaintenance(ctx, settings); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to remove ServerMaintenance: %w", err)
+	}
+	log.V(1).Info("Ensured ServerMaintenance is removed")
+
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, settings, BIOSSettingsFinalizer); err != nil || modified {
 		return ctrl.Result{}, err

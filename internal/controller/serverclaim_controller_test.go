@@ -68,7 +68,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should successfully claim a server in available state", func(ctx SpecContext) {
@@ -602,11 +602,14 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerClaimRef", BeNil()),
 		)
 
-		By("Ensuring the claim stays unbound")
-		Consistently(Object(claim)).Should(SatisfyAll(
+		By("Ensuring the claim is registered and stays unbound")
+		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
 		))
+		Consistently(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
+		)
 
 		By("Uncordoning the server")
 		Eventually(Update(server, func() {
@@ -655,11 +658,14 @@ var _ = Describe("ServerClaim Controller", func() {
 			HaveField("Spec.ServerClaimRef", BeNil()),
 		)
 
-		By("Ensuring the claim stays unbound")
-		Consistently(Object(claim)).Should(SatisfyAll(
+		By("Ensuring the claim is registered and stays unbound")
+		Eventually(Object(claim)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
 			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
 		))
+		Consistently(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseUnbound)),
+		)
 
 		By("Removing the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
@@ -749,7 +755,7 @@ var _ = Describe("ServerClaim Validation", func() {
 	AfterEach(func(ctx SpecContext) {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, claimWithSelector)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should deny if the ServerRef changes", func() {
@@ -847,7 +853,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	countUniqueBoundServers := func(ctx context.Context, serverCount int) func(Gomega) int {
 		return func(g Gomega) int {
 			var serverList metalv1alpha1.ServerList
-			g.Expect(k8sClient.List(ctx, &serverList)).To(Succeed())
+			g.Expect(k8sClient.List(ctx, &serverList, client.MatchingLabels{"foo": "bar"})).To(Succeed())
 			g.Expect(serverList.Items).To(HaveLen(serverCount))
 			claimNames := make(map[string]struct{})
 			for _, server := range serverList.Items {
@@ -862,7 +868,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 	countUniqueBoundClaims := func(ctx context.Context) func(Gomega) int {
 		return func(g Gomega) int {
 			var claimList metalv1alpha1.ServerClaimList
-			g.Expect(k8sClient.List(ctx, &claimList)).To(Succeed())
+			g.Expect(k8sClient.List(ctx, &claimList, client.InNamespace(ns.Name))).To(Succeed())
 			serverNames := make(map[string]struct{})
 			for _, claim := range claimList.Items {
 				if claim.Spec.ServerRef != nil {
@@ -887,7 +893,7 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 		for _, server := range serverList.Items {
 			Expect(k8sClient.Delete(ctx, &server)).To(Succeed())
 		}
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should bind four out of ten servers for four best effort claims", func(ctx SpecContext) {

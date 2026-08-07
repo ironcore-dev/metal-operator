@@ -50,7 +50,7 @@ var _ = Describe("BMCUser Controller", func() {
 				},
 				Protocol: metalv1alpha1.Protocol{
 					Name: metalv1alpha1.ProtocolRedfishLocal,
-					Port: 8000,
+					Port: MockServerPort,
 				},
 				BMCSecretRef: v1.LocalObjectReference{
 					Name: bmcSecret.Name,
@@ -72,7 +72,7 @@ var _ = Describe("BMCUser Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 	})
 
 	It("should create a BMC user and secret", func(ctx SpecContext) {

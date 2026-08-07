@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -165,26 +166,26 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		Eventually(UpdateStatus(server01, func() {
 			server01.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc01)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc01))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server01)).To(Succeed())
 		Eventually(Get(server01)).Should(Satisfy(apierrors.IsNotFound))
 
 		Eventually(UpdateStatus(server02, func() {
 			server02.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc02)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc02))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server02)).To(Succeed())
 		Eventually(Get(server02)).Should(Satisfy(apierrors.IsNotFound))
 
 		Eventually(UpdateStatus(server03, func() {
 			server03.Status.State = metalv1alpha1.ServerStateAvailable
 		})).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmc03)).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmc03))).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server03)).To(Succeed())
 		Eventually(Get(server03)).Should(Satisfy(apierrors.IsNotFound))
 
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		EnsureCleanState()
+		EnsureCleanState(ctx)
 		for _, ms := range mockServers {
 			ms.ResetUpgradeTask()
 		}
@@ -592,16 +593,23 @@ var _ = Describe("BMCVersionSet Controller", func() {
 			}
 		})).Should(Succeed())
 
+		// Note: the retried Pending state is transient and can be missed by the
+		// Eventually poll when the whole retry cycle completes quickly.
+		// Assert on the persistent retry condition instead.
 		By("Ensuring that the BMCVersion02 has been retried ")
-		Eventually(Object(bmcVersion02)).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(bmcVersion02)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 		By("Ensuring that the BMCVersion03 has been retried")
-		Eventually(Object(bmcVersion03)).Should(SatisfyAll(
-			HaveField("Status.State", Not(Equal(metalv1alpha1.BMCVersionStateFailed))),
-			HaveField("Status.FailedAttempts", Not(Equal(int32(failedAutoRetryCount)))),
-		))
+		Eventually(Object(bmcVersion03)).Should(
+			HaveField("Status.Conditions", ContainElement(SatisfyAll(
+				HaveField("Type", ConditionRetryOfFailedResourceIssued),
+				HaveField("Status", metav1.ConditionTrue),
+			))),
+		)
 
 		By("Ensuring that the BMCVersion02 has failed again")
 		Eventually(Object(bmcVersion02)).Should(SatisfyAll(

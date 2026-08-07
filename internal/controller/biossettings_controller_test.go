@@ -76,8 +76,8 @@ var _ = Describe("BIOSSettings Controller", func() {
 	})
 
 	AfterEach(func(ctx SpecContext) {
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		EnsureCleanState(ctx)
 		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 	})
@@ -1013,6 +1013,12 @@ var _ = Describe("BIOSSettings Controller", func() {
 			}
 			return nil
 		}).Should(Succeed())
+
+		// The force-deleted BIOSSettings above may have left a pending settings
+		// task on the (shared) mock server; a fresh BIOSSettings would observe it
+		// and fail terminally with PendingSettingsFound.
+		By("Resetting pending BIOS settings on the mock server")
+		mockServers[0].ResetBIOSSettings(path.Base(server.Spec.SystemURI))
 
 		biosSettings2 := &metalv1alpha1.BIOSSettings{
 			ObjectMeta: metav1.ObjectMeta{

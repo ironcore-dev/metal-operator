@@ -161,6 +161,15 @@ func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alph
 				}
 			}
 		}
+		if server.Spec.BMC != nil {
+			// Without credentials the maintenance can never be finished or unwound;
+			// do not block deletion forever on a missing BMCSecret.
+			secretName := server.Spec.BMC.BMCSecretRef.Name
+			if err := r.Get(ctx, client.ObjectKey{Name: secretName}, &metalv1alpha1.BMCSecret{}); apierrors.IsNotFound(err) {
+				log.V(1).Info("BMCSecret not found, proceeding with deletion", "BMCSecret", secretName, "Server", server.Name)
+				return true
+			}
+		}
 		log.V(1).Info("Postponing delete as server is in Maintenance state")
 		return false
 	}

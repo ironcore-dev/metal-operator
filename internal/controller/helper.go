@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -64,6 +65,19 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 	}
 
 	return maintenance, nil
+}
+
+// versionSetChildName returns a deterministic child resource name for the
+// combination of set and target (Server/BMC), so that a re-reconcile on a
+// stale cache cannot create duplicate children. Falls back to a GenerateName
+// prefix when the deterministic name would exceed the DNS1123 limit.
+// Exactly one of the two return values is set.
+func versionSetChildName(setName, targetName string) (name, generateName string) {
+	name = fmt.Sprintf("%s-%s", setName, targetName)
+	if len(name) > utilvalidation.DNS1123SubdomainMaxLength {
+		return "", name[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-"
+	}
+	return name, ""
 }
 
 // shouldProceedWithDeletion returns true when obj should proceed with deletion.

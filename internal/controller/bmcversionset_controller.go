@@ -7,11 +7,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -23,7 +23,6 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -42,7 +41,6 @@ type BMCVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -80,30 +78,16 @@ func (r *BMCVersionSetReconciler) delete(
 		return ctrl.Result{}, nil
 	}
 
-	if err := r.handleIgnoreAnnotationPropagation(ctx, bmcVersionSet); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BMCVersion resources %w", err)
 	}
-
-	currentStatus := r.getOwnedBMCVersionSetStatus(ownedBMCVersions)
-
-	if currentStatus.AvailableBMCVersion != (currentStatus.CompletedBMCVersion+currentStatus.FailedBMCVersion) ||
-		bmcVersionSet.Status.AvailableBMCVersion != currentStatus.AvailableBMCVersion {
-		err = r.updateStatus(ctx, currentStatus, bmcVersionSet)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to update current BMCVersionSet Status %w", err)
-		}
-		if err := r.handleRetryAnnotationPropagation(ctx, bmcVersionSet); err != nil {
-			return ctrl.Result{}, err
-		}
-		log.Info("Waiting on the created BMCVersion to reach terminal status")
-		return ctrl.Result{}, nil
+	if err := handleIgnoreAnnotationPropagation(ctx, r.Client, bmcVersionSet, ownedBMCVersions); err != nil {
+		return ctrl.Result{}, err
 	}
 
+	// children are garbage collected through the owner reference; their own
+	// finalizers postpone deletion while an upgrade maintenance is active
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcVersionSet, BMCVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -113,44 +97,17 @@ func (r *BMCVersionSetReconciler) delete(
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCVersionSetReconciler) handleIgnoreAnnotationPropagation(
-	ctx context.Context,
-	bmcVersionSet *metalv1alpha1.BMCVersionSet,
-) error {
-	log := ctrl.LoggerFrom(ctx)
-	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
-	if err != nil {
-		return err
-	}
-	if len(ownedBMCVersions.Items) == 0 {
-		log.V(1).Info("No BMCVersion found, skipping ignore annotation propagation")
-		return nil
-	}
-	return handleIgnoreAnnotationPropagation(ctx, r.Client, bmcVersionSet, ownedBMCVersions)
-}
-
-func (r *BMCVersionSetReconciler) handleRetryAnnotationPropagation(
-	ctx context.Context,
-	bmcVersionSet *metalv1alpha1.BMCVersionSet,
-) error {
-	log := ctrl.LoggerFrom(ctx)
-	ownedBMCVersion, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
-	if err != nil {
-		return err
-	}
-	if len(ownedBMCVersion.Items) == 0 {
-		log.V(1).Info("No BMCVersion found, skipping retry annotation propagation")
-		return nil
-	}
-	return handleRetryAnnotationPropagation(ctx, r.Client, bmcVersionSet, ownedBMCVersion)
-}
-
 func (r *BMCVersionSetReconciler) reconcile(
 	ctx context.Context,
 	bmcVersionSet *metalv1alpha1.BMCVersionSet,
 ) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if err := r.handleIgnoreAnnotationPropagation(ctx, bmcVersionSet); err != nil {
+	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BMCVersion resources %w", err)
+	}
+
+	if err := handleIgnoreAnnotationPropagation(ctx, r.Client, bmcVersionSet, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -168,11 +125,6 @@ func (r *BMCVersionSetReconciler) reconcile(
 		return ctrl.Result{}, fmt.Errorf("failed to get BMC resource through label selector %w", err)
 	}
 
-	ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, bmcVersionSet)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get owned BMCVersion resources %w", err)
-	}
-
 	log.V(1).Info("Summary of BMC and BMCVersions", "BMCs count", len(bmcList.Items),
 		"BMCVersion count", len(ownedBMCVersions.Items))
 
@@ -182,7 +134,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 	}
 
 	// delete BMCVersion for BMCs which do not exist anymore
-	if _, err := r.deleteOrphanBMCVersions(ctx, bmcList, ownedBMCVersions); err != nil {
+	if err := r.deleteOrphanBMCVersions(ctx, bmcList, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to delete orphaned BMCVersion resources %w", err)
 	}
 
@@ -199,7 +151,7 @@ func (r *BMCVersionSetReconciler) reconcile(
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update current BMCVersionSet Status %w", err)
 	}
-	if err := r.handleRetryAnnotationPropagation(ctx, bmcVersionSet); err != nil {
+	if err := handleRetryAnnotationPropagation(ctx, r.Client, bmcVersionSet, ownedBMCVersions); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -227,9 +179,11 @@ func (r *BMCVersionSetReconciler) createMissingBMCVersions(
 	var errs []error
 	for _, bmc := range bmcList.Items {
 		if _, ok := BMCWithBMCVersion[bmc.Name]; !ok {
+			name, generateName := versionSetChildName(bmcVersionSet.Name, bmc.Name)
 			newBMCVersion := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "bmc-version-set-",
+					Name:         name,
+					GenerateName: generateName,
 				}}
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCVersion, func() error {
 				newBMCVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()
@@ -249,37 +203,24 @@ func (r *BMCVersionSetReconciler) deleteOrphanBMCVersions(
 	ctx context.Context,
 	bmcList *metalv1alpha1.BMCList,
 	bmcVersionList *metalv1alpha1.BMCVersionList,
-) ([]string, error) {
-	log := ctrl.LoggerFrom(ctx)
-
+) error {
 	bmcMap := make(map[string]struct{})
 	for _, bmc := range bmcList.Items {
 		bmcMap[bmc.Name] = struct{}{}
 	}
 
 	var errs []error
-	var warnings []string
 	for _, bmcVersion := range bmcVersionList.Items {
+		// the BMCVersion finalizer postpones deletion while a maintenance is
+		// active, so orphans can be deleted unconditionally
 		if _, ok := bmcMap[bmcVersion.Spec.BMCRef.Name]; !ok {
-			if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
-				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
-				if err != nil {
-					errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCVersion %s: %w", bmcVersion.Name, err))
-					continue
-				}
-				if active {
-					log.V(1).Info("Waiting for BMCVersion maintenance to complete before deletion", "BMCVersion", bmcVersion.Name, "status", bmcVersion.Status)
-					warnings = append(warnings, fmt.Sprintf("BMCVersion %s is under active maintenance, skipping deletion", bmcVersion.Name))
-					continue
-				}
-			}
 			if err := r.Delete(ctx, &bmcVersion); err != nil {
 				errs = append(errs, err)
 			}
 		}
 	}
 
-	return warnings, errors.Join(errs...)
+	return errors.Join(errs...)
 }
 
 func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
@@ -358,6 +299,9 @@ func (r *BMCVersionSetReconciler) getBMCBySelector(
 	if err := r.List(ctx, bmcList, client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, err
 	}
+	bmcList.Items = slices.DeleteFunc(bmcList.Items, func(b metalv1alpha1.BMC) bool {
+		return !b.DeletionTimestamp.IsZero()
+	})
 
 	return bmcList, nil
 }
@@ -385,45 +329,21 @@ func (r *BMCVersionSetReconciler) updateStatus(
 func (r *BMCVersionSetReconciler) enqueueByBMC(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 
-	host := obj.(*metalv1alpha1.BMC)
-
 	bmcVersionSetList := &metalv1alpha1.BMCVersionSetList{}
 	if err := r.List(ctx, bmcVersionSetList); err != nil {
 		log.Error(err, "Failed to list BMCVersionSet")
 		return nil
 	}
-	reqs := make([]ctrl.Request, 0)
+	// on label changes enqueue all sets; each reconcile decides whether the
+	// BMC is in scope or its child became an orphan
+	reqs := make([]ctrl.Request, 0, len(bmcVersionSetList.Items))
 	for _, bmcVersionSet := range bmcVersionSetList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&bmcVersionSet.Spec.BMCSelector)
-		if err != nil {
-			log.Error(err, "Failed to convert label selector")
-			return nil
-		}
-		// if the host label matches the selector, enqueue the request
-		if selector.Matches(labels.Set(host.GetLabels())) {
-			reqs = append(reqs, ctrl.Request{
-				NamespacedName: client.ObjectKey{
-					Name:      bmcVersionSet.Name,
-					Namespace: bmcVersionSet.Namespace,
-				},
-			})
-		} else { // if the label has been removed
-			ownedBMCVersions, err := r.getOwnedBMCVersions(ctx, &bmcVersionSet)
-			if err != nil {
-				log.Error(err, "Failed to get owned BMCVersion resources")
-				return nil
-			}
-			for _, bmcVersion := range ownedBMCVersions.Items {
-				if bmcVersion.Spec.BMCRef.Name == host.Name {
-					reqs = append(reqs, ctrl.Request{
-						NamespacedName: client.ObjectKey{
-							Name:      bmcVersionSet.Name,
-							Namespace: bmcVersionSet.Namespace,
-						},
-					})
-				}
-			}
-		}
+		reqs = append(reqs, ctrl.Request{
+			NamespacedName: client.ObjectKey{
+				Name:      bmcVersionSet.Name,
+				Namespace: bmcVersionSet.Namespace,
+			},
+		})
 	}
 	return reqs
 }

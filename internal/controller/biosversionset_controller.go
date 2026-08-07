@@ -7,23 +7,22 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
-	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -42,7 +41,6 @@ type BIOSVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
-// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,35 +61,20 @@ func (r *BIOSVersionSetReconciler) reconcileExists(ctx context.Context, versionS
 
 func (r *BIOSVersionSetReconciler) delete(ctx context.Context, versionSet *metalv1alpha1.BIOSVersionSet) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Deleting BIOSVersionSet")
 	if !controllerutil.ContainsFinalizer(versionSet, BIOSVersionSetFinalizer) {
 		return ctrl.Result{}, nil
-	}
-
-	if err := r.handleIgnoreAnnotationPropagation(ctx, versionSet); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
-
-	status := r.getOwnedBIOSVersionSetStatus(versions)
-	if status.AvailableBIOSVersion != (status.CompletedBIOSVersion+status.FailedBIOSVersion) ||
-		versionSet.Status.AvailableBIOSVersion != status.AvailableBIOSVersion {
-		if err = r.patchStatus(ctx, status, versionSet); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to patch BIOSVersionSet status: %w", err)
-		}
-		log.V(1).Info("BIOSVersionSet status patched", "Status", status)
-
-		if err := r.handleRetryAnnotationPropagation(ctx, versionSet); err != nil {
-			return ctrl.Result{}, err
-		}
-		log.Info("Waiting on the created BIOSVersion to reach terminal status")
-		return ctrl.Result{}, nil
+	if err := handleIgnoreAnnotationPropagation(ctx, r.Client, versionSet, versions); err != nil {
+		return ctrl.Result{}, err
 	}
 
+	// children are garbage collected through the owner reference; their own
+	// finalizers postpone deletion while an upgrade maintenance is active
 	log.V(1).Info("Ensuring that the finalizer is removed")
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, versionSet, BIOSVersionSetFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
@@ -101,38 +84,16 @@ func (r *BIOSVersionSetReconciler) delete(ctx context.Context, versionSet *metal
 	return ctrl.Result{}, nil
 }
 
-func (r *BIOSVersionSetReconciler) handleIgnoreAnnotationPropagation(ctx context.Context, versionSet *metalv1alpha1.BIOSVersionSet) error {
-	log := ctrl.LoggerFrom(ctx)
-	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
-	if err != nil {
-		return err
-	}
-
-	if len(versions.Items) == 0 {
-		log.V(1).Info("No BIOSVersions found, skipping ignore annotation propagation")
-		return nil
-	}
-	return handleIgnoreAnnotationPropagation(ctx, r.Client, versionSet, versions)
-}
-
-func (r *BIOSVersionSetReconciler) handleRetryAnnotationPropagation(ctx context.Context, versionSet *metalv1alpha1.BIOSVersionSet) error {
-	log := ctrl.LoggerFrom(ctx)
-	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
-	if err != nil {
-		return err
-	}
-
-	if len(versions.Items) == 0 {
-		log.V(1).Info("No BIOSVersion found, skipping retry annotation propagation")
-		return nil
-	}
-	return handleRetryAnnotationPropagation(ctx, r.Client, versionSet, versions)
-}
-
 func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, versionSet *metalv1alpha1.BIOSVersionSet) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BIOSVersionSet")
-	if err := r.handleIgnoreAnnotationPropagation(ctx, versionSet); err != nil {
+
+	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
+	}
+
+	if err := handleIgnoreAnnotationPropagation(ctx, r.Client, versionSet, versions); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -148,11 +109,6 @@ func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, versionSet *me
 	servers, err := r.getServersBySelector(ctx, versionSet)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to get servers by selector: %w", err)
-	}
-
-	versions, err := r.getOwnedBIOSVersions(ctx, versionSet)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get owned BIOSVersions: %w", err)
 	}
 
 	log.V(1).Info("Summary of Servers and BIOSVersions", "ServerCount", len(servers.Items), "BIOSVersionCount", len(versions.Items))
@@ -181,7 +137,7 @@ func (r *BIOSVersionSetReconciler) reconcile(ctx context.Context, versionSet *me
 	}
 	log.V(1).Info("Patched BIOSVersionSet status", "Status", status)
 
-	if err := r.handleRetryAnnotationPropagation(ctx, versionSet); err != nil {
+	if err := handleRetryAnnotationPropagation(ctx, r.Client, versionSet, versions); err != nil {
 		return ctrl.Result{}, err
 	}
 
@@ -204,20 +160,12 @@ func (r *BIOSVersionSetReconciler) ensureBIOSVersionsForServers(ctx context.Cont
 	var errs []error
 	for _, server := range servers.Items {
 		if !withBiosVersion[server.Name] {
-			var newBiosVersion *metalv1alpha1.BIOSVersion
-			newBiosVersionName := fmt.Sprintf("%s-%s", versionSet.Name, server.Name)
-			if len(newBiosVersionName) > utilvalidation.DNS1123SubdomainMaxLength {
-				log.V(1).Info("BIOSVersion name is too long, it will be shortened using random string", "BIOSVersionName", newBiosVersionName)
-				newBiosVersion = &metalv1alpha1.BIOSVersion{
-					ObjectMeta: metav1.ObjectMeta{
-						GenerateName: newBiosVersionName[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-",
-					}}
-			} else {
-				newBiosVersion = &metalv1alpha1.BIOSVersion{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: newBiosVersionName,
-					}}
-			}
+			name, generateName := versionSetChildName(versionSet.Name, server.Name)
+			newBiosVersion := &metalv1alpha1.BIOSVersion{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:         name,
+					GenerateName: generateName,
+				}}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {
 				newBiosVersion.Spec.BIOSVersionTemplate = *versionSet.Spec.BIOSVersionTemplate.DeepCopy()
@@ -234,7 +182,6 @@ func (r *BIOSVersionSetReconciler) ensureBIOSVersionsForServers(ctx context.Cont
 }
 
 func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context, servers *metalv1alpha1.ServerList, versions *metalv1alpha1.BIOSVersionList) error {
-	log := ctrl.LoggerFrom(ctx)
 	serverMap := make(map[string]bool)
 	for _, server := range servers.Items {
 		serverMap[server.Name] = true
@@ -242,18 +189,9 @@ func (r *BIOSVersionSetReconciler) deleteOrphanBIOSVersions(ctx context.Context,
 
 	var errs []error
 	for _, biosVersion := range versions.Items {
+		// the BIOSVersion finalizer postpones deletion while a maintenance is
+		// active, so orphans can be deleted unconditionally
 		if !serverMap[biosVersion.Spec.ServerRef.Name] {
-			if biosVersion.Status.State == metalv1alpha1.BIOSVersionStateInProgress && biosVersion.Spec.ServerMaintenanceRef != nil {
-				active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*biosVersion.Spec.ServerMaintenanceRef})
-				if err != nil {
-					errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSVersion %s: %w", biosVersion.Name, err))
-					continue
-				}
-				if active {
-					log.V(1).Info("Waiting for BIOSVersion maintenance to complete before deletion", "BIOSVersion", biosVersion.Name, "Status", biosVersion.Status)
-					continue
-				}
-			}
 			if err := r.Delete(ctx, &biosVersion); err != nil {
 				errs = append(errs, err)
 			}
@@ -272,7 +210,8 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Cont
 	var pendingPatchingVersion bool
 	var errs []error
 	for _, version := range versions.Items {
-		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress {
+		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && version.Status.UpgradeTask != nil {
+			log.V(1).Info("Skipping BIOSVersion spec patching as it is InProgress with an active UpgradeTask", "BIOSVersion", version.Name)
 			pendingPatchingVersion = true
 			continue
 		}
@@ -325,6 +264,9 @@ func (r *BIOSVersionSetReconciler) getServersBySelector(ctx context.Context, set
 	if err := r.List(ctx, servers, client.MatchingLabelsSelector{Selector: selector}); err != nil {
 		return nil, err
 	}
+	servers.Items = slices.DeleteFunc(servers.Items, func(s metalv1alpha1.Server) bool {
+		return !s.DeletionTimestamp.IsZero()
+	})
 	return servers, nil
 }
 
@@ -340,35 +282,17 @@ func (r *BIOSVersionSetReconciler) patchStatus(ctx context.Context, status *meta
 
 func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
-	server := obj.(*metalv1alpha1.Server)
 
 	setList := &metalv1alpha1.BIOSVersionSetList{}
 	if err := r.List(ctx, setList); err != nil {
 		log.Error(err, "Failed to list BIOSVersionSet")
 		return nil
 	}
-	reqs := make([]ctrl.Request, 0)
+	// on label changes enqueue all sets; each reconcile decides whether the
+	// server is in scope or its child became an orphan
+	reqs := make([]ctrl.Request, 0, len(setList.Items))
 	for _, set := range setList.Items {
-		selector, err := metav1.LabelSelectorAsSelector(&set.Spec.ServerSelector)
-		if err != nil {
-			log.Error(err, "Failed to convert label selector")
-			return nil
-		}
-		// If the Server label matches the selector, enqueue the request
-		if selector.Matches(labels.Set(server.GetLabels())) {
-			reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: set.Name}})
-		} else { // if the label has been removed
-			versions, err := r.getOwnedBIOSVersions(ctx, &set)
-			if err != nil {
-				log.Error(err, "Failed to get owned BIOSVersions")
-				return nil
-			}
-			for _, version := range versions.Items {
-				if version.Spec.ServerRef.Name == server.Name {
-					reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: set.Name}})
-				}
-			}
-		}
+		reqs = append(reqs, ctrl.Request{NamespacedName: client.ObjectKey{Name: set.Name}})
 	}
 	return reqs
 }
@@ -377,7 +301,25 @@ func (r *BIOSVersionSetReconciler) enqueueByServer(ctx context.Context, obj clie
 func (r *BIOSVersionSetReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BIOSVersionSet{}).
-		Owns(&metalv1alpha1.BIOSVersion{}).
+		Watches(
+			&metalv1alpha1.BIOSVersion{},
+			handler.EnqueueRequestForOwner(r.Scheme, r.RESTMapper(), &metalv1alpha1.BIOSVersionSet{}),
+			builder.WithPredicates(
+				predicate.Funcs{
+					CreateFunc: func(e event.CreateEvent) bool {
+						return true
+					},
+					UpdateFunc: func(e event.UpdateEvent) bool {
+						return enqueueFromChildObjUpdatesExceptAnnotation(e)
+					},
+					DeleteFunc: func(e event.DeleteEvent) bool {
+						return true
+					}, GenericFunc: func(e event.GenericEvent) bool {
+						return false
+					},
+				},
+			),
+		).
 		Watches(&metalv1alpha1.Server{},
 			handler.EnqueueRequestsFromMapFunc(r.enqueueByServer),
 			builder.WithPredicates(predicate.LabelChangedPredicate{})).

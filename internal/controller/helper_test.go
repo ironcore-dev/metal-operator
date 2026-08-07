@@ -4,15 +4,38 @@
 package controller
 
 import (
+	"strings"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
 
 var _ = Describe("Variable templating", func() {
+
+	Describe("versionSetChildName", func() {
+		It("returns the plain combined name when it fits", func() {
+			Expect(versionSetChildName("set", "target")).To(Equal("set-target"))
+		})
+
+		It("returns the same valid bounded name for repeated overlength calls", func() {
+			set := strings.Repeat("a", 200) + "-set"
+			target := strings.Repeat("b", 200) + "-target"
+			name1 := versionSetChildName(set, target)
+			Expect(name1).To(Equal(versionSetChildName(set, target)))
+			Expect(name1).To(HaveLen(utilvalidation.DNS1123SubdomainMaxLength))
+			Expect(utilvalidation.IsDNS1123Subdomain(name1)).To(BeEmpty())
+		})
+
+		It("produces distinct names for distinct overlength inputs", func() {
+			prefix := strings.Repeat("a", 250)
+			Expect(versionSetChildName(prefix+"-one", "x")).NotTo(Equal(versionSetChildName(prefix+"-two", "y")))
+		})
+	})
 
 	Describe("substituteVars", func() {
 		It("replaces a single placeholder", func() {

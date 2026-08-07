@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"maps"
 	"math/big"
 	"reflect"
@@ -24,6 +25,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	randutil "k8s.io/apimachinery/pkg/util/rand"
 	utilvalidation "k8s.io/apimachinery/pkg/util/validation"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -69,15 +71,19 @@ func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client
 
 // versionSetChildName returns a deterministic child resource name for the
 // combination of set and target (Server/BMC), so that a re-reconcile on a
-// stale cache cannot create duplicate children. Falls back to a GenerateName
-// prefix when the deterministic name would exceed the DNS1123 limit.
-// Exactly one of the two return values is set.
-func versionSetChildName(setName, targetName string) (name, generateName string) {
-	name = fmt.Sprintf("%s-%s", setName, targetName)
-	if len(name) > utilvalidation.DNS1123SubdomainMaxLength {
-		return "", name[:utilvalidation.DNS1123SubdomainMaxLength-10] + "-"
+// stale cache cannot create duplicate children. Combinations exceeding the
+// DNS1123 limit are truncated and suffixed with a stable hash to stay valid.
+func versionSetChildName(setName, targetName string) string {
+	name := fmt.Sprintf("%s-%s", setName, targetName)
+	if len(name) <= utilvalidation.DNS1123SubdomainMaxLength {
+		return name
 	}
-	return name, ""
+	// Same scheme as Deployment -> ReplicaSet pod-template-hash:
+	// FNV-32a hash, SafeEncodeString keeps it DNS1123-safe.
+	hash := fnv.New32a()
+	hash.Write([]byte(name)) // hash.Hash never errors on Write
+	suffix := "-" + randutil.SafeEncodeString(fmt.Sprint(hash.Sum32()))
+	return name[:utilvalidation.DNS1123SubdomainMaxLength-len(suffix)] + suffix
 }
 
 // shouldProceedWithDeletion returns true when obj should proceed with deletion.

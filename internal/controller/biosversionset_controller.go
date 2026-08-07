@@ -160,11 +160,9 @@ func (r *BIOSVersionSetReconciler) ensureBIOSVersionsForServers(ctx context.Cont
 	var errs []error
 	for _, server := range servers.Items {
 		if !withBiosVersion[server.Name] {
-			name, generateName := versionSetChildName(versionSet.Name, server.Name)
 			newBiosVersion := &metalv1alpha1.BIOSVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:         name,
-					GenerateName: generateName,
+					Name: versionSetChildName(versionSet.Name, server.Name),
 				}}
 
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBiosVersion, func() error {

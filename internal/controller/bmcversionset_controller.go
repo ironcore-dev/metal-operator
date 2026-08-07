@@ -179,11 +179,9 @@ func (r *BMCVersionSetReconciler) createMissingBMCVersions(
 	var errs []error
 	for _, bmc := range bmcList.Items {
 		if _, ok := BMCWithBMCVersion[bmc.Name]; !ok {
-			name, generateName := versionSetChildName(bmcVersionSet.Name, bmc.Name)
 			newBMCVersion := &metalv1alpha1.BMCVersion{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:         name,
-					GenerateName: generateName,
+					Name: versionSetChildName(bmcVersionSet.Name, bmc.Name),
 				}}
 			opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, newBMCVersion, func() error {
 				newBMCVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()

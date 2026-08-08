@@ -219,7 +219,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Ensuring that the BMCVersion has been created")
 		bmcVersion01 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[0].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc02.Name),
 			},
 		}
 		Eventually(Get(bmcVersion01)).Should(Succeed())
@@ -227,7 +227,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Ensuring that the BMCVersion has been created")
 		bmcVersion02 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[1].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc03.Name),
 			},
 		}
 		Eventually(Get(bmcVersion02)).Should(Succeed())
@@ -323,7 +323,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the BMCVersion has been created")
 		bmcVersion02 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[0].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc02.Name),
 			},
 		}
 		Eventually(Get(bmcVersion02)).Should(Succeed())
@@ -331,7 +331,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the 2nd BMCVersion has been created")
 		bmcVersion03 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[1].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc03.Name),
 			},
 		}
 		Eventually(Get(bmcVersion03)).Should(Succeed())
@@ -413,7 +413,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the BMCVersion has been created")
 		bmcVersion02 = &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[0].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc02.Name),
 			},
 		}
 		Eventually(Get(bmcVersion02)).Should(Succeed())
@@ -421,7 +421,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the 2nd BMCVersion has been created")
 		bmcVersion03 = &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[1].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc03.Name),
 			},
 		}
 		Eventually(Get(bmcVersion03)).Should(Succeed())
@@ -453,7 +453,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the 3rd BMCVersion has been created")
 		bmcVersion01 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[2].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc01.Name),
 			},
 		}
 		Eventually(Get(bmcVersion01)).Should(Succeed())
@@ -535,7 +535,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the BMCVersion has been created")
 		bmcVersion02 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[0].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc02.Name),
 			},
 		}
 		Eventually(Get(bmcVersion02)).Should(Succeed())
@@ -543,7 +543,7 @@ var _ = Describe("BMCVersionSet Controller", func() {
 		By("Checking if the 2nd BMCVersion has been created")
 		bmcVersion03 := &metalv1alpha1.BMCVersion{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcVersionList.Items[1].Name,
+				Name: versionSetChildName(bmcVersionSet.Name, bmc03.Name),
 			},
 		}
 		Eventually(Get(bmcVersion03)).Should(Succeed())

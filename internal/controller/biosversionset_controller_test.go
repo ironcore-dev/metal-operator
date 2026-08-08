@@ -79,7 +79,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "48947555-7742-3448-3784-823347823835",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
@@ -103,7 +103,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				SystemUUID: "58947555-7742-3448-3784-823347823836",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
@@ -230,7 +230,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 		)
 	})
 
-	It("should successfully reconcile the resource when BMC are deleted/created", func(ctx SpecContext) {
+	It("should successfully reconcile the resource when Servers are deleted/created", func(ctx SpecContext) {
 		By("Create resource")
 		biosVersionSet := &metalv1alpha1.BIOSVersionSet{
 			ObjectMeta: metav1.ObjectMeta{

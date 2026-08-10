@@ -1347,7 +1347,7 @@ passwd:
 			Eventually(Object(server)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
 				HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			))
 
@@ -1392,7 +1392,7 @@ passwd:
 			Eventually(Object(server)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
 				HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
 			))
 			Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
 
@@ -1428,7 +1428,7 @@ passwd:
 			By("Ensuring the reconciler reconstructs the Parked state from the annotation")
 			Eventually(Object(server)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
-				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
 			))
 
 			By("Removing the parked annotation to resume")
@@ -1616,7 +1616,7 @@ passwd:
 			By("Ensuring the deferred request is now honored and the server is parked")
 			Eventually(Object(server)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
-				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			))
 

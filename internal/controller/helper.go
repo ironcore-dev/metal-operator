@@ -138,13 +138,11 @@ func shouldIgnoreReconciliation(obj client.Object) bool {
 	}, val)
 }
 
-// isServerParked reports whether the Server carries the durable parked annotation, i.e. the operator
-// (not the requestor) has recorded the server as parked.
 func isServerParked(server *metalv1alpha1.Server) bool {
-	return server.GetAnnotations()[metalv1alpha1.ParkedAnnotation] == metalv1alpha1.ParkedAnnotationTrue
+	_, ok := server.GetAnnotations()[metalv1alpha1.ParkedAnnotation]
+	return ok
 }
 
-// isServerParkingOrParked reports whether a Server is being parked or already parked.
 func isServerParkingOrParked(server *metalv1alpha1.Server) bool {
 	if isServerParked(server) {
 		return true

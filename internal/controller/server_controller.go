@@ -244,7 +244,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, err
 	}
 
-	if result, handled, err := r.handleParkedState(ctx, bmcClient, server); err != nil || handled {
+	if result, handled, err := r.handleParking(ctx, bmcClient, server); err != nil || handled {
 		return result, err
 	}
 
@@ -731,7 +731,7 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 	return false, nil
 }
 
-func (r *ServerReconciler) handleParkedState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
+func (r *ServerReconciler) handleParking(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
 	parked := isServerParked(server)
@@ -804,12 +804,12 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		// Wait for the power off to take effect; requeue explicitly since a BMC-side power
-		// transition might not produce a watch event.
+		// transition does not produce a watch event.
 		return ctrl.Result{RequeueAfter: r.ResyncInterval}, true, nil
 	}
 
 	serverBase := server.DeepCopy()
-	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, metalv1alpha1.ParkedAnnotationTrue)
+	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, "true")
 	metautils.DeleteAnnotation(server, metalv1alpha1.OperationAnnotation)
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, false, fmt.Errorf("failed to patch parked annotations: %w", err)

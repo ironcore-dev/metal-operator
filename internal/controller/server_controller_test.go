@@ -221,7 +221,7 @@ var _ = Describe("Server Controller", func() {
 
 		contents, ok := metalprobeUnit["contents"].(string)
 		Expect(ok).To(BeTrue(), "contents should be a string")
-		Expect(contents).To(ContainSubstring("--registry-url=http://localhost:30000"))
+		Expect(contents).To(ContainSubstring(fmt.Sprintf("--registry-url=%s", registryURL)))
 		Expect(contents).To(ContainSubstring("--server-uuid=38947555-7742-3448-3784-823347823834"))
 		Expect(contents).To(ContainSubstring("--discovery-token="))
 
@@ -471,7 +471,7 @@ var _ = Describe("Server Controller", func() {
 					filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 					ignition.Config{
 						Image:        "foo:latest",
-						Flags:        fmt.Sprintf("--registry-url=http://localhost:30000 --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", actualToken),
+						Flags:        fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834 --discovery-token=%s", registryURL, actualToken),
 						SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
 						PasswordHash: currentPasswordHash,
 					},

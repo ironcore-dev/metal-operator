@@ -79,7 +79,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "48947555-7742-3448-3784-823347823835",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,
@@ -103,7 +103,7 @@ var _ = Describe("BIOSVersionSet Controller", func() {
 				},
 			},
 			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "58947555-7742-3448-3784-823347823836",
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
 					Protocol: metalv1alpha1.Protocol{
 						Name: metalv1alpha1.ProtocolRedfishLocal,

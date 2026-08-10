@@ -21,6 +21,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/third_party/expansion"
 	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -361,7 +362,11 @@ func handleRetryAnnotationPropagation(ctx context.Context, c client.Client, pare
 		childObj := cObj.DeepCopyObject().(client.Object)
 		err := c.Get(ctx, client.ObjectKeyFromObject(cObj), childObj)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to fetch latest child %s: %w", cObj.GetName(), err))
+			// child may have been deleted after listing (e.g. orphan cleanup);
+			// nothing to propagate to it
+			if !apierrors.IsNotFound(err) {
+				errs = append(errs, fmt.Errorf("failed to fetch latest child %s: %w", cObj.GetName(), err))
+			}
 			return nil
 		}
 		// if the child is being deleted, we don't need to propagate

@@ -673,7 +673,7 @@ var _ = Describe("BMC Conditions", func() {
 				SatisfyAll(
 					HaveField("Type", ConditionReset),
 					HaveField("Status", metav1.ConditionFalse),
-					HaveField("Reason", "ResetComplete"),
+					HaveField("Reason", ReasonResetComplete),
 				),
 			)),
 		)

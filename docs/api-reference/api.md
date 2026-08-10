@@ -670,8 +670,6 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `Enabled` | BMCStateEnabled indicates that the BMC is enabled and functioning correctly.<br /> |
-| `Error` | BMCStateError indicates that there is an error with the BMC.<br /> |
-| `Pending` | BMCStatePending indicates that there is an error connecting with the BMC.<br /> |
 
 
 #### BMCStatus
@@ -694,7 +692,7 @@ _Appears in:_
 | `sku` _string_ | SKU is the stock keeping unit identifier for the BMC. |  |  |
 | `serialNumber` _string_ | SerialNumber is the serial number of the BMC. |  |  |
 | `firmwareVersion` _string_ | FirmwareVersion is the version of the firmware currently running on the BMC. |  |  |
-| `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending |  |
+| `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC as reported by Redfish. |  |  |
 | `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  |  |
 | `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
 | `metricsReportSubscriptionLink` _string_ | MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc. |  |  |

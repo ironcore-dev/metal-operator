@@ -197,9 +197,7 @@ type BMCStatus struct {
 	// +optional
 	FirmwareVersion string `json:"firmwareVersion,omitempty"`
 
-	// State represents the current state of the BMC.
-	// kubebuilder:validation:Enum=Enabled;Error;Pending
-	// +kubebuilder:default=Pending
+	// State represents the current state of the BMC as reported by Redfish.
 	// +optional
 	State BMCState `json:"state,omitempty"`
 
@@ -232,12 +230,6 @@ type BMCState string
 const (
 	// BMCStateEnabled indicates that the BMC is enabled and functioning correctly.
 	BMCStateEnabled BMCState = "Enabled"
-
-	// BMCStateError indicates that there is an error with the BMC.
-	BMCStateError BMCState = "Error"
-
-	// BMCStatePending indicates that there is an error connecting with the BMC.
-	BMCStatePending BMCState = "Pending"
 )
 
 // +kubebuilder:object:root=true

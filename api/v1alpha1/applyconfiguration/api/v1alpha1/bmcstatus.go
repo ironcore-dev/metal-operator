@@ -30,8 +30,7 @@ type BMCStatusApplyConfiguration struct {
 	SerialNumber *string `json:"serialNumber,omitempty"`
 	// FirmwareVersion is the version of the firmware currently running on the BMC.
 	FirmwareVersion *string `json:"firmwareVersion,omitempty"`
-	// State represents the current state of the BMC.
-	// kubebuilder:validation:Enum=Enabled;Error;Pending
+	// State represents the current state of the BMC as reported by Redfish.
 	State *apiv1alpha1.BMCState `json:"state,omitempty"`
 	// PowerState represents the current power state of the BMC.
 	PowerState *apiv1alpha1.BMCPowerState `json:"powerState,omitempty"`

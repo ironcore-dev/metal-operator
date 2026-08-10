@@ -23,6 +23,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -41,6 +42,7 @@ type BIOSVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=biosversions,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servers,verbs=get;list;watch
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -208,10 +210,19 @@ func (r *BIOSVersionSetReconciler) patchBIOSVersionFromTemplate(ctx context.Cont
 	var pendingPatchingVersion bool
 	var errs []error
 	for _, version := range versions.Items {
-		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && version.Status.UpgradeTask != nil {
-			log.V(1).Info("Skipping BIOSVersion spec patching as it is InProgress with an active UpgradeTask", "BIOSVersion", version.Name)
-			pendingPatchingVersion = true
-			continue
+		// stop patching once maintenance is approved: the BIOSVersion controller
+		// performs active operations (e.g. BMC reset) before the upgrade task exists
+		if version.Status.State == metalv1alpha1.BIOSVersionStateInProgress && version.Spec.ServerMaintenanceRef != nil {
+			active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, []metalv1alpha1.ObjectReference{*version.Spec.ServerMaintenanceRef})
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to check maintenance state for BIOSVersion %s: %w", version.Name, err))
+				continue
+			}
+			if active {
+				log.V(1).Info("Skipping BIOSVersion spec patching as its maintenance is approved", "BIOSVersion", version.Name)
+				pendingPatchingVersion = true
+				continue
+			}
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &version, func() error {
 			version.Spec.BIOSVersionTemplate = *template.DeepCopy()

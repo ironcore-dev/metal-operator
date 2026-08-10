@@ -23,6 +23,7 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	metalutil "github.com/ironcore-dev/metal-operator/internal/util"
 )
 
 const (
@@ -41,6 +42,7 @@ type BMCVersionSetReconciler struct {
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversionsets/finalizers,verbs=update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcversions,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=metal.ironcore.dev,resources=servermaintenances,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -235,10 +237,19 @@ func (r *BMCVersionSetReconciler) patchBMCVersionfromTemplate(
 	var pendingPatchingVersion bool
 	var errs []error
 	for _, bmcVersion := range bmcVersionList.Items {
-		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && bmcVersion.Status.UpgradeTask != nil {
-			log.V(1).Info("Skipping BMCVersion spec patching as it is in InProgress state with an active UpgradeTask")
-			pendingPatchingVersion = true
-			continue
+		// stop patching once maintenance is approved: the BMCVersion controller
+		// performs active operations before the upgrade task exists
+		if bmcVersion.Status.State == metalv1alpha1.BMCVersionStateInProgress && len(bmcVersion.Spec.ServerMaintenanceRefs) > 0 {
+			active, err := metalutil.IsAnyServerMaintenanceActive(ctx, r.Client, bmcVersion.Spec.ServerMaintenanceRefs)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("failed to check maintenance state for BMCVersion %s: %w", bmcVersion.Name, err))
+				continue
+			}
+			if active {
+				log.V(1).Info("Skipping BMCVersion spec patching as its maintenance is approved", "BMCVersion", bmcVersion.Name)
+				pendingPatchingVersion = true
+				continue
+			}
 		}
 		opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, &bmcVersion, func() error {
 			bmcVersion.Spec.BMCVersionTemplate = *bmcVersionSet.Spec.BMCVersionTemplate.DeepCopy()

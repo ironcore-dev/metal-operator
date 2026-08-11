@@ -57,6 +57,14 @@ type ServerSpecApplyConfiguration struct {
 	BootOrder []BootOrderApplyConfiguration `json:"bootOrder,omitempty"`
 	// BIOSSettingsRef is a reference to a biossettings object that specifies
 	// the BIOS configuration for this server.
+	//
+	// Deprecated: This field is an internal actuator variable exposed as
+	// user-facing API. It is written exclusively by the BIOSSettingsReconciler
+	// as a back-reference, and every write patches the Server object, racing
+	// with its actual owner. The relationship between a Server and its BIOS
+	// settings is expressed more precisely through BIOSSettings.Spec.ServerRef.
+	// Do not set this field on new Server resources; it will be removed in a
+	// future release.
 	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`

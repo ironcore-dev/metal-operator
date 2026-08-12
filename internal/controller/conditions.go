@@ -87,4 +87,6 @@ const (
 	ReasonWaitingForPowerOff = "WaitingForPowerOff"
 	// ReasonPowerOffConfirmed marks WaitingForPowerOff as resolved.
 	ReasonPowerOffConfirmed = "PowerOffConfirmed"
+	// ReasonResetComplete indicates a BMC reset has completed successfully.
+	ReasonResetComplete = "ResetComplete"
 )

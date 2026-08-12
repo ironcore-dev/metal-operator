@@ -88,17 +88,13 @@ linters:
       - linters:
           - staticcheck
         text: "SA1019.*server\\.Spec\\.Power is deprecated"
-      # Server.spec.biosSettingsRef is deprecated. The field is an internal
-      # back-reference that the BIOSSettingsReconciler still writes/clears while
-      # reconciling BIOSSettings objects. Legacy access remains until the field
-      # is fully removed in a future release.
+      # Server.spec.biosSettingsRef is deprecated. Legacy consumers still
+      # reference it until the field is fully removed.
       - linters:
           - staticcheck
         text: "SA1019.*\\.BIOSSettingsRef is deprecated"
-      # BMC.spec.bmcSettingsRef is deprecated. The field is an internal
-      # back-reference that the BMCSettingsReconciler still writes/clears while
-      # reconciling BMCSettings objects. Legacy access remains until the field
-      # is fully removed in a future release.
+      # BMC.spec.bmcSettingsRef is deprecated. Legacy consumers still
+      # reference it until the field is fully removed.
       - linters:
           - staticcheck
         text: "SA1019.*\\.BMCSettingRef is deprecated"

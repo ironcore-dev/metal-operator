@@ -652,7 +652,7 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC. |  |  |
+| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC.<br />Deprecated: This field is being deprecated and shall not be used going<br />forward, as it will be removed in a future release. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
@@ -1816,7 +1816,7 @@ _Appears in:_
 | `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
-| `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server. |  |  |
+| `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server.<br />Deprecated: This field is being deprecated and shall not be used going<br />forward, as it will be removed in a future release. |  |  |
 | `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 | `unclaimable` _boolean_ | Unclaimable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false |  |
 

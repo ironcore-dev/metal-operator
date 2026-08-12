@@ -88,6 +88,16 @@ linters:
       - linters:
           - staticcheck
         text: "SA1019.*server\\.Spec\\.Power is deprecated"
+      # Server.spec.biosSettingsRef is deprecated. Legacy consumers still
+      # reference it until the field is fully removed.
+      - linters:
+          - staticcheck
+        text: "SA1019.*\\.BIOSSettingsRef is deprecated"
+      # BMC.spec.bmcSettingsRef is deprecated. Legacy consumers still
+      # reference it until the field is fully removed.
+      - linters:
+          - staticcheck
+        text: "SA1019.*\\.BMCSettingRef is deprecated"
     paths:
       - third_party$
       - builtin$

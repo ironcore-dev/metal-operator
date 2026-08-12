@@ -1157,6 +1157,9 @@ spec:
                 description: |-
                   BMCSettingRef is a reference to a BMCSettings object that specifies
                   the BMC configuration for this BMC.
+
+                  Deprecated: This field is being deprecated and shall not be used going
+                  forward, as it will be removed in a future release.
                 properties:
                   name:
                     default: ""
@@ -3757,6 +3760,9 @@ spec:
                 description: |-
                   BIOSSettingsRef is a reference to a biossettings object that specifies
                   the BIOS configuration for this server.
+
+                  Deprecated: This field is being deprecated and shall not be used going
+                  forward, as it will be removed in a future release.
                 properties:
                   name:
                     default: ""

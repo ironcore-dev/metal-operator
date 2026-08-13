@@ -199,9 +199,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -223,9 +225,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			MaxConcurrentReconciles: 5,
 			Conditions:              accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
 			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
@@ -258,9 +262,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:     10 * time.Millisecond,
 			Conditions:         accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 			TimeoutExpiry: 6 * time.Second,
 		}).SetupWithManager(k8sManager)).To(Succeed())
@@ -274,9 +280,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:     10 * time.Millisecond,
 			Conditions:         accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -295,9 +303,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:     10 * time.Millisecond,
 			Conditions:         accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -310,9 +320,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval:     10 * time.Millisecond,
 			Conditions:         accessor,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -340,9 +352,11 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation: true,
 			BMCOptions: bmc.Options{
-				PowerPollingInterval: 50 * time.Millisecond,
-				PowerPollingTimeout:  200 * time.Millisecond,
-				BasicAuth:            true,
+				ResourcePollingInterval: 50 * time.Millisecond,
+				ResourcePollingTimeout:  200 * time.Millisecond,
+				PowerPollingInterval:    50 * time.Millisecond,
+				PowerPollingTimeout:     200 * time.Millisecond,
+				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

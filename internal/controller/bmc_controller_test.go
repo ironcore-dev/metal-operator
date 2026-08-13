@@ -735,17 +735,7 @@ var _ = Describe("BMC SSH Reset", func() {
 	AfterEach(func(ctx SpecContext) {
 		bmcutils.SSHResetBMCFunc = bmcutils.SSHResetBMC
 		mockServers[0].SetUnavailable(false)
-		// Use a longer timeout since BMC may be in a reset-wait state that delays cleanup.
-		Eventually(func(g Gomega) {
-			list := &metalv1alpha1.BMCList{}
-			g.Expect(k8sClient.List(ctx, list)).To(Succeed())
-			g.Expect(list.Items).To(BeEmpty())
-		}).WithTimeout(30 * time.Second).Should(Succeed())
-		Eventually(func(g Gomega) {
-			list := &metalv1alpha1.ServerList{}
-			g.Expect(k8sClient.List(ctx, list)).To(Succeed())
-			g.Expect(list.Items).To(BeEmpty())
-		}).WithTimeout(30 * time.Second).Should(Succeed())
+		EnsureCleanState(ctx)
 	})
 
 	It("Should successfully perform SSH reset after Redfish 5xx error", func(ctx SpecContext) {

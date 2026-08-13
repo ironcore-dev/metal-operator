@@ -47,7 +47,7 @@ func (r *ServerClaimSchedulerReconciler) Reconcile(ctx context.Context, req ctrl
 
 func (r *ServerClaimSchedulerReconciler) schedule(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Scheduling server claim")
+	log.V(1).Info("Scheduling ServerClaim")
 
 	if !claim.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
@@ -69,7 +69,7 @@ func (r *ServerClaimSchedulerReconciler) schedule(ctx context.Context, claim *me
 		return ctrl.Result{}, err
 	}
 	if server == nil {
-		log.V(1).Info("No server found for claim")
+		log.V(1).Info("No claimable Server found")
 		return ctrl.Result{}, nil
 	}
 
@@ -101,49 +101,50 @@ func (r *ServerClaimSchedulerReconciler) claimServer(ctx context.Context, claim 
 			return nil, err
 		}
 		if claim.Spec.ServerSelector != nil && !selector.Matches(labels.Set(server.Labels)) {
-			log.V(1).Info("Specified server matches ServerRef but does not match label selector", "Server", server.Name, "Claim", claim.Name)
+			log.V(1).Info("Server does not match label selector", "Server", server.Name, "ServerClaim", claim.Name)
 			return nil, nil
 		}
 		return r.tryClaimServer(ctx, claim, server)
 	}
 
-	serverList := &metalv1alpha1.ServerList{}
-	if err := r.List(ctx, serverList); err != nil {
+	// A server may already carry this claim's ref, e.g. when the reconciler crashed
+	// between claiming it and recording the binding. This lookup is label-independent
+	// on purpose: a server whose labels changed mid-binding must still be found so its
+	// ownership can be confirmed.
+	claimedList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, claimedList, client.MatchingFields{serverClaimRefField: claim.Namespace + "/" + claim.Name}); err != nil {
 		return nil, err
 	}
-
-	// fetch previously claimed server if its present
-	// keeping this separate for reason of clarity
-	for _, server := range serverList.Items {
-		// find previously claimed server
-		if ref := server.Spec.ServerClaimRef; ref != nil {
-			if ref.Name == claim.Name && ref.Namespace == claim.Namespace {
-				// Re-fetch from the API server to confirm this claim still owns it.
-				// The list above is cached and may be stale.
-				fresh := server.DeepCopy()
-				if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(fresh), fresh); err != nil {
-					return nil, client.IgnoreNotFound(err)
-				}
-				if ref := fresh.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
-					return nil, nil
-				}
-				return fresh, nil
-			}
+	if len(claimedList.Items) > 0 {
+		// Re-fetch from the API server to confirm this claim still owns it.
+		// The list above is cached and may be stale.
+		fresh := claimedList.Items[0].DeepCopy()
+		if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(fresh), fresh); err != nil {
+			return nil, client.IgnoreNotFound(err)
 		}
+		if ref := fresh.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
+			return nil, nil
+		}
+		return fresh, nil
+	}
+
+	var listOpts []client.ListOption
+	if claim.Spec.ServerSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
+		if err != nil {
+			return nil, err
+		}
+		listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: selector})
+	}
+	serverList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, serverList, listOpts...); err != nil {
+		return nil, err
 	}
 
 	var selectedServer *metalv1alpha1.Server
-	selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
-	if err != nil {
-		return nil, err
-	}
-	for _, server := range serverList.Items {
-		if claim.Spec.ServerSelector != nil && !selector.Matches(labels.Set(server.Labels)) {
-			log.V(1).Info("Specified server does not match label selector", "Server", server.Name, "Claim", claim.Name)
-			continue
-		}
-		if r.isServerClaimable(ctx, &server, claim) {
-			selectedServer = &server
+	for i := range serverList.Items {
+		if r.isServerClaimable(ctx, &serverList.Items[i], claim) {
+			selectedServer = &serverList.Items[i]
 			break
 		}
 	}
@@ -176,8 +177,6 @@ func (r *ServerClaimSchedulerReconciler) tryClaimServer(ctx context.Context, cla
 	if ref := server.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
 		return nil, fmt.Errorf("server %s was claimed concurrently, will retry", server.Name)
 	}
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
 	return server, nil
 }
 
@@ -222,7 +221,7 @@ func (r *ServerClaimSchedulerReconciler) patchServerRef(ctx context.Context, cla
 func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
 	log := ctrl.LoggerFrom(ctx)
 	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && (claimRef.Name != claim.Name || claimRef.Namespace != claim.Namespace) {
-		log.V(1).Info("Server claim ref does not match claim", "Server", server.Name, "ClaimName", claimRef.Name)
+		log.V(1).Info("Server claim ref does not match ServerClaim", "Server", server.Name, "ServerClaimRef", fmt.Sprintf("%s/%s", claimRef.Namespace, claimRef.Name))
 		return false
 	}
 	if server.Status.State != metalv1alpha1.ServerStateAvailable {
@@ -230,7 +229,7 @@ func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, 
 		return false
 	}
 	if server.Spec.Unclaimable {
-		log.V(1).Info("Server is cordoned", "Server", server.Name, "Claim", claim.Name)
+		log.V(1).Info("Server is cordoned", "Server", server.Name, "ServerClaim", claim.Name)
 		return false
 	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
@@ -238,7 +237,7 @@ func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, 
 		return false
 	}
 	if !tolerates(server.Spec.Taints, claim.Spec.Tolerations) {
-		log.V(1).Info("Server taints not tolerated by claim", "Server", server.Name, "Claim", claim.Name)
+		log.V(1).Info("Server taints not tolerated by ServerClaim", "Server", server.Name, "ServerClaim", claim.Name)
 		return false
 	}
 	return true

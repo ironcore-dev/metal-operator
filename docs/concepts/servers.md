@@ -206,7 +206,7 @@ healed, so an intermediate restart during the procedure cannot boot the claim's 
 `ServerClaim` stays in place (bound), so on recovery the claim controller can take over again
 without re-scheduling.
 
-Parking uses two annotations with distinct roles:
+Parking is driven by annotations with distinct roles:
 
 - `metal.ironcore.dev/operation: park`: a **transient request** set by the external actor. The
   `Server` reconciler removes it again as soon as the server has reached the `Parked` state.
@@ -215,7 +215,12 @@ Parking uses two annotations with distinct roles:
   server.
 - `metal.ironcore.dev/parked: "true"`: a **durable, controller-set marker** the operator writes
   when it parks the server and removes again when an unpark request comes in. Do not set or remove
-  it directly; it is controller-owned state, not user-facing input. 
+  it directly; it is controller-owned state, not user-facing input.
+
+The `operation: park`/`unpark` request annotations are the interface of the current `Server`
+reconciler implementation only. Eventually, the parking request is expected to originate from an
+external entity rather than being issued by hand; the stand-down semantics of the `Parked` state
+and the parked marker stay the same regardless of how the request arrives.
 
 ### Lifecycle
 

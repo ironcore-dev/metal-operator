@@ -220,18 +220,16 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 
 		server := object.(*metalv1alpha1.Server)
 
-		var req []reconcile.Request
 		claimList := &metalv1alpha1.ServerClaimList{}
-		if err := r.List(ctx, claimList); err != nil {
+		if err := r.List(ctx, claimList, client.MatchingFields{serverRefField: server.Name}); err != nil {
 			log.Error(err, "Failed to list ServerClaims")
 			return nil
 		}
+		req := make([]reconcile.Request, 0, len(claimList.Items))
 		for _, claim := range claimList.Items {
-			if claim.Spec.ServerRef != nil && claim.Spec.ServerRef.Name == server.Name {
-				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
-				})
-			}
+			req = append(req, reconcile.Request{
+				NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+			})
 		}
 		return req
 	})

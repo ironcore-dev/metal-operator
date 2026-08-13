@@ -6,6 +6,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
@@ -18,6 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -303,8 +305,27 @@ func (r *ServerClaimSchedulerReconciler) SetupWithManager(mgr ctrl.Manager) erro
 			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
 		}).
 		For(&metalv1alpha1.ServerClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(isUnscheduledServerClaim))).
-		Watches(&metalv1alpha1.Server{}, r.enqueueUnboundServerClaims()).
+		Watches(&metalv1alpha1.Server{}, r.enqueueUnboundServerClaims(), builder.WithPredicates(serverClaimabilityChanged())).
 		Complete(r)
+}
+
+func serverClaimabilityChanged() predicate.Funcs {
+	return predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			oldServer, ok := e.ObjectOld.(*metalv1alpha1.Server)
+			if !ok {
+				return false
+			}
+			newServer, ok := e.ObjectNew.(*metalv1alpha1.Server)
+			if !ok {
+				return false
+			}
+			return oldServer.Generation != newServer.Generation ||
+				!maps.Equal(oldServer.Labels, newServer.Labels) ||
+				oldServer.Status.State != newServer.Status.State ||
+				oldServer.Status.PowerState != newServer.Status.PowerState
+		},
+	}
 }
 
 func (r *ServerClaimSchedulerReconciler) enqueueUnboundServerClaims() handler.EventHandler {

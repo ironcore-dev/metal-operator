@@ -735,7 +735,23 @@ func (r *ServerReconciler) handleParking(ctx context.Context, bmcClient bmc.BMC,
 	log := ctrl.LoggerFrom(ctx)
 
 	parked := isServerParked(server)
-	hasParkRequest := server.GetAnnotations()[metalv1alpha1.OperationAnnotation] == metalv1alpha1.OperationAnnotationPark
+	operation := server.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+	hasParkRequest := operation == metalv1alpha1.OperationAnnotationPark
+	hasUnparkRequest := operation == metalv1alpha1.OperationAnnotationUnpark
+
+	// 0. Unpark
+	if hasUnparkRequest {
+		serverBase := server.DeepCopy()
+		metautils.DeleteAnnotation(server, metalv1alpha1.OperationAnnotation)
+		if parked {
+			log.V(1).Info("Unpark requested, releasing server")
+			metautils.DeleteAnnotation(server, metalv1alpha1.ParkedAnnotation)
+		}
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return ctrl.Result{}, false, fmt.Errorf("failed to consume unpark request: %w", err)
+		}
+		return ctrl.Result{}, true, nil
+	}
 
 	// 1. Resume: the parked annotation is gone but state still records Parked.
 	if !parked && server.Status.State == metalv1alpha1.ServerStateParked {
@@ -750,9 +766,7 @@ func (r *ServerReconciler) handleParking(ctx context.Context, bmcClient bmc.BMC,
 		return ctrl.Result{}, false, nil
 	}
 
-	// 2. Stay parked: the annotation is the source of truth. Stand down entirely: no power
-	// healing, no boot order, no state-machine progression. The external actor owns the server
-	// (including power) until the parked annotation is removed, which re-triggers reconciliation.
+	// 2. Stay parked
 	if parked {
 		if server.Status.State != metalv1alpha1.ServerStateParked {
 			log.Info("Reconciling Parked state from parked annotation", "currentState", server.Status.State)
@@ -784,9 +798,6 @@ func isParkableState(state metalv1alpha1.ServerState) bool {
 	return false
 }
 
-// parkServer powers the server off via the BMC (idempotent, spec.power is left untouched),
-// records the parked annotation, sets status.state = Parked, and removes the transient
-// operation: park request annotation.
 func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 

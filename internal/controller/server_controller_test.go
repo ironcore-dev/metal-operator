@@ -1351,9 +1351,9 @@ passwd:
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			))
 
-			By("Removing the parked annotation to resume")
+			By("Requesting unpark to resume")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 
 			By("Ensuring the server resumes to available")
@@ -1396,9 +1396,9 @@ passwd:
 			))
 			Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
 
-			By("Removing the parked annotation to resume")
+			By("Requesting unpark to resume")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 
 			By("Ensuring the server resumes to reserved")
@@ -1431,9 +1431,9 @@ passwd:
 				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
 			))
 
-			By("Removing the parked annotation to resume")
+			By("Requesting unpark to resume")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 
@@ -1471,9 +1471,9 @@ passwd:
 				server.Spec.ServerClaimRef = nil
 			})).Should(Succeed())
 
-			By("Removing the parked annotation to resume")
+			By("Requesting unpark to resume")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 
 			By("Ensuring the server resumes to available (not reserved) since the claim ref is gone")
@@ -1620,9 +1620,9 @@ passwd:
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			))
 
-			By("Removing the parked annotation to resume")
+			By("Requesting unpark to resume")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 

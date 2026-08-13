@@ -102,8 +102,8 @@ stateDiagram-v2
     Maintenance --> Initial : Maintenance complete
     Available --> Parked : Park requested
     Reserved --> Parked : Park requested
-    Parked --> Available : Parked annotation removed (no ServerClaimRef)
-    Parked --> Reserved : Parked annotation removed (ServerClaimRef present)
+    Parked --> Available : Unpark requested (no ServerClaimRef)
+    Parked --> Reserved : Unpark requested (ServerClaimRef present)
     Available --> Error : Error detected
     Reserved --> Error : Error detected
     Discovery --> Error : Error detected
@@ -210,11 +210,12 @@ Parking uses two annotations with distinct roles:
 
 - `metal.ironcore.dev/operation: park`: a **transient request** set by the external actor. The
   `Server` reconciler removes it again as soon as the server has reached the `Parked` state.
+- `metal.ironcore.dev/operation: unpark`: a **transient request** set by the external actor to end
+  parking. The `Server` reconciler consumes it by releasing the parked marker and resuming the
+  server.
 - `metal.ironcore.dev/parked: "true"`: a **durable, controller-set marker** the operator writes
-  when it parks the server. The external actor removes it again to end parking. It is the source of
-  truth for the parked
-  state: if `status.state` is ever lost or reset, the reconcilers reconstruct the parked status from
-  this annotation and keep standing down across operator restarts.
+  when it parks the server and removes again when an unpark request comes in. Do not set or remove
+  it directly; it is controller-owned state, not user-facing input. 
 
 ### Lifecycle
 
@@ -241,9 +242,18 @@ Parking uses two annotations with distinct roles:
      configuration or revert power. The `ServerClaim` stays bound; its phase is unchanged.
    - If `status.state` is ever lost or reset, the reconcilers reconstruct the parked status from the
      annotation and keep standing down.
-4. **Resume.** The external actor brings the server back by removing the internal
-   `metal.ironcore.dev/parked` annotation (or clearing its value). The next reconciliation re-enters
-   the normal flow:
+4. **Resume.** The external actor brings the server back by setting the `operation` annotation to
+   `unpark`:
+
+   ```yaml
+   metadata:
+     annotations:
+       metal.ironcore.dev/operation: unpark
+   ```
+
+   The `Server` reconciler consumes the request: it removes the internal
+   `metal.ironcore.dev/parked` annotation and both operation annotations, then the next
+   reconciliation re-enters the normal flow:
    - the `Server` reconciler refreshes system info (hardware or firmware state may have changed
      during the procedure),
    - transitions back to the pre-parking state: `Reserved` if the server has a `ServerClaimRef`,
@@ -251,9 +261,8 @@ Parking uses two annotations with distinct roles:
    - the `ServerClaim` reconciler takes over again and re-applies the boot configuration and power
      state as before.
 
-   Removing the `metal.ironcore.dev/operation` annotation is **not** the resume signal: that
-   annotation was already consumed during parking. Resume is driven by the requestor removing the
-   internal `parked` annotation.
+   An unpark request on a server that is not parked is a no-op: the request annotation is consumed
+   and nothing else happens.
 
 ### Admission control
 
@@ -278,10 +287,10 @@ kubectl annotate server my-server metal.ironcore.dev/operation=park
 ```
 
 Once the server has reached `Parked` (and the request annotation is consumed), perform the procedure.
-When done, bring the server back by removing the parked marker:
+When done, bring the server back with an unpark request:
 
 ```bash
-kubectl annotate server my-server metal.ironcore.dev/parked-
+kubectl annotate server my-server metal.ironcore.dev/operation=unpark
 ```
 
 The bound `ServerClaim` resumes ownership without re-scheduling, and its reconciler reapplies the claim's requested power state, including `Off` when the claim requests it.

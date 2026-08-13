@@ -75,6 +75,10 @@ const (
 	// hardware rework).
 	OperationAnnotationPark = "park"
 
+	// OperationAnnotationUnpark requests that a parked Server be resumed into the normal
+	// ServerClaim lifecycle.
+	OperationAnnotationUnpark = "unpark"
+
 	// ParkedAnnotation is the durable, controller-set marker recording that a Server is parked.
 	ParkedAnnotation = "metal.ironcore.dev/parked"
 

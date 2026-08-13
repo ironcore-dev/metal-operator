@@ -754,9 +754,9 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Asserting spec.power is left untouched while parked")
 		Consistently(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
 
-		By("Resuming the server")
+		By("Resuming the server via an unpark request")
 		Eventually(Update(server, func() {
-			delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 		})).Should(Succeed())
 
 		By("Ensuring the server resumes to reserved and the claim reconciler re-applies power")

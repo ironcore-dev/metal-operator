@@ -211,8 +211,8 @@ Parking is driven by annotations with distinct roles:
 - `metal.ironcore.dev/operation: park`: a **transient request** set by the external actor. The
   `Server` reconciler removes it again as soon as the server has reached the `Parked` state.
 - `metal.ironcore.dev/operation: unpark`: a **transient request** set by the external actor to end
-  parking. The `Server` reconciler consumes it by releasing the parked marker and resuming the
-  server.
+  parking. The `Server` reconciler removes it once the server has left the `Parked` state; while
+  the annotation is present, the unpark is still in progress.
 - `metal.ironcore.dev/parked: "true"`: a **durable, controller-set marker** the operator writes
   when it parks the server and removes again when an unpark request comes in. Do not set or remove
   it directly; it is controller-owned state, not user-facing input.
@@ -256,9 +256,9 @@ and the parked marker stay the same regardless of how the request arrives.
        metal.ironcore.dev/operation: unpark
    ```
 
-   The `Server` reconciler consumes the request: it removes the internal
-   `metal.ironcore.dev/parked` annotation and both operation annotations, then the next
-   reconciliation re-enters the normal flow:
+   The `Server` reconciler processes the request step by step: it removes the internal
+   `metal.ironcore.dev/parked` annotation, resumes the server, and only then removes the
+   `operation: unpark` request annotation. The next reconciliation re-enters the normal flow:
    - the `Server` reconciler refreshes system info (hardware or firmware state may have changed
      during the procedure),
    - transitions back to the pre-parking state: `Reserved` if the server has a `ServerClaimRef`,

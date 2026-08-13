@@ -1356,8 +1356,11 @@ passwd:
 				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 
-			By("Ensuring the server resumes to available")
-			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+			By("Ensuring the server resumes to available and the unpark request is consumed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
 
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
@@ -1551,9 +1554,9 @@ passwd:
 			By("Ensuring the operator does not power the parked server back off")
 			Consistently(mockPowerState, "2s", "100ms").Should(Equal("On"))
 
-			By("Resuming the server")
+			By("Resuming the server via an unpark request")
 			Eventually(Update(server, func() {
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 
@@ -1582,7 +1585,7 @@ passwd:
 			By("Resuming the server after clearing the maintenance ref")
 			Eventually(Update(server, func() {
 				server.Spec.ServerMaintenanceRef = nil
-				delete(server.Annotations, metalv1alpha1.ParkedAnnotation)
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 

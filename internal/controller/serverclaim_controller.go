@@ -61,9 +61,9 @@ func (r *ServerClaimReconciler) reconcileExists(ctx context.Context, claim *meta
 
 func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Deleting server claim")
+	log.V(1).Info("Deleting ServerClaim")
 	if !controllerutil.ContainsFinalizer(claim, serverClaimFinalizer) {
-		log.V(1).Info("Deleted server claim")
+		log.V(1).Info("Deleted ServerClaim")
 		return ctrl.Result{}, nil
 	}
 
@@ -75,7 +75,7 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1
 	}
 	log.V(1).Info("Ensured that the finalizer has been removed")
 
-	log.V(1).Info("Deleted server claim")
+	log.V(1).Info("Deleted ServerClaim")
 	return ctrl.Result{}, nil
 }
 
@@ -90,7 +90,7 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to get server: %w", err)
 		}
-		log.V(1).Info("Server gone")
+		log.V(1).Info("Server not found", "Server", claim.Spec.ServerRef.Name)
 	}
 
 	config := &metalv1alpha1.ServerBootConfiguration{
@@ -103,9 +103,10 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 		if !apierrors.IsNotFound(err) {
 			return fmt.Errorf("failed to delete serverbootconfig: %w", err)
 		}
-		log.V(1).Info("ServerBootConfiguration gone")
+		log.V(1).Info("ServerBootConfiguration already deleted", "ServerBootConfiguration", config.Name)
+		return nil
 	}
-
+	log.V(1).Info("Deleted ServerBootConfiguration", "ServerBootConfiguration", config.Name)
 	return nil
 }
 
@@ -117,9 +118,9 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 // - Ensure the power state
 func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Reconciling server claim")
+	log.V(1).Info("Reconciling ServerClaim")
 	if shouldIgnoreReconciliation(claim) {
-		log.V(1).Info("Skipped Server claim reconciliation")
+		log.V(1).Info("Skipped ServerClaim reconciliation")
 		return ctrl.Result{}, nil
 	}
 
@@ -138,10 +139,9 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("Ensured finalizer has been added")
 
 	if claim.Spec.ServerRef == nil {
-		log.V(1).Info("Claim is not scheduled to a server yet")
+		log.V(1).Info("ServerClaim is not scheduled to a Server yet")
 		return ctrl.Result{}, nil
 	}
 
@@ -151,12 +151,12 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 	}
 
 	if claim.Status.Phase != metalv1alpha1.PhaseBound {
-		log.V(1).Info("Claim is not bound yet, waiting for scheduler")
+		log.V(1).Info("ServerClaim is not bound yet, waiting for scheduler")
 		return ctrl.Result{}, nil
 	}
 
 	if ref := server.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
-		log.V(1).Info("Server is not claimed for this claim yet, waiting for scheduler", "Server", server.Name)
+		log.V(1).Info("Server is not claimed by this ServerClaim yet, waiting for scheduler", "Server", server.Name)
 		return ctrl.Result{}, nil
 	}
 
@@ -168,14 +168,12 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
 	}
-	log.V(1).Info("Applied BootConfiguration for ServerClaim")
 
 	if modified, err := r.ensurePowerStateForServer(ctx, claim, server); err != nil || modified {
 		return ctrl.Result{}, err
 	}
-	log.V(1).Info("Ensured PowerState for Server", "Server", server.Name)
 
-	log.V(1).Info("Reconciled server claim")
+	log.V(1).Info("Reconciled ServerClaim")
 	return ctrl.Result{}, nil
 }
 
@@ -210,7 +208,9 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 	if err != nil {
 		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
 	}
-	log.V(1).Info("Created or patched ServerBootConfiguration", "ServerBootConfiguration", config.Name, "Operation", opResult)
+	if opResult != controllerutil.OperationResultNone {
+		log.V(1).Info("Created or patched ServerBootConfiguration", "ServerBootConfiguration", config.Name, "Operation", opResult)
+	}
 
 	serverBase := server.DeepCopy()
 	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{

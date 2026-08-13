@@ -7,12 +7,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,7 +49,7 @@ func (r *ServerClaimSchedulerReconciler) Reconcile(ctx context.Context, req ctrl
 
 func (r *ServerClaimSchedulerReconciler) schedule(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Scheduling server claim")
+	log.V(1).Info("Scheduling ServerClaim")
 
 	if !claim.DeletionTimestamp.IsZero() {
 		return ctrl.Result{}, nil
@@ -71,7 +71,7 @@ func (r *ServerClaimSchedulerReconciler) schedule(ctx context.Context, claim *me
 		return ctrl.Result{}, err
 	}
 	if server == nil {
-		log.V(1).Info("No server found for claim")
+		log.V(1).Info("No claimable Server found")
 		return ctrl.Result{}, nil
 	}
 
@@ -103,49 +103,59 @@ func (r *ServerClaimSchedulerReconciler) claimServer(ctx context.Context, claim 
 			return nil, err
 		}
 		if claim.Spec.ServerSelector != nil && !selector.Matches(labels.Set(server.Labels)) {
-			log.V(1).Info("Specified server matches ServerRef but does not match label selector", "Server", server.Name, "Claim", claim.Name)
+			log.V(1).Info("Server does not match label selector", "Server", server.Name, "ServerClaim", claim.Name)
 			return nil, nil
 		}
-		return r.tryClaimServer(ctx, claim, server)
+		underMaintenance, err := r.serversUnderMaintenance(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return r.tryClaimServer(ctx, claim, server, underMaintenance)
 	}
 
+	// A server may already carry this claim's ref, e.g. when the reconciler crashed
+	// between claiming it and recording the binding. This lookup is label-independent
+	// on purpose: a server whose labels changed mid-binding must still be found so its
+	// ownership can be confirmed.
+	claimedList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, claimedList, client.MatchingFields{serverClaimRefField: claim.Namespace + "/" + claim.Name}); err != nil {
+		return nil, err
+	}
+	if len(claimedList.Items) > 0 {
+		// Re-fetch from the API server to confirm this claim still owns it.
+		// The list above is cached and may be stale.
+		fresh := claimedList.Items[0].DeepCopy()
+		if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(fresh), fresh); err != nil {
+			return nil, client.IgnoreNotFound(err)
+		}
+		if ref := fresh.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
+			return nil, nil
+		}
+		return fresh, nil
+	}
+
+	var listOpts []client.ListOption
+	if claim.Spec.ServerSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
+		if err != nil {
+			return nil, err
+		}
+		listOpts = append(listOpts, client.MatchingLabelsSelector{Selector: selector})
+	}
 	serverList := &metalv1alpha1.ServerList{}
-	if err := r.List(ctx, serverList); err != nil {
+	if err := r.List(ctx, serverList, listOpts...); err != nil {
 		return nil, err
 	}
 
-	// fetch previously claimed server if its present
-	// keeping this separate for reason of clarity
-	for _, server := range serverList.Items {
-		// find previously claimed server
-		if ref := server.Spec.ServerClaimRef; ref != nil {
-			if ref.Name == claim.Name && ref.Namespace == claim.Namespace {
-				// Re-fetch from the API server to confirm this claim still owns it.
-				// The list above is cached and may be stale.
-				fresh := server.DeepCopy()
-				if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(fresh), fresh); err != nil {
-					return nil, client.IgnoreNotFound(err)
-				}
-				if ref := fresh.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
-					return nil, nil
-				}
-				return fresh, nil
-			}
-		}
-	}
-
-	var selectedServer *metalv1alpha1.Server
-	selector, err := metav1.LabelSelectorAsSelector(claim.Spec.ServerSelector)
+	underMaintenance, err := r.serversUnderMaintenance(ctx)
 	if err != nil {
 		return nil, err
 	}
-	for _, server := range serverList.Items {
-		if claim.Spec.ServerSelector != nil && !selector.Matches(labels.Set(server.Labels)) {
-			log.V(1).Info("Specified server does not match label selector", "Server", server.Name, "Claim", claim.Name)
-			continue
-		}
-		if r.isServerClaimable(ctx, &server, claim) {
-			selectedServer = &server
+
+	var selectedServer *metalv1alpha1.Server
+	for i := range serverList.Items {
+		if r.isServerClaimable(ctx, &serverList.Items[i], claim, underMaintenance) {
+			selectedServer = &serverList.Items[i]
 			break
 		}
 	}
@@ -153,10 +163,10 @@ func (r *ServerClaimSchedulerReconciler) claimServer(ctx context.Context, claim 
 		return nil, nil
 	}
 	log.V(1).Info("Matching server found", "Server", selectedServer.Name)
-	return r.tryClaimServer(ctx, claim, selectedServer)
+	return r.tryClaimServer(ctx, claim, selectedServer, underMaintenance)
 }
 
-func (r *ServerClaimSchedulerReconciler) tryClaimServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (*metalv1alpha1.Server, error) {
+func (r *ServerClaimSchedulerReconciler) tryClaimServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server, underMaintenance sets.Set[string]) (*metalv1alpha1.Server, error) {
 	// Re-fetch the selected server directly from the API server before claiming.
 	// The server may come from the informer cache; a concurrent reconciler may have
 	// already claimed or changed the server since then. Re-fetching here ensures
@@ -164,7 +174,7 @@ func (r *ServerClaimSchedulerReconciler) tryClaimServer(ctx context.Context, cla
 	if err := r.APIReader.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
 		return nil, client.IgnoreNotFound(err)
 	}
-	if !r.isServerClaimable(ctx, server, claim) {
+	if !r.isServerClaimable(ctx, server, claim, underMaintenance) {
 		return nil, nil
 	}
 
@@ -178,8 +188,6 @@ func (r *ServerClaimSchedulerReconciler) tryClaimServer(ctx context.Context, cla
 	if ref := server.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
 		return nil, fmt.Errorf("server %s was claimed concurrently, will retry", server.Name)
 	}
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Ensured ObjectRef for Server", "Server", server.Name)
 	return server, nil
 }
 
@@ -221,32 +229,24 @@ func (r *ServerClaimSchedulerReconciler) patchServerRef(ctx context.Context, cla
 	return false, fmt.Errorf("failed to patch server ref for claim: server reference is immutable")
 }
 
-func (r *ServerClaimSchedulerReconciler) isUnderMaintenanceQueue(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
-		log.V(1).Info("Server in or entering Maintenance, Hence can not be claimed")
-		return true, nil
+func (r *ServerClaimSchedulerReconciler) serversUnderMaintenance(ctx context.Context) (sets.Set[string], error) {
+	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
+	if err := r.List(ctx, maintenanceList); err != nil {
+		return nil, err
 	}
-	// check if the current available state is a temporary state between multiple Maintenances states.
-	// We do not want to claim server while it is undergoing series of Maintenance in sequence.
-	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
-		serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
-		return serverMaintenance.Spec.ServerRef.Name == server.Name, nil
-	}); err != nil {
-		return true, err
+	underMaintenance := sets.New[string]()
+	for _, maintenance := range maintenanceList.Items {
+		if maintenance.Spec.ServerRef != nil {
+			underMaintenance.Insert(maintenance.Spec.ServerRef.Name)
+		}
 	}
-	if len(serverMaintenancesList.Items) == 0 {
-		return false, nil
-	}
-	log.V(1).Info("Server has ongoing Maintenances, Hence can not be claimed")
-	return true, nil
+	return underMaintenance, nil
 }
 
-func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
+func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim, underMaintenance sets.Set[string]) bool {
 	log := ctrl.LoggerFrom(ctx)
 	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && (claimRef.Name != claim.Name || claimRef.Namespace != claim.Namespace) {
-		log.V(1).Info("Server claim ref does not match claim", "Server", server.Name, "ClaimName", claimRef.Name)
+		log.V(1).Info("Server claim ref does not match ServerClaim", "Server", server.Name, "ServerClaimRef", fmt.Sprintf("%s/%s", claimRef.Namespace, claimRef.Name))
 		return false
 	}
 	if server.Status.State != metalv1alpha1.ServerStateAvailable {
@@ -254,21 +254,23 @@ func (r *ServerClaimSchedulerReconciler) isServerClaimable(ctx context.Context, 
 		return false
 	}
 	if server.Spec.Unclaimable {
-		log.V(1).Info("Server is cordoned", "Server", server.Name, "Claim", claim.Name)
+		log.V(1).Info("Server is cordoned", "Server", server.Name, "ServerClaim", claim.Name)
 		return false
 	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
 		return false
 	}
-	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, server)
-	// is undergoing maintenance and not in Reserved State, we should not claim this server
-	if err != nil || isUnderMaintenance {
-		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
+	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
+		log.V(1).Info("Server in or entering maintenance, cannot be claimed")
+		return false
+	}
+	if underMaintenance.Has(server.Name) {
+		log.V(1).Info("Server has ongoing maintenance, cannot be claimed")
 		return false
 	}
 	if !tolerates(server.Spec.Taints, claim.Spec.Tolerations) {
-		log.V(1).Info("Server taints not tolerated by claim", "Server", server.Name, "Claim", claim.Name)
+		log.V(1).Info("Server taints not tolerated by ServerClaim", "Server", server.Name, "ServerClaim", claim.Name)
 		return false
 	}
 	return true

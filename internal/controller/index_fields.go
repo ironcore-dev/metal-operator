@@ -13,6 +13,7 @@ import (
 const (
 	serverSystemUUIDIndexField = "spec.systemUUID"
 	serverRefField             = "spec.serverRef.name"
+	serverClaimRefField        = "spec.serverClaimRef"
 	bmcRefField                = "spec.bmcRef.name"
 )
 
@@ -26,6 +27,19 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 			return nil
 		}
 		return []string{server.Spec.SystemUUID}
+	}); err != nil {
+		return err
+	}
+
+	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, serverClaimRefField, func(rawObj client.Object) []string {
+		server, ok := rawObj.(*metalv1alpha1.Server)
+		if !ok {
+			return nil
+		}
+		if ref := server.Spec.ServerClaimRef; ref != nil {
+			return []string{ref.Namespace + "/" + ref.Name}
+		}
+		return nil
 	}); err != nil {
 		return err
 	}

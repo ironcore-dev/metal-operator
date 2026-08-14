@@ -25,6 +25,7 @@ type DellRedfishBMC struct {
 
 type dellAttributes struct {
 	Id         string
+	SourceURI  string
 	Attributes schemas.SettingsAttributes
 	Settings   schemas.Settings `json:"@Redfish.Settings"`
 	Etag       string
@@ -162,6 +163,7 @@ func (r *DellRedfishBMC) getCurrentBMCSettingAttribute(manager *schemas.Manager)
 			continue
 		}
 		bmcDellAttribute.Etag = eTag
+		bmcDellAttribute.SourceURI = data.String()
 		bmcDellAttributes = append(bmcDellAttributes, *bmcDellAttribute)
 	}
 	if len(errs) > 0 {
@@ -368,11 +370,18 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 	for key, value := range attributes {
 		for _, eachAttr := range bmcAttrValues {
 			if _, ok := eachAttr.Attributes[key]; ok {
-				if data, ok := payloads[eachAttr.Settings.SettingsObject]; ok {
+				target := eachAttr.Settings.SettingsObject
+				if target == "" {
+					target = eachAttr.SourceURI
+				}
+				if target == "" {
+					return nil, fmt.Errorf("attribute '%v' has no target endpoint to patch", key)
+				}
+				if data, ok := payloads[target]; ok {
 					data[key] = value
 				} else {
-					payloads[eachAttr.Settings.SettingsObject] = make(schemas.SettingsAttributes)
-					payloads[eachAttr.Settings.SettingsObject][key] = value
+					payloads[target] = make(schemas.SettingsAttributes)
+					payloads[target][key] = value
 				}
 				break
 			}

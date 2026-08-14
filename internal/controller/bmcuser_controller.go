@@ -262,6 +262,7 @@ func (r *BMCUserReconciler) createBMCSecretForUser(ctx context.Context, user *me
 		Immutable: new(true),
 	}
 	op, err := controllerutil.CreateOrPatch(ctx, r.Client, secret, func() error {
+		metalv1alpha1.PropagateWatchFilterLabel(secret, user)
 		if err := controllerutil.SetControllerReference(user, secret, r.Scheme); err != nil {
 			return fmt.Errorf("failed to set controller reference for BMCSecret: %w", err)
 		}

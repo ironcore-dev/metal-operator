@@ -249,6 +249,7 @@ func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, serv
 	config.Name = claim.Name
 	config.Namespace = claim.Namespace
 	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
+		metalv1alpha1.PropagateWatchFilterLabel(config, claim)
 		// TODO: we might want to add a finalizer on the ignition secret
 		config.Spec.ServerRef = *claim.Spec.ServerRef
 		config.Spec.Image = claim.Spec.Image

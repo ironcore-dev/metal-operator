@@ -70,6 +70,12 @@ const (
 	// when set on it.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 
+	// WatchFilterLabel selects the operator instance that owns a resource. An
+	// instance started with --watch-filter=<value> only watches and reconciles
+	// resources carrying this label with that value. An instance without
+	// --watch-filter only handles resources that do not carry the label at all.
+	WatchFilterLabel = "metal.ironcore.dev/watch-filter"
+
 	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
 	// whose suffix is exposed via the metaldata service to the booted server.
 	MetadataKeyPrefix = "metadata.metal.ironcore.dev/"

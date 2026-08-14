@@ -28,6 +28,7 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -90,6 +91,7 @@ func main() { // nolint: gocyclo
 		webhookPort                        int
 		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
+		watchFilter                        string
 		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
@@ -162,6 +164,10 @@ func main() { // nolint: gocyclo
 		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
+	flag.StringVar(&watchFilter, "watch-filter", "",
+		"Watch filter value selecting the resources this instance owns. Only resources labeled "+
+			""+metalv1alpha1.WatchFilterLabel+"=<value> are watched and reconciled. If empty, only resources without "+
+			"the label are handled.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
@@ -381,13 +387,27 @@ func main() { // nolint: gocyclo
 		})
 	}
 
+	watchFilterSelector, err := metalv1alpha1.WatchFilterSelector(watchFilter)
+	if err != nil {
+		setupLog.Error(err, "Invalid watch filter value", "watchFilter", watchFilter)
+		os.Exit(1)
+	}
+	leaderElectionID := "f26702e4.ironcore.dev"
+	if watchFilter != "" {
+		setupLog.Info("Running with watch filter", "watchFilter", watchFilter)
+		leaderElectionID = fmt.Sprintf("%s-%s", watchFilter, leaderElectionID)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
+		Cache:                  cache.Options{DefaultLabelSelector: watchFilterSelector},
 		Metrics:                metricsServerOptions,
 		WebhookServer:          webhookServer,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "f26702e4.ironcore.dev",
+		// The election ID is prefixed with the watch filter value so that
+		// instances owning different filters do not compete for the same lease.
+		LeaderElectionID: leaderElectionID,
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly

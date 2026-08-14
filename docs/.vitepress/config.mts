@@ -52,6 +52,7 @@ export default withMermaid({
             items: [
               { text: 'Kustomize', link: '/installation/kustomize' },
               { text: 'Helm', link: '/installation/helm' },
+              { text: 'Configuration', link: '/installation/configuration' },
             ]
           },
           { text: 'Architecture', link: '/architecture' },
@@ -73,6 +74,7 @@ export default withMermaid({
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
+          { text: 'Watch Filter', link: '/concepts/watch-filter' },
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
           { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },

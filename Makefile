@@ -321,6 +321,8 @@ METALCTL ?= $(LOCALBIN)/metalctl
 GINKGO ?= $(LOCALBIN)/ginkgo
 PROMTOOL ?= $(LOCALBIN)/promtool
 YQ ?= $(LOCALBIN)/yq
+U_ROOT ?= $(LOCALBIN)/u-root
+KBAKE ?= $(LOCALBIN)/kbake
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
@@ -340,6 +342,8 @@ ADDLICENSE_VERSION ?= v1.1.1
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
 PROMTOOL_VERSION ?= 3.11.3
 YQ_VERSION ?= v4.44.3
+U_ROOT_VERSION ?= v0.16.0
+KBAKE_VERSION ?= main
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.
@@ -391,6 +395,11 @@ $(GOLANGCI_LINT): $(LOCALBIN)
 		mv -f $(LOCALBIN)/golangci-lint-custom $(GOLANGCI_LINT); \
 	} || true
 
+.PHONY: u-root
+u-root: $(U_ROOT) ## Download u-root locally if necessary.
+$(U_ROOT): $(LOCALBIN)
+	$(call go-install-tool,$(U_ROOT),github.com/u-root/u-root,$(U_ROOT_VERSION))
+
 .PHONY: goimports
 goimports: $(GOIMPORTS) ## Download goimports locally if necessary.
 $(GOIMPORTS): $(LOCALBIN)
@@ -405,6 +414,11 @@ $(CRD_REF_DOCS): $(LOCALBIN)
 kubebuilder: $(KUBEBUILDER) ## Download kubebuilder locally if necessary.
 $(KUBEBUILDER): $(LOCALBIN)
 	$(call go-install-tool,$(KUBEBUILDER),sigs.k8s.io/kubebuilder/v4,$(KUBEBUILDER_VERSION))
+
+.PHONY: kbake
+kbake: $(KBAKE) ## Download kbake locally if necessary.
+$(KBAKE): $(LOCALBIN)
+	$(call go-install-tool,$(KBAKE),github.com/ironcore-dev/kbake,$(KBAKE_VERSION))
 
 .PHONY: mockserver
 mockserver: $(MOCKSERVER_BIN) ## Build mock Redfish server locally if necessary.

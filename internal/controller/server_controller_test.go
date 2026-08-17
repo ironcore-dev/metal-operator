@@ -23,6 +23,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
+	eventsv1 "k8s.io/api/events/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1631,6 +1632,195 @@ passwd:
 
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should consume a reset operation annotation while parked without leaving it linger", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			park(server)
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			By("Issuing a reset operation against the parked server")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.GracefulRestartServerPower)
+			})).Should(Succeed())
+
+			By("Ensuring the server stays parked and the reset request is consumed (not lingered)")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateParked),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
+
+			By("Ensuring a warning event was emitted for the reset dropped while parked")
+			Eventually(func(g Gomega) {
+				events := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, events)).To(Succeed())
+				found := false
+				for _, e := range events.Items {
+					if e.Regarding.Name == server.Name && e.Reason == "ParkedOperationDropped" {
+						found = true
+						break
+					}
+				}
+				g.Expect(found).To(BeTrue(), "expected a ParkedOperationDropped warning event for the server")
+			}).Should(Succeed())
+
+			By("Resuming the server via an unpark request")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should consume a redundant park request while already parked", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			park(server)
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateParked),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
+
+			By("Re-issuing a park request against the already-parked server")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
+			})).Should(Succeed())
+
+			By("Ensuring the redundant park request is consumed and the server stays parked")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateParked),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
+
+			By("Resuming the server via an unpark request")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+	})
+
+	Describe("Operation annotations", func() {
+		createServerAndSecret := func(ctx SpecContext) (*metalv1alpha1.Server, *metalv1alpha1.BMCSecret) {
+			By("Creating a BMCSecret")
+			bmcSecret := &metalv1alpha1.BMCSecret{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "test-server-"},
+				Data: map[string][]byte{
+					"username": []byte("foo"),
+					"password": []byte("bar"),
+				},
+			}
+			Expect(k8sClient.Create(ctx, bmcSecret)).Should(Succeed())
+
+			By("Creating a Server with inline BMC configuration")
+			server := &metalv1alpha1.Server{
+				ObjectMeta: metav1.ObjectMeta{GenerateName: "server-"},
+				Spec: metalv1alpha1.ServerSpec{
+					SystemUUID: "38947555-7742-3448-3784-823347823834",
+					BMC: &metalv1alpha1.BMCAccess{
+						Protocol: metalv1alpha1.Protocol{
+							Name: metalv1alpha1.ProtocolRedfishLocal,
+							Port: MockServerPort,
+						},
+						Address: MockServerIP,
+						BMCSecretRef: v1.LocalObjectReference{
+							Name: bmcSecret.Name,
+						},
+					},
+				},
+			}
+			Expect(k8sClient.Create(ctx, server)).Should(Succeed())
+			return server, bmcSecret
+		}
+
+		It("should clear an unsupported operation annotation and emit a warning event", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+
+			By("Setting an unsupported operation annotation")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, "bogus-operation")
+			})).Should(Succeed())
+
+			By("Ensuring the unsupported operation annotation is consumed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		})
+
+		It("should emit a warning event for an unsupported operation while parked", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			By("Setting an unsupported operation annotation on the parked server")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, "bogus-operation")
+			})).Should(Succeed())
+
+			By("Ensuring the unsupported operation annotation is consumed and the server stays parked")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateParked),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+			))
+
+			By("Ensuring a warning event was emitted for the unsupported operation")
+			Eventually(func(g Gomega) {
+				events := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, events)).To(Succeed())
+				found := false
+				for _, e := range events.Items {
+					if e.Regarding.Name == server.Name && e.Reason == "UnsupportedOperation" {
+						found = true
+						break
+					}
+				}
+				g.Expect(found).To(BeTrue(), "expected an UnsupportedOperation warning event for the server")
+			}).Should(Succeed())
+
+			By("Ensuring no ParkedOperationDropped event fires for an unsupported operation")
+			Consistently(func(g Gomega) {
+				events := &eventsv1.EventList{}
+				g.Expect(k8sClient.List(ctx, events)).To(Succeed())
+				for _, e := range events.Items {
+					g.Expect(e.Regarding.Name == server.Name && e.Reason == "ParkedOperationDropped").To(BeFalse(),
+						"unsupported operations must not emit ParkedOperationDropped")
+				}
+			}, "1s").Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		})
 	})
 })

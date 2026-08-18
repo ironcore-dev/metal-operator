@@ -48,14 +48,7 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Eventually(Object(bmc)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "Endpoint",
-				Name:               endpoint.Name,
-				UID:                endpoint.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
 			HaveField("Status.Model", "Joo Janta 200"),

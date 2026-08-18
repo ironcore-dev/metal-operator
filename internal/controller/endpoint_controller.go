@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 
 	"github.com/ironcore-dev/controller-utils/clientutils"
@@ -16,11 +17,13 @@ import (
 	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 const (
@@ -64,7 +67,30 @@ func (r *EndpointReconciler) reconcileExists(ctx context.Context, endpoint *meta
 func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1.Endpoint) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
-	// TODO: cleanup endpoint
+
+	// Drop legacy Endpoint owner references from the BMC and BMCSecret
+	for _, obj := range []client.Object{
+		&metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{Name: endpoint.Name}},
+		&metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{Name: endpoint.Name}},
+	} {
+		if err := r.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
+			if apierrors.IsNotFound(err) {
+				continue
+			}
+			return ctrl.Result{}, fmt.Errorf("failed to get %T %s: %w", obj, obj.GetName(), err)
+		}
+		if before := len(obj.GetOwnerReferences()); before > 0 {
+			base := obj.DeepCopyObject().(client.Object)
+			removeEndpointOwnerReference(obj)
+			if len(obj.GetOwnerReferences()) != before {
+				if err := r.Patch(ctx, obj, client.MergeFrom(base)); err != nil {
+					return ctrl.Result{}, fmt.Errorf("failed to remove Endpoint owner reference from %T %s: %w", obj, obj.GetName(), err)
+				}
+				log.V(1).Info("Removed Endpoint owner reference", "Name", obj.GetName())
+			}
+		}
+	}
+
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, endpointFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}
@@ -78,6 +104,10 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 	if shouldIgnoreReconciliation(endpoint) {
 		log.V(1).Info("Skipped Endpoint reconciliation")
 		return ctrl.Result{}, nil
+	}
+
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, endpoint, endpointFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 
 	sanitizedMACAddress := strings.ReplaceAll(endpoint.Spec.MACAddress, ":", "")
@@ -158,7 +188,6 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 			default:
 				return ctrl.Result{}, fmt.Errorf("unknown protocol: %s", m.Protocol)
 			}
-			// TODO: other types like Switches can be handled here later
 		}
 	}
 	log.V(1).Info("Reconciled Endpoint")
@@ -209,7 +238,8 @@ func (r *EndpointReconciler) applyBMC(ctx context.Context, bmcClient bmc.BMC, en
 		if bmcUUID != "" {
 			spec.BMCUUID = bmcUUID
 		}
-		return controllerutil.SetControllerReference(endpoint, bmcObj, r.Client.Scheme())
+		removeEndpointOwnerReference(bmcObj)
+		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create or patch BMC: %w", err)
@@ -228,7 +258,8 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metal
 			metalv1alpha1.BMCSecretUsernameKeyName: []byte(m.DefaultCredentials[0].Username),
 			metalv1alpha1.BMCSecretPasswordKeyName: []byte(m.DefaultCredentials[0].Password),
 		}
-		return controllerutil.SetControllerReference(endpoint, bmcSecret, r.Client.Scheme())
+		removeEndpointOwnerReference(bmcSecret)
+		return nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create or patch BMCSecret: %w", err)
@@ -238,11 +269,21 @@ func (r *EndpointReconciler) applyBMCSecret(ctx context.Context, endpoint *metal
 	return bmcSecret, nil
 }
 
+func removeEndpointOwnerReference(obj metav1.Object) {
+	obj.SetOwnerReferences(slices.DeleteFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+		return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "Endpoint"
+	}))
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *EndpointReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	mapToEndpoint := func(_ context.Context, obj client.Object) []ctrl.Request {
+		return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: obj.GetName()}}}
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.Endpoint{}).
-		Owns(&metalv1alpha1.BMCSecret{}).
-		Owns(&metalv1alpha1.BMC{}).
+		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(mapToEndpoint)).
+		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(mapToEndpoint)).
 		Complete(r)
 }

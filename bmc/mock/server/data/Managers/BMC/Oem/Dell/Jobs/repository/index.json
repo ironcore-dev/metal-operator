@@ -1,0 +1,10 @@
+{
+    "@odata.type": "#DellJob.v1_0_0.DellJob",
+    "@odata.id": "/redfish/v1/Managers/BMC/Oem/Dell/Jobs/repository",
+    "Id": "repository",
+    "Name": "Repository-based Firmware Install",
+    "JobType": "RepositoryUpdate",
+    "JobState": "New",
+    "Message": "Task successfully scheduled.",
+    "PercentComplete": 0
+}

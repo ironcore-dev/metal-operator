@@ -1,0 +1,11 @@
+{
+    "@odata.type": "#DellJobCollection.DellJobCollection",
+    "Name": "Job Collection",
+    "Members@odata.count": 1,
+    "Members": [
+        {
+            "@odata.id": "/redfish/v1/Managers/BMC/Oem/Dell/Jobs/repository"
+        }
+    ],
+    "@odata.id": "/redfish/v1/Managers/BMC/Oem/Dell/Jobs"
+}

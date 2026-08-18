@@ -1294,7 +1294,6 @@ passwd:
 	})
 
 	Describe("Parked state", func() {
-
 		park := func(server *metalv1alpha1.Server) {
 			By("Requesting the server to be parked")
 			Eventually(Update(server, func() {
@@ -1604,11 +1603,9 @@ passwd:
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		})
-
 	})
 
 	Describe("Operation annotations", func() {
-
 		It("should clear an unsupported operation annotation", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 

@@ -733,47 +733,54 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 }
 
 func (r *ServerReconciler) handleAnnotationOperations(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
+	log := ctrl.LoggerFrom(ctx)
 	operation := server.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+
+	var (
+		result ctrl.Result
+		done   bool
+		err    error
+	)
 
 	switch {
 	case operation == metalv1alpha1.OperationAnnotationUnpark:
-		modified, err := r.unparkServer(ctx, server)
-		return ctrl.Result{}, modified, err
+		done, err = true, r.unparkServer(ctx, server)
+	case isServerParked(server) && (operation == metalv1alpha1.OperationAnnotationPark || isResetAnnotation(operation) || operation == ""):
+		done, err = true, r.standDownParked(ctx, server, operation)
 	case operation == metalv1alpha1.OperationAnnotationPark:
-		if isServerParked(server) {
-			return r.standDownParked(ctx, server, operation)
-		}
-		return r.parkServer(ctx, bmcClient, server)
+		result, done, err = r.parkServer(ctx, bmcClient, server)
 	case isResetAnnotation(operation):
-		if isServerParked(server) {
-			return r.standDownParked(ctx, server, operation)
-		}
-		modified, err := r.resetServer(ctx, bmcClient, server, operation)
-		return ctrl.Result{}, modified, err
+		done, err = true, r.resetServer(ctx, bmcClient, server, operation)
+	case operation != "":
+		r.rejectUnsupportedOperation(ctx, server, operation)
+		done = true
 	default:
-		if operation != "" {
-			return r.rejectUnsupportedOperation(ctx, server, operation)
-		}
-		if isServerParked(server) {
-			return r.standDownParked(ctx, server, operation)
-		}
 		return ctrl.Result{}, false, nil
 	}
-}
 
-func (r *ServerReconciler) standDownParked(ctx context.Context, server *metalv1alpha1.Server, operation string) (ctrl.Result, bool, error) {
-	log := ctrl.LoggerFrom(ctx)
+	// not done yet
+	if err != nil || !done || !result.IsZero() {
+		return result, done, err
+	}
+
 	if operation != "" {
-		log.V(1).Info("Server is parked, dropping operation annotation", "Operation", operation)
 		if err := r.removeOperationAnnotation(ctx, server); err != nil {
 			return ctrl.Result{}, false, err
 		}
+		log.V(1).Info("Removed operation annotation", "Operation", operation)
+	}
+	return ctrl.Result{}, true, nil
+}
 
+func (r *ServerReconciler) standDownParked(ctx context.Context, server *metalv1alpha1.Server, operation string) error {
+	log := ctrl.LoggerFrom(ctx)
+	if operation != "" {
+		log.V(1).Info("Dropping Server operation annotation because Server is parked", "Operation", operation)
 		if operation != metalv1alpha1.OperationAnnotationPark {
 			r.Recorder.Eventf(server, nil, v1.EventTypeWarning, "ParkedOperationDropped", "ClearOperationAnnotation", "Operation %q dropped because server is parked", operation)
 		}
 	}
-	return ctrl.Result{}, true, r.stayParked(ctx, server)
+	return r.stayParked(ctx, server)
 }
 
 func (r *ServerReconciler) removeOperationAnnotation(ctx context.Context, server *metalv1alpha1.Server) error {
@@ -785,35 +792,27 @@ func (r *ServerReconciler) removeOperationAnnotation(ctx context.Context, server
 	return nil
 }
 
-func (r *ServerReconciler) rejectUnsupportedOperation(ctx context.Context, server *metalv1alpha1.Server, operation string) (ctrl.Result, bool, error) {
+func (r *ServerReconciler) rejectUnsupportedOperation(ctx context.Context, server *metalv1alpha1.Server, operation string) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Unsupported operation annotation", "Operation", operation, "SupportedOperations", metalv1alpha1.AnnotationToRedfishMapping)
+	log.V(1).Info("Unsupported Server operation annotation", "Operation", operation, "SupportedOperations", metalv1alpha1.AnnotationToRedfishMapping)
 	r.Recorder.Eventf(server, nil, v1.EventTypeWarning, "UnsupportedOperation", "ClearOperationAnnotation", "Unsupported operation annotation %q", operation)
-	if err := r.removeOperationAnnotation(ctx, server); err != nil {
-		return ctrl.Result{}, false, err
-	}
-	return ctrl.Result{}, true, nil
 }
 
-func (r *ServerReconciler) unparkServer(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+func (r *ServerReconciler) unparkServer(ctx context.Context, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 
-	if isServerParked(server) {
-		log.V(1).Info("Unpark requested, releasing server")
-		serverBase := server.DeepCopy()
-		metautils.DeleteAnnotation(server, metalv1alpha1.ParkedAnnotation)
-		metautils.DeleteAnnotation(server, metalv1alpha1.OperationAnnotation)
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to release parked annotation: %w", err)
-		}
-		r.Recorder.Eventf(server, nil, v1.EventTypeNormal, "Unparking", "Unpark", "Unpark requested, releasing server")
-		return true, nil
+	if !isServerParked(server) {
+		return nil
 	}
 
-	if err := r.removeOperationAnnotation(ctx, server); err != nil {
-		return false, err
+	log.V(1).Info("Unpark requested, releasing server")
+	serverBase := server.DeepCopy()
+	metautils.DeleteAnnotation(server, metalv1alpha1.ParkedAnnotation)
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+		return fmt.Errorf("failed to release parked annotation: %w", err)
 	}
-	return true, nil
+	r.Recorder.Eventf(server, nil, v1.EventTypeNormal, "Unparking", "Unpark", "Unpark requested, releasing server")
+	return nil
 }
 
 func (r *ServerReconciler) resumeParkedServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
@@ -840,33 +839,16 @@ func (r *ServerReconciler) stayParked(ctx context.Context, server *metalv1alpha1
 	return err
 }
 
-func (r *ServerReconciler) resetServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, operation string) (bool, error) {
+func (r *ServerReconciler) resetServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, operation string) error {
 	log := ctrl.LoggerFrom(ctx)
 	resetType := metalv1alpha1.AnnotationToRedfishMapping[operation]
 
 	log.V(1).Info("Handling operation", "Operation", operation, "RedfishResetType", resetType)
 	if err := bmcClient.Reset(ctx, server.Spec.SystemURI, resetType); err != nil {
-		return false, fmt.Errorf("failed to reset server: %w", err)
+		return fmt.Errorf("failed to reset server: %w", err)
 	}
 	log.V(1).Info("Operation completed", "Operation", operation, "RedfishResetType", resetType)
-
-	if err := r.removeOperationAnnotation(ctx, server); err != nil {
-		return false, err
-	}
-	return true, nil
-}
-
-func isParkableState(state metalv1alpha1.ServerState) bool {
-	switch state {
-	case metalv1alpha1.ServerStateAvailable, metalv1alpha1.ServerStateReserved:
-		return true
-	}
-	return false
-}
-
-func isResetAnnotation(operation string) bool {
-	_, ok := metalv1alpha1.AnnotationToRedfishMapping[operation]
-	return ok
+	return nil
 }
 
 func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
@@ -898,7 +880,6 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 
 	serverBase := server.DeepCopy()
 	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, "true")
-	metautils.DeleteAnnotation(server, metalv1alpha1.OperationAnnotation)
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, false, fmt.Errorf("failed to patch parked annotations: %w", err)
 	}

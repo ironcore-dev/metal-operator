@@ -710,6 +710,65 @@ var _ = Describe("ServerClaim Controller", func() {
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
+
+	It("should stand down and not revert power while the bound server is parked", func(ctx SpecContext) {
+		By("Creating a ServerClaim with PowerOn")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      "parked-stand-down-claim",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring the server is reserved and the claim is bound")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		By("Patching the boot configuration to a Ready state so the claim binds and powers on")
+		config := &metalv1alpha1.ServerBootConfiguration{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: ns.Name,
+				Name:      claim.Name,
+			},
+		}
+		Eventually(UpdateStatus(config, func() {
+			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
+		})).Should(Succeed())
+		Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
+		Eventually(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
+
+		By("Parking the server")
+		Eventually(Update(server, func() {
+			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
+		})).Should(Succeed())
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+		By("Ensuring the server is powered off while parked")
+		Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState))
+
+		By("Asserting spec.power is left untouched while parked")
+		Consistently(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
+
+		By("Resuming the server via an unpark request")
+		Eventually(Update(server, func() {
+			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
+		})).Should(Succeed())
+
+		By("Ensuring the server resumes to reserved and the claim reconciler re-applies power")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
+			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+		))
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Eventually(Get(claim)).To(Satisfy(apierrors.IsNotFound))
+	})
 })
 
 var _ = Describe("ServerClaim Validation", func() {

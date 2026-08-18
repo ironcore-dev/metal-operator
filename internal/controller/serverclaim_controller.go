@@ -135,6 +135,18 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 		}
 	}
 
+	if claim.Spec.ServerRef != nil {
+		server := &metalv1alpha1.Server{}
+		if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err == nil {
+			if isServerParkingOrParked(server) {
+				log.V(1).Info("Bound server is parked, standing down", "Server", server.Name)
+				return ctrl.Result{}, nil
+			}
+		} else if !apierrors.IsNotFound(err) {
+			return ctrl.Result{}, fmt.Errorf("failed to get server for parked check: %w", err)
+		}
+	}
+
 	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}

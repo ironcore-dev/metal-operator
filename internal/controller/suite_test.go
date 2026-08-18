@@ -211,6 +211,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Client:                  k8sManager.GetClient(),
 			APIReader:               k8sManager.GetAPIReader(),
 			Scheme:                  k8sManager.GetScheme(),
+			Recorder:                k8sManager.GetEventRecorder("server-controller"),
 			DefaultProtocol:         metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation:      true,
 			ManagerNamespace:        ns.Name,

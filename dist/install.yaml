@@ -5277,14 +5277,12 @@ rules:
   - update
   - watch
 - apiGroups:
-  - metal.ironcore.dev
+  - events.k8s.io
   resources:
-  - BMC
+  - events
   verbs:
-  - get
-  - list
-  - update
-  - watch
+  - create
+  - patch
 - apiGroups:
   - metal.ironcore.dev
   resources:

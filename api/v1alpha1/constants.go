@@ -70,6 +70,18 @@ const (
 	// when set on it.
 	OperationAnnotationRotateCredentials = "rotate-credentials"
 
+	// OperationAnnotationPark requests that a Server be parked out of the ServerClaim lifecycle so an
+	// external component can run out-of-band day-2 operations (firmware/BIOS/BMC updates, diagnostics,
+	// hardware rework).
+	OperationAnnotationPark = "park"
+
+	// OperationAnnotationUnpark requests that a parked Server be resumed into the normal
+	// ServerClaim lifecycle.
+	OperationAnnotationUnpark = "unpark"
+
+	// ParkedAnnotation is the durable, controller-set marker recording that a Server is parked.
+	ParkedAnnotation = "metal.ironcore.dev/parked"
+
 	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
 	// whose suffix is exposed via the metaldata service to the booted server.
 	MetadataKeyPrefix = "metadata.metal.ironcore.dev/"

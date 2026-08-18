@@ -451,6 +451,7 @@ func main() { // nolint: gocyclo
 		Client:                  mgr.GetClient(),
 		APIReader:               mgr.GetAPIReader(),
 		Scheme:                  mgr.GetScheme(),
+		Recorder:                mgr.GetEventRecorder("server-controller"),
 		DefaultProtocol:         effectiveProtocol,
 		SkipCertValidation:      effectiveSkipCert,
 		ManagerNamespace:        managerNamespace,

@@ -1841,6 +1841,7 @@ _Appears in:_
 | `Released` | ServerStateReleased indicates that the server is released after use.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
 | `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
+| `Parked` | ServerStateParked indicates that the server is parked out of the ServerClaim lifecycle so an<br />external component can run out-of-band day-2 operations. Parked is an overlay state: while<br />active, normal state-machine progression, boot, and power healing are suspended.<br /> |
 
 
 #### ServerStatus

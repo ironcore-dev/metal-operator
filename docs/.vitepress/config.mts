@@ -74,7 +74,6 @@ export default withMermaid({
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
           { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
-          { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },
         ]
       },

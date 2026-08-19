@@ -25,9 +25,6 @@ resources:
   - biossettings_admin_role.yaml
   - biossettings_editor_role.yaml
   - biossettings_viewer_role.yaml
-  - biossettingsset_admin_role.yaml
-  - biossettingsset_editor_role.yaml
-  - biossettingsset_viewer_role.yaml
   - biosversion_admin_role.yaml
   - biosversion_editor_role.yaml
   - biosversion_viewer_role.yaml

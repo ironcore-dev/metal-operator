@@ -12,7 +12,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 
 ### Resource Types
 - [BIOSSettings](#biossettings)
-- [BIOSSettingsSet](#biossettingsset)
 - [BIOSVersion](#biosversion)
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
@@ -90,65 +89,6 @@ _Appears in:_
 | `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
 
 
-#### BIOSSettingsSet
-
-
-
-BIOSSettingsSet is the Schema for the biossettingssets API.
-
-Deprecated: The BIOSSettingsSet resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BIOSSettingsSet` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BIOSSettingsSetSpec](#biossettingssetspec)_ |  |  |  |
-| `status` _[BIOSSettingsSetStatus](#biossettingssetstatus)_ |  |  |  |
-
-
-#### BIOSSettingsSetSpec
-
-
-
-BIOSSettingsSetSpec defines the desired state of BIOSSettingsSet.
-
-
-
-_Appears in:_
-- [BIOSSettingsSet](#biossettingsset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `biosSettingsTemplate` _[BIOSSettingsTemplate](#biossettingstemplate)_ | BIOSSettingsTemplate defines the template for the BIOSSettings resource to be applied to the servers. |  |  |
-| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the servers that are to be selected. |  |  |
-
-
-#### BIOSSettingsSetStatus
-
-
-
-BIOSSettingsSetStatus defines the observed state of BIOSSettingsSet.
-
-
-
-_Appears in:_
-- [BIOSSettingsSet](#biossettingsset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fullyLabeledServers` _integer_ | FullyLabeledServers is the number of servers in the set. |  |  |
-| `availableBIOSSettings` _integer_ | AvailableBIOSSettings is the number of BIOSSettings currently created by the set. |  |  |
-| `pendingBIOSSettings` _integer_ | PendingBIOSSettings is the total number of pending BIOSSettings in the set. |  |  |
-| `inProgressBIOSSettings` _integer_ | InProgressBIOSSettings is the total number of BIOSSettings in the set that are currently in progress. |  |  |
-| `completedBIOSSettings` _integer_ | CompletedBIOSSettings is the total number of completed BIOSSettings in the set. |  |  |
-| `failedBIOSSettings` _integer_ | FailedBIOSSettings is the total number of failed BIOSSettings in the set. |  |  |
-
-
 #### BIOSSettingsSpec
 
 
@@ -219,7 +159,6 @@ _Appears in:_
 
 
 _Appears in:_
-- [BIOSSettingsSetSpec](#biossettingssetspec)
 - [BIOSSettingsSpec](#biossettingsspec)
 
 | Field | Description | Default | Validation |

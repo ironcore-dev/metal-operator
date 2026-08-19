@@ -335,12 +335,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			ResyncInterval: 10 * time.Millisecond,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BIOSSettingsSetReconciler{
-			Client:         k8sManager.GetClient(),
-			Scheme:         k8sManager.GetScheme(),
-			ResyncInterval: 10 * time.Millisecond,
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
 		Expect((&BMCUserReconciler{
 			Client:             k8sManager.GetClient(),
 			Scheme:             k8sManager.GetScheme(),
@@ -421,7 +415,6 @@ func EnsureCleanState(ctx context.Context) {
 		&metalv1alpha1.BMCVersionSetList{},
 		&metalv1alpha1.BMCVersionList{},
 		&metalv1alpha1.BIOSVersionList{},
-		&metalv1alpha1.BIOSSettingsSetList{},
 		&metalv1alpha1.BIOSSettingsList{},
 		&metalv1alpha1.ServerClaimList{},
 		&metalv1alpha1.ServerMaintenanceList{},

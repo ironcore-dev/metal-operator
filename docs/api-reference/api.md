@@ -14,7 +14,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BIOSSettings](#biossettings)
 - [BIOSSettingsSet](#biossettingsset)
 - [BIOSVersion](#biosversion)
-- [BIOSVersionSet](#biosversionset)
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCSettings](#bmcsettings)
@@ -252,65 +251,6 @@ Deprecated: The BIOSVersion resource is deprecated.
 | `status` _[BIOSVersionStatus](#biosversionstatus)_ |  |  |  |
 
 
-#### BIOSVersionSet
-
-
-
-BIOSVersionSet is the Schema for the biosversionsets API.
-
-Deprecated: The BIOSVersionSet resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BIOSVersionSet` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BIOSVersionSetSpec](#biosversionsetspec)_ |  |  |  |
-| `status` _[BIOSVersionSetStatus](#biosversionsetstatus)_ |  |  |  |
-
-
-#### BIOSVersionSetSpec
-
-
-
-BIOSVersionSetSpec defines the desired state of BIOSVersionSet.
-
-
-
-_Appears in:_
-- [BIOSVersionSet](#biosversionset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the servers that are to be selected. |  |  |
-| `biosVersionTemplate` _[BIOSVersionTemplate](#biosversiontemplate)_ | BIOSVersionTemplate defines the template for the BIOSVersion resource to be applied to the servers. |  |  |
-
-
-#### BIOSVersionSetStatus
-
-
-
-BIOSVersionSetStatus defines the observed state of BIOSVersionSet.
-
-
-
-_Appears in:_
-- [BIOSVersionSet](#biosversionset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fullyLabeledServers` _integer_ | FullyLabeledServers is the number of servers in the set. |  |  |
-| `availableBIOSVersion` _integer_ | AvailableBIOSVersion is the number of BIOSVersion created by the set. |  |  |
-| `pendingBIOSVersion` _integer_ | PendingBIOSVersion is the total number of pending BIOSVersion in the set. |  |  |
-| `inProgressBIOSVersion` _integer_ | InProgressBIOSVersion is the total number of BIOSVersion resources in the set that are currently in progress. |  |  |
-| `completedBIOSVersion` _integer_ | CompletedBIOSVersion is the total number of completed BIOSVersion in the set. |  |  |
-| `failedBIOSVersion` _integer_ | FailedBIOSVersion is the total number of failed BIOSVersion in the set. |  |  |
-
-
 #### BIOSVersionSpec
 
 
@@ -381,7 +321,6 @@ _Appears in:_
 
 
 _Appears in:_
-- [BIOSVersionSetSpec](#biosversionsetspec)
 - [BIOSVersionSpec](#biosversionspec)
 
 | Field | Description | Default | Validation |

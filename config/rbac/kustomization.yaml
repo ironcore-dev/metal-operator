@@ -31,9 +31,6 @@ resources:
   - biosversion_admin_role.yaml
   - biosversion_editor_role.yaml
   - biosversion_viewer_role.yaml
-  - biosversionset_admin_role.yaml
-  - biosversionset_editor_role.yaml
-  - biosversionset_viewer_role.yaml
   - bmc_admin_role.yaml
   - bmc_editor_role.yaml
   - bmc_viewer_role.yaml

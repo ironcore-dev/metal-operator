@@ -139,4 +139,4 @@ spec:
 ## Related Resources
 
 - Use `BIOSSettingsSet` for fleet rollout.
-- Use `BIOSVersion`/`BIOSVersionSet` when firmware version must be changed.
+- Use `BIOSVersion` when firmware version must be changed.

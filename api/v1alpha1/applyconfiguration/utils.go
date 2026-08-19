@@ -37,12 +37,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BIOSSettingsTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersion"):
 		return &apiv1alpha1.BIOSVersionApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSet"):
-		return &apiv1alpha1.BIOSVersionSetApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSetSpec"):
-		return &apiv1alpha1.BIOSVersionSetSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSetStatus"):
-		return &apiv1alpha1.BIOSVersionSetStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSpec"):
 		return &apiv1alpha1.BIOSVersionSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionStatus"):

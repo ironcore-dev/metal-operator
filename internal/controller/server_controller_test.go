@@ -181,6 +181,67 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
+	It("should resume a claimed server with wiped status directly in reserved state", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a claim for the server")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-claim-",
+				Namespace:    ns.Name,
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power: metalv1alpha1.PowerOn,
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Creating a Server with a claim ref and wiped status")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "47947555-7742-3448-3784-823347823835",
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+				ServerClaimRef: &metalv1alpha1.ImmutableObjectReference{
+					Namespace: claim.Namespace,
+					Name:      claim.Name,
+				},
+				ReclaimPolicy: metalv1alpha1.ServerReclaimPolicyRetain,
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("waiting for the server to be reserved without going through discovery")
+		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+		Consistently(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateReserved))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, claim)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+	})
+
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{

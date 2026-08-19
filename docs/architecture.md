@@ -78,7 +78,6 @@ flowchart LR
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server's BIOS.
-- [**BIOSSettingsSet**](concepts/biossettingsset.md): Handles creation of multiple `BIOSSettings` by selecting physical server's through labels.
 - [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
@@ -95,7 +94,6 @@ flowchart LR
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
 - **BIOSSettingsReconciler**: Handles [`BIOSSettings`](concepts/biossettings.md) resource. Provides ability to update the bios settings on physical server's BIOS.
-- **BiosSettingsSetReconciler**: Handles [`BIOSSettingsSet`](concepts/biossettingsset.md) resource. Provides ability to update the bios settings on several physical server's BIOS at a time through selecting server's through labels.
 - **BiosVersionReconciler**: Handles [`BIOSVersion`](concepts/biosversion.md) resource. Provides ability to upgrade the bios version on physical server's BIOS.
 - **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.

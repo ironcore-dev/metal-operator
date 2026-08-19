@@ -67,54 +67,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: priority
       type:
         scalar: numeric
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSet
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetSpec
-  map:
-    fields:
-    - name: biosSettingsTemplate
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsTemplate
-    - name: serverSelector
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSetStatus
-  map:
-    fields:
-    - name: availableBIOSSettings
-      type:
-        scalar: numeric
-    - name: completedBIOSSettings
-      type:
-        scalar: numeric
-    - name: failedBIOSSettings
-      type:
-        scalar: numeric
-    - name: fullyLabeledServers
-      type:
-        scalar: numeric
-    - name: inProgressBIOSSettings
-      type:
-        scalar: numeric
-    - name: pendingBIOSSettings
-      type:
-        scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
   map:
     fields:
@@ -168,24 +120,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsState
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsTemplate
-  map:
-    fields:
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: settingsFlow
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
-          elementRelationship: atomic
-    - name: version
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersion
   map:
     fields:

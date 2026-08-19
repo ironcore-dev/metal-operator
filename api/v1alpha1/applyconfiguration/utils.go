@@ -23,12 +23,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BIOSSettingsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsFlowStatus"):
 		return &apiv1alpha1.BIOSSettingsFlowStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsSet"):
-		return &apiv1alpha1.BIOSSettingsSetApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsSetSpec"):
-		return &apiv1alpha1.BIOSSettingsSetSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsSetStatus"):
-		return &apiv1alpha1.BIOSSettingsSetStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsSpec"):
 		return &apiv1alpha1.BIOSSettingsSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsStatus"):

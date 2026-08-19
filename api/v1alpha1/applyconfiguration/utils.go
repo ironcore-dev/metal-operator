@@ -19,16 +19,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=metal.ironcore.dev, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettings"):
-		return &apiv1alpha1.BIOSSettingsApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsFlowStatus"):
-		return &apiv1alpha1.BIOSSettingsFlowStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsSpec"):
-		return &apiv1alpha1.BIOSSettingsSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsStatus"):
-		return &apiv1alpha1.BIOSSettingsStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSSettingsTemplate"):
-		return &apiv1alpha1.BIOSSettingsTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersion"):
 		return &apiv1alpha1.BIOSVersionApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSpec"):
@@ -149,8 +139,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ServerSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerStatus"):
 		return &apiv1alpha1.ServerStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("SettingsFlowItem"):
-		return &apiv1alpha1.SettingsFlowItemApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Storage"):
 		return &apiv1alpha1.StorageApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("StorageDrive"):

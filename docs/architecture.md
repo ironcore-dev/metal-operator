@@ -39,10 +39,6 @@ flowchart LR
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
-    BiosSettingsReconciler -- Discovers --> BIOSSettings
-    BiosSettingsReconciler -- Creates/Deletes --> ServerMaintenance
-    BIOSSettings -- References <--> Server
-
     BiosVersionReconciler -- Discovers --> BIOSVersion
     BiosVersionReconciler -- Creates/Deletes --> ServerMaintenance
     BIOSVersion -- References --> Server
@@ -61,8 +57,8 @@ flowchart LR
     classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
     classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BiosSettingsReconciler,BiosVersionReconciler,BMCSettingsReconciler,BMCVersionReconciler operator;
-    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion,BIOSVersion,BIOSSettings crd;
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BiosVersionReconciler,BMCSettingsReconciler,BMCVersionReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion,BIOSVersion crd;
     class BootOperator external;
 ```
 
@@ -77,7 +73,6 @@ flowchart LR
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
-- [**BIOSSettings**](concepts/biossettings.md): Handles updating the BIOS setting on the physical server's BIOS.
 - [**BIOSVersion**](concepts/biosversion.md): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
@@ -89,11 +84,10 @@ flowchart LR
 
 - **BMCReconciler**: Manages `BMC` resources by connecting to BMC devices using credentials from `BMCSecret`. It retrieves hardware information, updates the BMC status, and detects managed servers, creating `Server` resources for them.
 
-- **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management, BIOS configurations, and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
+- **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
-- **BIOSSettingsReconciler**: Handles [`BIOSSettings`](concepts/biossettings.md) resource. Provides ability to update the bios settings on physical server's BIOS.
 - **BiosVersionReconciler**: Handles [`BIOSVersion`](concepts/biosversion.md) resource. Provides ability to upgrade the bios version on physical server's BIOS.
 - **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.

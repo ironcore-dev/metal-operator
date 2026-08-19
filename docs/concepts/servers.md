@@ -22,12 +22,7 @@ spec:
     - name: PXE
       priority: 1
       device: Network
-  biosSettingsRef:
-    name: my-server-bios
 ```
-
-BIOS configuration is expressed as a separate [`BIOSSettings`](biossettings.md) resource
-referenced from `spec.biosSettingsRef`, rather than inline on the `Server`.
 
 ## Usage
 
@@ -320,8 +315,6 @@ spec:
     - name: PXE
       priority: 1
       device: Network
-  biosSettingsRef:
-    name: server-with-bmc-ref-bios
 ```
 
 Inline Configuration: Use the `bmc` field to provide direct BMC access details on the

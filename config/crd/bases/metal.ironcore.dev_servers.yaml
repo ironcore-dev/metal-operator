@@ -79,25 +79,6 @@ spec:
           spec:
             description: ServerSpec defines the desired state of a Server.
             properties:
-              biosSettingsRef:
-                description: |-
-                  BIOSSettingsRef is a reference to a biossettings object that specifies
-                  the BIOS configuration for this server.
-
-                  Deprecated: This field is being deprecated and shall not be used going
-                  forward, as it will be removed in a future release.
-                properties:
-                  name:
-                    default: ""
-                    description: |-
-                      Name of the referent.
-                      This field is effectively required, but due to backwards compatibility is
-                      allowed to be empty. Instances of this type with an empty value here are
-                      almost certainly wrong.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
               bmc:
                 description: BMC contains the access details for the BMC.
                 properties:

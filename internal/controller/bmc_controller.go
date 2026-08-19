@@ -60,7 +60,6 @@ type BMCReconciler struct {
 	// DNSRecordTemplatePath is the path to the file containing the DNSRecord template.
 	DNSRecordTemplate string
 	Conditions        *conditionutils.Accessor
-
 	// SSHResetTimeout defines the timeout for SSH reset operations (dial + command execution).
 	SSHResetTimeout time.Duration
 }

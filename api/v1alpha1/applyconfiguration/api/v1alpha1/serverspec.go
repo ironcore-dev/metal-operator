@@ -55,12 +55,6 @@ type ServerSpecApplyConfiguration struct {
 	MaintenanceBootConfigurationRef *ObjectReferenceApplyConfiguration `json:"maintenanceBootConfigurationRef,omitempty"`
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrderApplyConfiguration `json:"bootOrder,omitempty"`
-	// BIOSSettingsRef is a reference to a biossettings object that specifies
-	// the BIOS configuration for this server.
-	//
-	// Deprecated: This field is being deprecated and shall not be used going
-	// forward, as it will be removed in a future release.
-	BIOSSettingsRef *v1.LocalObjectReference `json:"biosSettingsRef,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
 	Taints []TaintApplyConfiguration `json:"taints,omitempty"`
 	// Unclaimable, when true, prevents new ServerClaims from being bound to
@@ -172,14 +166,6 @@ func (b *ServerSpecApplyConfiguration) WithBootOrder(values ...*BootOrderApplyCo
 		}
 		b.BootOrder = append(b.BootOrder, *values[i])
 	}
-	return b
-}
-
-// WithBIOSSettingsRef sets the BIOSSettingsRef field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the BIOSSettingsRef field is set to the value of the last call.
-func (b *ServerSpecApplyConfiguration) WithBIOSSettingsRef(value v1.LocalObjectReference) *ServerSpecApplyConfiguration {
-	b.BIOSSettingsRef = &value
 	return b
 }
 

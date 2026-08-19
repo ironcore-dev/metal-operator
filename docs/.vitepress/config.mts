@@ -76,7 +76,6 @@ export default withMermaid({
           { text: 'BIOSSettings', link: '/concepts/biossettings' },
           { text: 'BIOSSettingsSet', link: '/concepts/biossettingsset' },
           { text: 'BIOSVersion', link: '/concepts/biosversion' },
-          { text: 'BIOSVersionSet', link: '/concepts/biosversionset' },
         ]
       },
       {

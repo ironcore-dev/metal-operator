@@ -30,19 +30,6 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 		return err
 	}
 
-	if err := indexer.IndexField(ctx, &metalv1alpha1.BIOSSettings{}, serverRefField, func(rawObj client.Object) []string {
-		biosSettings, ok := rawObj.(*metalv1alpha1.BIOSSettings)
-		if !ok {
-			return nil
-		}
-		if biosSettings.Spec.ServerRef == nil {
-			return nil
-		}
-		return []string{biosSettings.Spec.ServerRef.Name}
-	}); err != nil {
-		return err
-	}
-
 	if err := indexer.IndexField(ctx, &metalv1alpha1.Server{}, bmcRefField, func(rawObj client.Object) []string {
 		server, ok := rawObj.(*metalv1alpha1.Server)
 		if !ok {

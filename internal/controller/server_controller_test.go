@@ -358,20 +358,11 @@ var _ = Describe("Server Controller", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 
-		biosSettings := &metalv1alpha1.BIOSSettings{ObjectMeta: metav1.ObjectMeta{
-			Name: "bios-settings",
-		}}
-		Expect(k8sClient.Create(ctx, biosSettings)).To(Succeed())
-		Eventually(Update(server, func() {
-			server.Spec.BIOSSettingsRef = &v1.LocalObjectReference{Name: biosSettings.Name}
-		})).Should(Succeed())
-
 		// cleanup
 		Expect(k8sClient.Delete(ctx, endpoint)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
-		Eventually(Get(biosSettings)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("should initialize a Server with inline BMC configuration", func(ctx SpecContext) {

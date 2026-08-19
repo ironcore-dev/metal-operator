@@ -1003,7 +1003,7 @@ func (r *BIOSVersionReconciler) enqueueBiosVersionByServerRefs(ctx context.Conte
 	return nil
 }
 
-func (r *BIOSVersionReconciler) enqueueBiosSettingsByBMC(ctx context.Context, obj client.Object) []ctrl.Request {
+func (r *BIOSVersionReconciler) enqueueBiosVersionByBMC(ctx context.Context, obj client.Object) []ctrl.Request {
 	log := ctrl.LoggerFrom(ctx)
 	bmcObj := obj.(*metalv1alpha1.BMC)
 
@@ -1062,6 +1062,6 @@ func (r *BIOSVersionReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&metalv1alpha1.BIOSVersion{}).
 		Owns(&metalv1alpha1.ServerMaintenance{}).
 		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionByServerRefs)).
-		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosSettingsByBMC)).
+		Watches(&metalv1alpha1.BMC{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBiosVersionByBMC)).
 		Complete(r)
 }

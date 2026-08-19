@@ -7,7 +7,7 @@ assignees: ''
 ---
 
 **Which component is affected?**
-<!-- Which resource(s) or controller(s) does this bug relate to? e.g. Server, ServerClaim, ServerBootConfiguration, BMC, Endpoint, ServerMaintenance, BIOSSettings, etc. -->
+<!-- Which resource(s) or controller(s) does this bug relate to? e.g. Server, ServerClaim, ServerBootConfiguration, BMC, Endpoint, ServerMaintenance, etc. -->
 
 **Describe the bug**
 A clear and concise description of what the bug is.

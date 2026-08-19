@@ -26,100 +26,6 @@ func Parser() *typed.Parser {
 var parserOnce sync.Once
 var parser *typed.Parser
 var schemaYAML = typed.YAMLObject(`types:
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettings
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowState
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
-    - name: flowState
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowState
-    - name: lastAppliedTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: name
-      type:
-        scalar: string
-    - name: priority
-      type:
-        scalar: numeric
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsSpec
-  map:
-    fields:
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: serverMaintenanceRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
-    - name: serverRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: settingsFlow
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
-          elementRelationship: atomic
-    - name: version
-      type:
-        scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsState
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
-    - name: failedAttempts
-      type:
-        scalar: numeric
-    - name: flowState
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsFlowStatus
-          elementRelationship: atomic
-    - name: lastAppliedTime
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: state
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSSettingsState
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BIOSVersion
   map:
     fields:
@@ -1130,9 +1036,6 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec
   map:
     fields:
-    - name: biosSettingsRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
     - name: bmc
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCAccess
@@ -1239,20 +1142,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: totalSystemMemory
       type:
         namedType: io.k8s.apimachinery.pkg.api.resource.Quantity
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.SettingsFlowItem
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-    - name: priority
-      type:
-        scalar: numeric
-    - name: settings
-      type:
-        map:
-          elementType:
-            scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Storage
   map:
     fields:

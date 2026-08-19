@@ -98,7 +98,6 @@ func main() { // nolint: gocyclo
 		resourcePollingInterval            time.Duration
 		resourcePollingTimeout             time.Duration
 		discoveryTimeout                   time.Duration
-		biosSettingsApplyTimeout           time.Duration
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
 		bmcResetWaitingInterval            time.Duration
@@ -177,8 +176,6 @@ func main() { // nolint: gocyclo
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.DurationVar(&biosSettingsApplyTimeout, "bios-setting-timeout", 2*time.Hour,
-		"Timeout for BIOS Settings Controller")
 	flag.StringVar(&dnsRecordTemplatePath, "dns-record-template-path", "",
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
@@ -503,27 +500,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "servermaintenance")
 		os.Exit(1)
 	}
-	if err = (&controller.BIOSSettingsReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		ManagerNamespace:   managerNamespace,
-		DefaultProtocol:    effectiveProtocol,
-		SkipCertValidation: effectiveSkipCert,
-		ResyncInterval:     maintenanceResyncInterval,
-		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-		TimeoutExpiry:               biosSettingsApplyTimeout,
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "biossettings")
-		os.Exit(1)
-	}
 	if err = (&controller.BIOSVersionReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -652,12 +628,6 @@ func main() { // nolint: gocyclo
 		}
 	}
 	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1alpha1.SetupBIOSSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "biossettings")
-			os.Exit(1)
-		}
-	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBIOSVersionWebhookWithManager(mgr); err != nil {

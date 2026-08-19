@@ -11,7 +11,6 @@ Package v1alpha1 contains API Schema definitions for the metal.ironcore.dev API 
 Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group.
 
 ### Resource Types
-- [BIOSSettings](#biossettings)
 - [BIOSVersion](#biosversion)
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
@@ -27,146 +26,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerMaintenance](#servermaintenance)
 - [ServerReadinessRule](#serverreadinessrule)
 
-
-
-#### BIOSSettings
-
-
-
-BIOSSettings is the Schema for the biossettings API.
-
-Deprecated: The BIOSSettings resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BIOSSettings` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BIOSSettingsSpec](#biossettingsspec)_ |  |  |  |
-| `status` _[BIOSSettingsStatus](#biossettingsstatus)_ |  |  |  |
-
-
-#### BIOSSettingsFlowState
-
-_Underlying type:_ _string_
-
-
-
-
-
-_Appears in:_
-- [BIOSSettingsFlowStatus](#biossettingsflowstatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | BIOSSettingsFlowStatePending specifies that the BIOS settings update for the current priority is pending.<br /> |
-| `InProgress` | BIOSSettingsFlowStateInProgress specifies that the BIOS settings update for the current priority is in progress.<br /> |
-| `Applied` | BIOSSettingsFlowStateApplied specifies that the BIOS settings for the current priority have been applied.<br /> |
-| `Failed` | BIOSSettingsFlowStateFailed specifies that the BIOS settings update has failed.<br /> |
-
-
-#### BIOSSettingsFlowStatus
-
-
-
-
-
-
-
-_Appears in:_
-- [BIOSSettingsStatus](#biossettingsstatus)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `flowState` _[BIOSSettingsFlowState](#biossettingsflowstate)_ | State represents the current state of the BIOS settings update for the current priority. |  |  |
-| `name` _string_ | Name identifies the current priority settings from the spec. |  |  |
-| `priority` _integer_ | Priority identifies the settings priority from the spec. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current Flowstate. |  |  |
-| `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
-
-
-#### BIOSSettingsSpec
-
-
-
-BIOSSettingsSpec defines the desired state of BIOSSettings.
-
-
-
-_Appears in:_
-- [BIOSSettings](#biossettings)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that BIOSSettings has requested for the referred server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS settings on. |  |  |
-
-
-#### BIOSSettingsState
-
-_Underlying type:_ _string_
-
-BIOSSettingsState specifies the current state of the BIOS Settings update.
-
-
-
-_Appears in:_
-- [BIOSSettingsStatus](#biossettingsstatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | BIOSSettingsStatePending specifies that the BIOS settings update is waiting.<br /> |
-| `InProgress` | BIOSSettingsStateInProgress specifies that the BIOS settings update is in progress.<br /> |
-| `Applied` | BIOSSettingsStateApplied specifies that the BIOS settings have been applied.<br /> |
-| `Failed` | BIOSSettingsStateFailed specifies that the BIOS settings update has failed.<br /> |
-
-
-#### BIOSSettingsStatus
-
-
-
-BIOSSettingsStatus defines the observed state of BIOSSettings.
-
-
-
-_Appears in:_
-- [BIOSSettings](#biossettings)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `state` _[BIOSSettingsState](#biossettingsstate)_ | State represents the current state of the BIOS settings update. |  |  |
-| `flowState` _[BIOSSettingsFlowStatus](#biossettingsflowstatus) array_ | FlowState is a list of individual BIOSSettings operation flows. |  |  |
-| `lastAppliedTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastAppliedTime represents the timestamp when the last setting was successfully applied. |  |  |
-| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
-| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOSSettings's current state. |  |  |
-
-
-#### BIOSSettingsTemplate
-
-
-
-
-
-
-
-_Appears in:_
-- [BIOSSettingsSpec](#biossettingsspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the software version (e.g. BIOS, BMC) these settings apply to. |  |  |
-| `settingsFlow` _[SettingsFlowItem](#settingsflowitem) array_ | SettingsFlow contains the BIOS settings sequence to apply in the given order. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
 
 
 #### BIOSVersion
@@ -1146,7 +1005,6 @@ ObjectReference is the namespaced name reference to an object.
 
 
 _Appears in:_
-- [BIOSSettingsSpec](#biossettingsspec)
 - [BIOSVersionSpec](#biosversionspec)
 - [BMCVersionSpec](#bmcversionspec)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
@@ -1281,8 +1139,6 @@ RetryPolicy defines the retry behavior on transient failures.
 
 
 _Appears in:_
-- [BIOSSettingsSpec](#biossettingsspec)
-- [BIOSSettingsTemplate](#biossettingstemplate)
 - [BIOSVersionSpec](#biosversionspec)
 - [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
@@ -1491,8 +1347,6 @@ ServerMaintenancePolicy specifies the maintenance policy to be enforced on the s
 
 
 _Appears in:_
-- [BIOSSettingsSpec](#biossettingsspec)
-- [BIOSSettingsTemplate](#biossettingstemplate)
 - [BIOSVersionSpec](#biosversionspec)
 - [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
@@ -1694,7 +1548,6 @@ _Appears in:_
 | `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
 | `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
-| `biosSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BIOSSettingsRef is a reference to a biossettings object that specifies<br />the BIOS configuration for this server.<br />Deprecated: This field is being deprecated and shall not be used going<br />forward, as it will be removed in a future release. |  |  |
 | `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 | `unclaimable` _boolean_ | Unclaimable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false |  |
 
@@ -1748,25 +1601,6 @@ _Appears in:_
 | `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  |  |
 | `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the server's current state. |  |  |
-
-
-#### SettingsFlowItem
-
-
-
-
-
-
-
-_Appears in:_
-- [BIOSSettingsSpec](#biossettingsspec)
-- [BIOSSettingsTemplate](#biossettingstemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the flow item. |  | MaxLength: 1000 <br />MinLength: 1 <br /> |
-| `settings` _object (keys:string, values:string)_ | Settings contains software (e.g. BIOS, BMC) settings as a map. |  |  |
-| `priority` _integer_ | Priority defines the order of applying the settings. Lower numbers have higher priority (i.e. lower numbers are applied first). |  | Maximum: 2.147483645e+09 <br />Minimum: 1 <br /> |
 
 
 #### Storage

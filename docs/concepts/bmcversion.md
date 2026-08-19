@@ -4,7 +4,7 @@
 
 `BMCVersion` upgrades BMC firmware for one `BMC`.
 
-It is the BMC counterpart of `BIOSVersion`, with additional multi-server maintenance gating because one BMC can manage multiple hosts.
+It applies BMC firmware upgrades with multi-server maintenance gating because one BMC can manage multiple hosts.
 
 ## What It Does
 

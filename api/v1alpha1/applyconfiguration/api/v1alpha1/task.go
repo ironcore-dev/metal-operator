@@ -11,10 +11,8 @@ import (
 
 // TaskApplyConfiguration represents a declarative configuration of the Task type for use
 // with apply.
-//
-// Task contains the status of the task created by the BMC for the BIOS upgrade.
 type TaskApplyConfiguration struct {
-	// URI is the URI of the task created by the BMC for the BIOS upgrade.
+	// URI is the URI of the task created by the BMC for the upgrade.
 	URI *string `json:"URI,omitempty"`
 	// State is the current state of the task.
 	State *schemas.TaskState `json:"state,omitempty"`

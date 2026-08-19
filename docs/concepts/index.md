@@ -10,7 +10,6 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**ServerClaim**](/concepts/serverclaims): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](/concepts/serverbootconfigurations): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](/concepts/servermaintenance): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
-- [**BIOSVersion**](/concepts/biosversion): Handles upgrading the BIOS Version on the physical server's BIOS.
 - [**BMCSettings**](/concepts/bmcsettings): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCSettingsSet**](/concepts/bmcsettingsset): Handles creation of multiple `BMCSettings` by selecting BMCs through labels.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.

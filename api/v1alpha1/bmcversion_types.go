@@ -4,10 +4,49 @@
 package v1alpha1
 
 import (
+	"github.com/stmcginnis/gofish/schemas"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 )
+
+type UpdatePolicy string
+
+const (
+	UpdatePolicyForce UpdatePolicy = "Force"
+)
+
+type ImageSpec struct {
+	// SecretRef is a reference to the Secret containing the credentials to access the image URI.
+	// +optional
+	SecretRef *corev1.SecretReference `json:"secretRef,omitempty"`
+
+	// TransferProtocol is the network protocol used to retrieve the image URI.
+	// +optional
+	TransferProtocol string `json:"transferProtocol,omitempty"`
+
+	// URI is the URI of the software image to install.
+	// +required
+	URI string `json:"URI"`
+}
+
+type Task struct {
+	// URI is the URI of the task created by the BMC for the upgrade.
+	// +optional
+	URI string `json:"URI,omitempty"`
+
+	// State is the current state of the task.
+	// +optional
+	State schemas.TaskState `json:"state,omitempty"`
+
+	// Status is the current status of the task.
+	// +optional
+	Status schemas.Health `json:"status,omitempty"`
+
+	// PercentComplete is the percentage of completion of the task.
+	// +optional
+	PercentComplete int32 `json:"percentageComplete,omitempty"`
+}
 
 type BMCVersionState string
 

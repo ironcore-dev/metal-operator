@@ -161,7 +161,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		))
 	})
@@ -200,7 +200,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring that the Server has the correct claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 		))
 
@@ -222,7 +222,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		))
 	})
@@ -270,7 +270,7 @@ var _ = Describe("ServerClaim Controller", func() {
 				Name:      claim.Name,
 				Namespace: claim.Namespace,
 			}),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
@@ -285,7 +285,7 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 		))
@@ -740,7 +740,7 @@ var _ = Describe("ServerClaim Controller", func() {
 			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
 		})).Should(Succeed())
 		Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
-		Eventually(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
+		Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState))
 
 		By("Parking the server")
 		Eventually(Update(server, func() {
@@ -751,18 +751,19 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring the server is powered off while parked")
 		Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState))
 
-		By("Asserting spec.power is left untouched while parked")
-		Consistently(Object(server)).Should(HaveField("Spec.Power", metalv1alpha1.PowerOn))
+		By("Asserting spec.power stays cleared while parked")
+		Consistently(Object(server)).Should(HaveField("Spec.Power", BeEmpty()))
 
 		By("Resuming the server via an unpark request")
 		Eventually(Update(server, func() {
 			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 		})).Should(Succeed())
 
-		By("Ensuring the server resumes to reserved and the claim reconciler re-applies power")
+		By("Ensuring the server resumes to reserved and the state machine re-applies power")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
+			HaveField("Spec.Power", BeEmpty()),
 		))
 
 		By("Removing the ServerClaim")

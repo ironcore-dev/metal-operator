@@ -14,7 +14,6 @@ metadata:
   name: my-server
 spec:
   systemUUID: "123e4567-e89b-12d3-a456-426614174000"
-  power: "Off"
   reclaimPolicy: Recycle
   bmcRef:
     name: my-bmc
@@ -23,6 +22,9 @@ spec:
       priority: 1
       device: Network
 ```
+
+Desired power for a workload is configured on the `ServerClaim` via [`spec.power`](serverclaims.md),
+not on the `Server`.
 
 ## Usage
 
@@ -230,8 +232,7 @@ and the parked marker stay the same regardless of how the request arrives.
    This is a one-shot request; it does **not** itself persist the parked state.
 2. **Park.** The `Server` reconciler observes the request and, if the server is in a parkable state
    (`Available` or `Reserved`):
-   - powers the server **off** via the BMC (idempotent; only if not already off; `spec.power` is
-     left untouched),
+   - powers the server **off** via the BMC (idempotent; only if not already off),
    - records the parked state by setting the internal `metal.ironcore.dev/parked: "true"` annotation,
    - sets `status.state = Parked`,
    - **removes** the `metal.ironcore.dev/operation: park` request annotation again.
@@ -258,8 +259,8 @@ and the parked marker stay the same regardless of how the request arrives.
      during the procedure),
    - transitions back to the pre-parking state: `Reserved` if the server has a `ServerClaimRef`,
      otherwise `Available`,
-   - the `ServerClaim` reconciler takes over again and re-applies the boot configuration and power
-     state as before.
+   - the `ServerClaim` reconciler takes over again and re-applies the boot configuration, and the
+     server state machine re-applies the claim's requested power state as before.
 
    An unpark request on a server that is not parked is a no-op: the request annotation is consumed
    and nothing else happens.
@@ -293,7 +294,7 @@ When done, bring the server back with an unpark request:
 kubectl annotate server my-server metal.ironcore.dev/operation=unpark
 ```
 
-The bound `ServerClaim` resumes ownership without re-scheduling, and its reconciler reapplies the claim's requested power state, including `Off` when the claim requests it.
+The bound `ServerClaim` resumes ownership without re-scheduling, and the server state machine reapplies the claim's requested power state, including `Off` when the claim requests it.
 
 ## Interaction with BMC
 
@@ -308,7 +309,6 @@ metadata:
   name: server-with-bmc-ref
 spec:
   systemUUID: "123e4567-e89b-12d3-a456-426614174000"
-  power: "On"
   bmcRef:
     name: my-bmc
   bootOrder:
@@ -328,7 +328,6 @@ metadata:
   name: server-with-inline-bmc
 spec:
   systemUUID: "123e4567-e89b-12d3-a456-426614174000"
-  power: "On"
   bmc:
     protocol:
       name: Redfish

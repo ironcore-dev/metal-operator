@@ -181,11 +181,6 @@ func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alp
 	}
 	log.V(1).Info("Patched ServerClaim phase", "Phase", claim.Status.Phase)
 
-	if modified, err := r.ensurePowerStateForServer(ctx, claim, server); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Ensured PowerState for Server", "Server", server.Name)
-
 	log.V(1).Info("Reconciled server claim")
 	return ctrl.Result{}, nil
 }
@@ -208,22 +203,6 @@ func (r *ServerClaimReconciler) ensureObjectRefForServer(ctx context.Context, cl
 	}
 	log.V(1).Info("Patched ServerClaim reference on Server", "Server", server.Name, "ServerClaimRef", claim.Name)
 	return nil
-}
-
-func (r *ServerClaimReconciler) ensurePowerStateForServer(ctx context.Context, claim *metalv1alpha1.ServerClaim, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if server.Spec.Power == claim.Spec.Power {
-		return false, nil
-	}
-	if server.Spec.ServerClaimRef != nil {
-		serverBase := server.DeepCopy()
-		server.Spec.Power = claim.Spec.Power
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to patch power for server: %w", err)
-		}
-		log.V(1).Info("Patched desired Power of the claimed Server", "Server", server.Name)
-	}
-	return true, nil
 }
 
 func (r *ServerClaimReconciler) patchServerClaimPhase(ctx context.Context, claim *metalv1alpha1.ServerClaim, phase metalv1alpha1.Phase) (bool, error) {

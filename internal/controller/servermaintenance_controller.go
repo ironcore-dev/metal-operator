@@ -267,7 +267,7 @@ func (r *ServerMaintenanceReconciler) handleInMaintenanceState(ctx context.Conte
 		if err := r.setAndPatchServerState(ctx, server, maintenance); err != nil {
 			return ctrl.Result{}, err
 		}
-		log.V(1).Info("Patched server power state", "Server", server.Name, "Power", maintenance.Spec.ServerPower)
+		log.V(1).Info("Patched server indicator LED", "Server", server.Name, "IndicatorLED", maintenance.Spec.LocatorLED)
 		return ctrl.Result{}, nil
 	}
 
@@ -328,11 +328,11 @@ func (r *ServerMaintenanceReconciler) applyServerBootConfiguration(ctx context.C
 }
 
 func (r *ServerMaintenanceReconciler) setAndPatchServerState(ctx context.Context, server *metalv1alpha1.Server, maintenance *metalv1alpha1.ServerMaintenance) error {
-	serverBase := server.DeepCopy()
-	server.Spec.Power = maintenance.Spec.ServerPower
-	if maintenance.Spec.LocatorLED != "" {
-		server.Spec.IndicatorLED = maintenance.Spec.LocatorLED
+	if maintenance.Spec.LocatorLED == "" || server.Spec.IndicatorLED == maintenance.Spec.LocatorLED {
+		return nil
 	}
+	serverBase := server.DeepCopy()
+	server.Spec.IndicatorLED = maintenance.Spec.LocatorLED
 	return r.Patch(ctx, server, client.MergeFrom(serverBase))
 }
 

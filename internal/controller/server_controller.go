@@ -218,7 +218,11 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 
 	// do late state initialization
 	if server.Status.State == "" {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
+		state := metalv1alpha1.ServerStateInitial
+		if server.Spec.ServerClaimRef != nil {
+			state = metalv1alpha1.ServerStateReserved
+		}
+		if modified, err := r.patchServerState(ctx, server, state); err != nil || modified {
 			return ctrl.Result{}, err
 		}
 	}

@@ -223,6 +223,17 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		}
 	}
 
+	// Clear the deprecated spec.power field.
+	// TODO: remove this part once the spec field is gone
+	if server.Spec.Power != "" {
+		serverBase := server.DeepCopy()
+		server.Spec.Power = ""
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated spec.power field: %w", err)
+		}
+		log.V(1).Info("Cleared deprecated spec.power field")
+	}
+
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.WithRegistryURL(r.RegistryURL))
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
@@ -331,11 +342,6 @@ func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc
 	}
 	log.V(1).Info("Initial conditions for Server met")
 
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
-	}
-	log.V(1).Info("Ensured power state for Server")
-
 	if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to update server status system info: %w", err)
 	}
@@ -372,13 +378,7 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 	log.V(1).Info("Server boot configuration is ready")
 
 	serverBase := server.DeepCopy()
-	server.Spec.Power = metalv1alpha1.PowerOn
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to update server power state: %w", err)
-	}
-	log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOn)
-
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+	if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOn); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 	log.V(1).Info("Server state set to power on")
@@ -431,15 +431,8 @@ func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient b
 
 func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	serverBase := server.DeepCopy()
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
-		server.Spec.Power = metalv1alpha1.PowerOff
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return false, fmt.Errorf("failed to update server power state: %w", err)
-		}
-		log.V(1).Info("Updated Server power state", "PowerState", metalv1alpha1.PowerOff)
-
-		if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+		if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		log.V(1).Info("Server state set to power off")
@@ -535,7 +528,7 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 		}
 		log.V(1).Info("Server is powered off, booting Server in PXE")
 	}
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+	if err := r.ensureServerPowerState(ctx, bmcClient, server, claim.Spec.Power); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 
@@ -549,16 +542,13 @@ func (r *ServerReconciler) handleReservedState(ctx context.Context, bmcClient bm
 func (r *ServerReconciler) ensureServerPoweredOff(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (off bool, err error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	if server.Spec.Power != metalv1alpha1.PowerOff || server.Spec.BootConfigurationRef != nil {
+	if server.Spec.BootConfigurationRef != nil {
 		base := server.DeepCopy()
-		// TODO: drop the spec.power write — it's deprecated (#1042) and only
-		// kept here to carry the desired state until the field is removed.
-		server.Spec.Power = metalv1alpha1.PowerOff
 		server.Spec.BootConfigurationRef = nil
 		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-			return false, fmt.Errorf("failed to patch spec.power / spec.bootConfigurationRef: %w", err)
+			return false, fmt.Errorf("failed to clear spec.bootConfigurationRef: %w", err)
 		}
-		log.V(1).Info("Requested power off and cleared boot configuration")
+		log.V(1).Info("Cleared boot configuration")
 	}
 
 	if server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
@@ -714,7 +704,11 @@ func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient
 		}
 		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
 	}
-	if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
+	maintenance, err := GetServerMaintenanceForObjectReference(ctx, r.Client, server.Spec.ServerMaintenanceRef)
+	if err != nil {
+		return false, fmt.Errorf("failed to get ServerMaintenance for server: %w", err)
+	}
+	if err := r.ensureServerPowerState(ctx, bmcClient, server, maintenance.Spec.ServerPower); err != nil {
 		return false, fmt.Errorf("failed to ensure server power state: %w", err)
 	}
 
@@ -1145,44 +1139,12 @@ func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, ss
 
 func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if server.Spec.Power == "" && server.Status.PowerState == metalv1alpha1.ServerOffPowerState {
-		requeue, err := r.setAndPatchServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff)
-		if err != nil {
-			return false, fmt.Errorf("failed to set server power state: %w", err)
-		}
-		if requeue {
-			return requeue, nil
-		}
-	}
-
 	if server.Status.State == metalv1alpha1.ServerStateInitial &&
 		server.Status.PowerState == metalv1alpha1.ServerOnPowerState &&
 		r.EnforceFirstBoot {
 		log.V(1).Info("Server in initial state is powered on, ensuring it is powered off")
-		requeue, err := r.setAndPatchServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff)
-		if err != nil {
-			return false, fmt.Errorf("failed to set server power state: %w", err)
-		}
-		if requeue {
-			return requeue, nil
-		}
-	}
-	return false, nil
-}
-
-func (r *ServerReconciler) setAndPatchServerPowerState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, powerState metalv1alpha1.Power) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	op, err := controllerutil.CreateOrPatch(ctx, r.Client, server, func() error {
-		server.Spec.Power = powerState
-		return nil
-	})
-	if err != nil {
-		return false, fmt.Errorf("failed to patch Server: %w", err)
-	}
-	if op == controllerutil.OperationResultUpdated {
-		log.V(1).Info("Server updated to power off state")
-		if err := r.ensureServerPowerState(ctx, bmcClient, server); err != nil {
-			log.V(1).Info("Failed to ensure power state")
+		if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff); err != nil {
+			return false, fmt.Errorf("failed to power off server in initial state: %w", err)
 		}
 		return true, nil
 	}
@@ -1359,9 +1321,9 @@ func (r *ServerReconciler) patchServerURI(ctx context.Context, bmcClient bmc.BMC
 	return true, nil
 }
 
-func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
+func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server, power metalv1alpha1.Power) error {
 	log := ctrl.LoggerFrom(ctx)
-	if server.Spec.Power == "" {
+	if power == "" {
 		// no desired power state set
 		return nil
 	}
@@ -1369,13 +1331,13 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient
 	powerOp := powerOpNoOP
 	if server.Status.PowerState != metalv1alpha1.ServerOnPowerState &&
 		server.Status.PowerState != metalv1alpha1.ServerPoweringOnPowerState &&
-		server.Spec.Power == metalv1alpha1.PowerOn {
+		power == metalv1alpha1.PowerOn {
 		powerOp = powerOpOn
 	}
 
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState &&
 		server.Status.PowerState != metalv1alpha1.ServerPoweringOffPowerState &&
-		server.Spec.Power == metalv1alpha1.PowerOff {
+		power == metalv1alpha1.PowerOff {
 		powerOp = powerOpOff
 	}
 
@@ -1418,7 +1380,7 @@ func (r *ServerReconciler) ensureServerPowerState(ctx context.Context, bmcClient
 			}
 		}
 	}
-	log.V(1).Info("Ensured server power state", "PowerState", server.Spec.Power)
+	log.V(1).Info("Ensured server power state", "targetPower", power)
 
 	return nil
 }
@@ -1579,6 +1541,14 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerBootConfiguration{},
 			r.enqueueServerByServerBootConfiguration(),
 		).
+		Watches(
+			&metalv1alpha1.ServerClaim{},
+			r.enqueueServerByClaim(),
+		).
+		Watches(
+			&metalv1alpha1.ServerMaintenance{},
+			r.enqueueServerByMaintenance(),
+		).
 		Complete(r)
 }
 
@@ -1602,6 +1572,34 @@ func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.Even
 		return []ctrl.Request{
 			{
 				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
+			},
+		}
+	})
+}
+
+func (r *ServerReconciler) enqueueServerByClaim() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		claim := obj.(*metalv1alpha1.ServerClaim)
+		if claim.Spec.ServerRef == nil {
+			return nil
+		}
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{Name: claim.Spec.ServerRef.Name},
+			},
+		}
+	})
+}
+
+func (r *ServerReconciler) enqueueServerByMaintenance() handler.EventHandler {
+	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
+		maintenance := obj.(*metalv1alpha1.ServerMaintenance)
+		if maintenance.Spec.ServerRef == nil {
+			return nil
+		}
+		return []ctrl.Request{
+			{
+				NamespacedName: types.NamespacedName{Name: maintenance.Spec.ServerRef.Name},
 			},
 		}
 	})

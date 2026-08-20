@@ -126,6 +126,61 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 	})
 
+	It("should clear the deprecated spec.power field without disrupting power control", func(ctx SpecContext) {
+		By("Creating a BMCSecret")
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-server-",
+			},
+			Data: map[string][]byte{
+				"username": []byte("foo"),
+				"password": []byte("bar"),
+			},
+		}
+		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
+
+		By("Creating a Server with a legacy spec.power value")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "server-",
+			},
+			Spec: metalv1alpha1.ServerSpec{
+				SystemUUID: "38947555-7742-3448-3784-823347823834",
+				Power:      metalv1alpha1.PowerOn,
+				BMC: &metalv1alpha1.BMCAccess{
+					Protocol: metalv1alpha1.Protocol{
+						Name: metalv1alpha1.ProtocolRedfishLocal,
+						Port: MockServerPort,
+					},
+					Address: MockServerIP,
+					BMCSecretRef: v1.LocalObjectReference{
+						Name: bmcSecret.Name,
+					},
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, server)).To(Succeed())
+
+		By("Updating the Server to available state")
+		Eventually(UpdateStatus(server, func() {
+			server.Status.State = metalv1alpha1.ServerStateAvailable
+		})).Should(Succeed())
+
+		By("Ensuring that the deprecated spec.power field is cleared")
+		Eventually(Object(server)).Should(HaveField("Spec.Power", BeEmpty()))
+		Consistently(Object(server)).Should(HaveField("Spec.Power", BeEmpty()))
+
+		By("Ensuring that the power state is still managed by the state machine")
+		Eventually(Object(server)).Should(SatisfyAll(
+			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+			HaveField("Spec.Power", BeEmpty()),
+		))
+
+		// cleanup
+		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+	})
+
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{
@@ -174,7 +229,7 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Status.Manufacturer", "Contoso"),
@@ -324,7 +379,7 @@ var _ = Describe("Server Controller", func() {
 				Controller:         new(true),
 				BlockOwnerDeletion: new(true),
 			})),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Namespace: ns.Name,
 				Name:      server.Name,
@@ -504,7 +559,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
-			HaveField("Spec.Power", metalv1alpha1.PowerOn),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
@@ -540,7 +595,7 @@ var _ = Describe("Server Controller", func() {
 		_ = zeroCapacity.String()
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", metalv1alpha1.PowerOff),
+			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),

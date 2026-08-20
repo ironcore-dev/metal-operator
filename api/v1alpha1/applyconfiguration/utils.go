@@ -19,14 +19,6 @@ import (
 func ForKind(kind schema.GroupVersionKind) interface{} {
 	switch kind {
 	// Group=metal.ironcore.dev, Version=v1alpha1
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersion"):
-		return &apiv1alpha1.BIOSVersionApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionSpec"):
-		return &apiv1alpha1.BIOSVersionSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionStatus"):
-		return &apiv1alpha1.BIOSVersionStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BIOSVersionTemplate"):
-		return &apiv1alpha1.BIOSVersionTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMC"):
 		return &apiv1alpha1.BMCApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCAccess"):

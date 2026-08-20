@@ -249,7 +249,7 @@ spec:
                 properties:
                   URI:
                     description: URI is the URI of the task created by the BMC for
-                      the BIOS upgrade.
+                      the upgrade.
                     type: string
                   percentageComplete:
                     description: PercentComplete is the percentage of completion of

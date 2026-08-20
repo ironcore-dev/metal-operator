@@ -54,12 +54,11 @@ var (
 	testEnv   *envtest.Environment
 	// MockServerPort and RegistryPort are offset per parallel ginkgo
 	// process so suites running concurrently do not collide on ports.
-	MockServerPort          int32
-	RegistryPort            int
-	registryURL             string
-	mockUpServerBiosVersion = "P79 v1.45 (12/06/2017)"
-	mockUpServerBMCVersion  = "1.45.455b66-rev4"
-	mockServers             []*server.MockServer
+	MockServerPort         int32
+	RegistryPort           int
+	registryURL            string
+	mockUpServerBMCVersion = "1.45.455b66-rev4"
+	mockServers            []*server.MockServer
 )
 
 func TestControllers(t *testing.T) {
@@ -254,23 +253,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BIOSVersionReconciler{
-			Client:             k8sManager.GetClient(),
-			ManagerNamespace:   ns.Name,
-			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
-			SkipCertValidation: true,
-			Scheme:             k8sManager.GetScheme(),
-			ResyncInterval:     10 * time.Millisecond,
-			Conditions:         accessor,
-			BMCOptions: bmc.Options{
-				ResourcePollingInterval: 50 * time.Millisecond,
-				ResourcePollingTimeout:  200 * time.Millisecond,
-				PowerPollingInterval:    50 * time.Millisecond,
-				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
-			},
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
 		Expect((&BMCSettingsReconciler{
 			Client:             k8sManager.GetClient(),
 			ManagerNamespace:   ns.Name,
@@ -396,7 +378,6 @@ func EnsureCleanState(ctx context.Context) {
 		&metalv1alpha1.BMCSettingsList{},
 		&metalv1alpha1.BMCVersionSetList{},
 		&metalv1alpha1.BMCVersionList{},
-		&metalv1alpha1.BIOSVersionList{},
 		&metalv1alpha1.ServerClaimList{},
 		&metalv1alpha1.ServerMaintenanceList{},
 		&metalv1alpha1.ServerList{},

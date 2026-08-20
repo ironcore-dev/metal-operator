@@ -349,7 +349,7 @@ var _ = Describe("BMCVersion Controller", func() {
 		By("Deleting the BMCVersion")
 		Expect(k8sClient.Delete(ctx, bmcVersion)).To(Succeed())
 
-		By("Ensuring that the BiosVersion has been removed")
+		By("Ensuring that the BMCVersion has been removed")
 		Eventually(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 		Consistently(Get(bmcVersion)).Should(Satisfy(apierrors.IsNotFound))
 
@@ -640,7 +640,7 @@ var _ = Describe("BMCVersion Controller", func() {
 
 func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersion *metalv1alpha1.BMCVersion) {
 	GinkgoHelper()
-	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeIssued'")
+	By("Ensuring that the VersionUpgradeIssued condition has reached its expected state")
 	condIssue := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
@@ -659,7 +659,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 		g.Expect(bmcVersion.Status.UpgradeTask.URI).To(Equal(bmc.DummyMockTaskForUpgrade))
 	}).Should(Succeed())
 
-	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeCompleted'")
+	By("Ensuring that the VersionUpgradeCompleted condition has reached its expected state")
 	condComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(Get(bmcVersion)()).To(Succeed())
@@ -671,7 +671,7 @@ func ensureBMCVersionConditionTransition(acc *conditionutils.Accessor, bmcVersio
 		return condComplete.Status == metav1.ConditionTrue
 	}).Should(BeTrue())
 
-	By("Ensuring that BMC Conditions have reached expected state 'biosVersionUpgradeVerificationCondition'")
+	By("Ensuring that the VersionUpgradeVerification condition has reached its expected state")
 	verificationComplete := &metav1.Condition{}
 	Eventually(func(g Gomega) int {
 		g.Expect(Get(bmcVersion)()).To(Succeed())

@@ -11,7 +11,6 @@ Package v1alpha1 contains API Schema definitions for the metal.ironcore.dev API 
 Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API group.
 
 ### Resource Types
-- [BIOSVersion](#biosversion)
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCSettings](#bmcsettings)
@@ -26,108 +25,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [ServerMaintenance](#servermaintenance)
 - [ServerReadinessRule](#serverreadinessrule)
 
-
-
-#### BIOSVersion
-
-
-
-BIOSVersion is the Schema for the biosversions API.
-
-Deprecated: The BIOSVersion resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BIOSVersion` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BIOSVersionSpec](#biosversionspec)_ |  |  |  |
-| `status` _[BIOSVersionStatus](#biosversionstatus)_ |  |  |  |
-
-
-#### BIOSVersionSpec
-
-
-
-BIOSVersionSpec defines the desired state of BIOSVersion.
-
-
-
-_Appears in:_
-- [BIOSVersion](#biosversion)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the controller has requested for the referred server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to apply the BIOS upgrade on. |  |  |
-
-
-#### BIOSVersionState
-
-_Underlying type:_ _string_
-
-
-
-
-
-_Appears in:_
-- [BIOSVersionStatus](#biosversionstatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | BIOSVersionStatePending specifies that the BIOS upgrade is waiting.<br /> |
-| `InProgress` | BIOSVersionStateInProgress specifies that upgrading BIOS is in progress.<br /> |
-| `Completed` | BIOSVersionStateCompleted specifies that the BIOS upgrade has been completed.<br /> |
-| `Failed` | BIOSVersionStateFailed specifies that the BIOS upgrade has failed.<br /> |
-
-
-#### BIOSVersionStatus
-
-
-
-BIOSVersionStatus defines the observed state of BIOSVersion.
-
-
-
-_Appears in:_
-- [BIOSVersion](#biosversion)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `state` _[BIOSVersionState](#biosversionstate)_ | State represents the current state of the BIOS upgrade task. |  |  |
-| `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the Upgrade Task created by the BMC |  |  |
-| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
-| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BIOS version upgrade state. |  |  |
-
-
-#### BIOSVersionTemplate
-
-
-
-
-
-
-
-_Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BIOS version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BIOS version. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
 
 
 #### BMC
@@ -849,8 +746,6 @@ _Appears in:_
 
 
 _Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
-- [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 
@@ -1005,7 +900,6 @@ ObjectReference is the namespaced name reference to an object.
 
 
 _Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
 - [BMCVersionSpec](#bmcversionspec)
 - [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
@@ -1139,8 +1033,6 @@ RetryPolicy defines the retry behavior on transient failures.
 
 
 _Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
-- [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
 - [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
@@ -1347,8 +1239,6 @@ ServerMaintenancePolicy specifies the maintenance policy to be enforced on the s
 
 
 _Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
-- [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCSettingsSpec](#bmcsettingsspec)
 - [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
@@ -1729,17 +1619,16 @@ _Appears in:_
 
 
 
-Task contains the status of the task created by the BMC for the BIOS upgrade.
+
 
 
 
 _Appears in:_
-- [BIOSVersionStatus](#biosversionstatus)
 - [BMCVersionStatus](#bmcversionstatus)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `URI` _string_ | URI is the URI of the task created by the BMC for the BIOS upgrade. |  |  |
+| `URI` _string_ | URI is the URI of the task created by the BMC for the upgrade. |  |  |
 | `state` _[TaskState](#taskstate)_ | State is the current state of the task. |  |  |
 | `status` _[Health](#health)_ | Status is the current status of the task. |  |  |
 | `percentageComplete` _integer_ | PercentComplete is the percentage of completion of the task. |  |  |
@@ -1792,8 +1681,6 @@ _Underlying type:_ _string_
 
 
 _Appears in:_
-- [BIOSVersionSpec](#biosversionspec)
-- [BIOSVersionTemplate](#biosversiontemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 

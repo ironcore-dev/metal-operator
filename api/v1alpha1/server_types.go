@@ -103,10 +103,10 @@ type ServerSpec struct {
 	// Deprecated: This field is an internal actuator variable exposed as
 	// user-facing API. It is written almost exclusively by controllers
 	// (the ServerReconciler while traversing the state machine, and the
-	// ServerClaim/ServerMaintenance reconcilers as surrogate input), and
+	// ServerClaim reconciler as surrogate input), and
 	// every write patches the Server object, racing with its actual owner.
 	// The desired power state is expressed more precisely through
-	// ServerClaim, ServerMaintenance, and the server state machine itself;
+	// ServerClaim and the server state machine itself;
 	// the genuinely observed value is status.powerState. Do not set this
 	// field on new Server resources; it will be removed in a future release.
 	// +optional
@@ -130,10 +130,6 @@ type ServerSpec struct {
 	// +optional
 	ServerClaimRef *ImmutableObjectReference `json:"serverClaimRef,omitempty"`
 
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
-	// +optional
-	ServerMaintenanceRef *ObjectReference `json:"serverMaintenanceRef,omitempty"`
-
 	// BMCRef is a reference to the BMC object associated with this server.
 	// +optional
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
@@ -146,11 +142,6 @@ type ServerSpec struct {
 	// the boot configuration for this server.
 	// +optional
 	BootConfigurationRef *ObjectReference `json:"bootConfigurationRef,omitempty"`
-
-	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-	// the boot configuration for this server during maintenance.
-	// +optional
-	MaintenanceBootConfigurationRef *ObjectReference `json:"maintenanceBootConfigurationRef,omitempty"`
 
 	// BootOrder specifies the boot order of the server.
 	// +optional
@@ -188,9 +179,6 @@ const (
 
 	// ServerStateError indicates that there is an error with the server.
 	ServerStateError ServerState = "Error"
-
-	// ServerStateMaintenance indicates that the server is in maintenance.
-	ServerStateMaintenance ServerState = "Maintenance"
 
 	// ServerStateParked indicates that the server is parked out of the ServerClaim lifecycle so an
 	// external component can run out-of-band day-2 operations. Parked is an overlay state: while

@@ -141,43 +141,10 @@ func (r *ServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ServerReconciler) reconcileExists(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
-	if r.shouldDelete(ctx, server) {
+	if !server.DeletionTimestamp.IsZero() {
 		return r.delete(ctx, server)
 	}
 	return r.reconcile(ctx, server)
-}
-
-func (r *ServerReconciler) shouldDelete(ctx context.Context, server *metalv1alpha1.Server) bool {
-	log := ctrl.LoggerFrom(ctx)
-	if server.DeletionTimestamp.IsZero() {
-		return false
-	}
-
-	if controllerutil.ContainsFinalizer(server, ServerFinalizer) &&
-		server.Status.State == metalv1alpha1.ServerStateMaintenance {
-		if server.Spec.BMCRef != nil {
-			b := &metalv1alpha1.BMC{}
-			bmcName := server.Spec.BMCRef.Name
-			if err := r.Get(ctx, client.ObjectKey{Name: bmcName}, b); err != nil {
-				if apierrors.IsNotFound(err) {
-					log.V(1).Info("BMC not found, proceeding with deletion", "BMC", bmcName, "Server", server.Name)
-					return true
-				}
-			}
-		}
-		if server.Spec.BMC != nil {
-			// Without credentials the maintenance can never be finished or unwound;
-			// do not block deletion forever on a missing BMCSecret.
-			secretName := server.Spec.BMC.BMCSecretRef.Name
-			if err := r.Get(ctx, client.ObjectKey{Name: secretName}, &metalv1alpha1.BMCSecret{}); apierrors.IsNotFound(err) {
-				log.V(1).Info("BMCSecret not found, proceeding with deletion", "BMCSecret", secretName, "Server", server.Name)
-				return true
-			}
-		}
-		log.V(1).Info("Postponing delete as server is in Maintenance state")
-		return false
-	}
-	return true
 }
 
 func (r *ServerReconciler) delete(ctx context.Context, server *metalv1alpha1.Server) (ctrl.Result, error) {
@@ -262,12 +229,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	}
 	log.V(1).Info("Ensured finalizer has been added")
 
-	if server.Status.State != metalv1alpha1.ServerStateInitial && server.Spec.ServerMaintenanceRef != nil {
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateMaintenance); err != nil || modified {
-			return ctrl.Result{}, err
-		}
-	}
-
 	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
 	}
@@ -315,9 +276,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 // A tainted Server needs to be sanitized (clean up disks etc.). This is done in a similar way as in the
 // initial state where the server reconciler will create a BootConfiguration and an Ignition secret to
 // boot the server with a cleanup agent. This agent has also an endpoint to report its health state.
-//
-// Maintenance:
-// A Maintenance state represents a special case where certain operations like BIOS updates should be performed.
 func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	switch server.Status.State {
 	case metalv1alpha1.ServerStateInitial:
@@ -330,8 +288,6 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcC
 		return r.handleReservedState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateReleased:
 		return r.handleReleasedState(ctx, bmcClient, server)
-	case metalv1alpha1.ServerStateMaintenance:
-		return r.handleMaintenanceState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateParked:
 		return r.resumeParkedServer(ctx, bmcClient, server)
 	default:
@@ -626,98 +582,6 @@ func (r *ServerReconciler) handleReleasedState(ctx context.Context, bmcClient bm
 
 	log.V(1).Info("ServerClaimRef is gone, transitioning server to available state")
 	return r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable)
-}
-
-func (r *ServerReconciler) hasPendingMaintenances(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	maintenanceList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := r.List(ctx, maintenanceList, client.MatchingFields{serverRefField: server.Name}); err != nil {
-		return false, fmt.Errorf("failed to list ServerMaintenances: %w", err)
-	}
-
-	var pendingOwnerApproval bool
-	for i := range maintenanceList.Items {
-		m := &maintenanceList.Items[i]
-		if !m.DeletionTimestamp.IsZero() {
-			continue
-		}
-		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyEnforced {
-			return true, nil
-		}
-		if m.Spec.Policy == metalv1alpha1.ServerMaintenancePolicyOwnerApproval {
-			pendingOwnerApproval = true
-		}
-	}
-
-	if pendingOwnerApproval {
-		if server.Spec.ServerClaimRef == nil {
-			return true, nil
-		}
-		serverClaim := &metalv1alpha1.ServerClaim{}
-		if err := r.Get(ctx, client.ObjectKey{Name: server.Spec.ServerClaimRef.Name, Namespace: server.Spec.ServerClaimRef.Namespace}, serverClaim); err != nil {
-			if apierrors.IsNotFound(err) {
-				return false, nil
-			}
-			return false, fmt.Errorf("failed to get ServerClaim: %w", err)
-		}
-		if _, hasApproval := serverClaim.Labels[metalv1alpha1.ServerMaintenanceApprovedLabelKey]; hasApproval {
-			return true, nil
-		}
-	}
-
-	return false, nil
-}
-
-func (r *ServerReconciler) handleMaintenanceState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if ref := server.Spec.ServerMaintenanceRef; ref != nil {
-		// A maintenance holding the ref may have been deleted out of band
-		// (e.g. finalizer removed). Clear the dangling ref so the server can
-		// leave Maintenance state; pending maintenances take over afterwards.
-		if _, err := GetServerMaintenanceForObjectReference(ctx, r.Client, ref); err != nil {
-			if !apierrors.IsNotFound(err) {
-				return false, fmt.Errorf("failed to get ServerMaintenance referenced by Server: %w", err)
-			}
-			log.V(1).Info("ServerMaintenanceRef points to a deleted ServerMaintenance, clearing ref", "Server", server.Name, "ServerMaintenance", ref.Name)
-			serverBase := server.DeepCopy()
-			server.Spec.ServerMaintenanceRef = nil
-			if err := r.Patch(ctx, server, client.MergeFromWithOptions(serverBase, client.MergeFromWithOptimisticLock{})); err != nil {
-				return false, fmt.Errorf("failed to clear dangling ServerMaintenance ref: %w", err)
-			}
-		}
-	}
-	if server.Spec.ServerMaintenanceRef == nil {
-		hasPending, err := r.hasPendingMaintenances(ctx, server)
-		if err != nil {
-			return false, fmt.Errorf("failed to check pending maintenances: %w", err)
-		}
-		if hasPending {
-			log.V(1).Info("Other maintenances are pending, staying in Maintenance state", "Server", server.Name)
-			if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
-				return false, fmt.Errorf("failed to update server status system info between maintenances: %w", err)
-			}
-			return false, nil
-		}
-
-		log.V(1).Info("Server is in Maintenance state, but no ServerMaintenanceRef is set, transitioning back to previous state")
-		// update system info in case the server was changed during Maintenance state (hardwere changes, biosVersion etc.)
-		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
-			return false, fmt.Errorf("failed to update server status system info: %w", err)
-		}
-		if server.Spec.ServerClaimRef == nil {
-			return r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial)
-		}
-		return r.patchServerState(ctx, server, metalv1alpha1.ServerStateReserved)
-	}
-	maintenance, err := GetServerMaintenanceForObjectReference(ctx, r.Client, server.Spec.ServerMaintenanceRef)
-	if err != nil {
-		return false, fmt.Errorf("failed to get ServerMaintenance for server: %w", err)
-	}
-	if err := r.ensureServerPowerState(ctx, bmcClient, server, maintenance.Spec.ServerPower); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
-	}
-
-	log.V(1).Info("Reconciled maintenance state")
-	return false, nil
 }
 
 func (r *ServerReconciler) handleAnnotationOperations(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
@@ -1549,10 +1413,6 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			&metalv1alpha1.ServerClaim{},
 			r.enqueueServerByClaim(),
 		).
-		Watches(
-			&metalv1alpha1.ServerMaintenance{},
-			r.enqueueServerByMaintenance(),
-		).
 		Complete(r)
 }
 
@@ -1590,20 +1450,6 @@ func (r *ServerReconciler) enqueueServerByClaim() handler.EventHandler {
 		return []ctrl.Request{
 			{
 				NamespacedName: types.NamespacedName{Name: claim.Spec.ServerRef.Name},
-			},
-		}
-	})
-}
-
-func (r *ServerReconciler) enqueueServerByMaintenance() handler.EventHandler {
-	return handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []ctrl.Request {
-		maintenance := obj.(*metalv1alpha1.ServerMaintenance)
-		if maintenance.Spec.ServerRef == nil {
-			return nil
-		}
-		return []ctrl.Request{
-			{
-				NamespacedName: types.NamespacedName{Name: maintenance.Spec.ServerRef.Name},
 			},
 		}
 	})

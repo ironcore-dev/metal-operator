@@ -15,10 +15,7 @@ import (
 )
 
 var _ = Describe("Server Webhook", func() {
-	var (
-		server    *metalv1alpha1.Server
-		validator ServerCustomValidator
-	)
+	var server *metalv1alpha1.Server
 
 	BeforeEach(func() {
 		server = &metalv1alpha1.Server{
@@ -37,7 +34,6 @@ var _ = Describe("Server Webhook", func() {
 			},
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		validator = ServerCustomValidator{Client: k8sClient}
 		SetClient(k8sClient)
 		By("Creating a Server")
 	})
@@ -45,25 +41,6 @@ var _ = Describe("Server Webhook", func() {
 	AfterEach(func(ctx context.Context) {
 		By("Deleting the server")
 		Expect(k8sClient.DeleteAllOf(ctx, server)).To(Succeed())
-	})
-
-	Context("When deleting Server under Validating Webhook", func() {
-		It("should refuse to delete if in Maintenance", func() {
-			By("Patching the server to a maintenance state and adding finalizer")
-			Eventually(UpdateStatus(server, func() {
-				server.Status.State = metalv1alpha1.ServerStateMaintenance
-			})).Should(Succeed())
-
-			By("Deleting the Server should not pass")
-			Expect(validator.ValidateDelete(ctx, server)).Error().To(HaveOccurred())
-
-			By("Patching the server to have force delete annotation")
-			Eventually(Update(server, func() {
-				server.Annotations = map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationForceUpdateOrDeleteInProgress,
-				}
-			})).Should(Succeed())
-		})
 	})
 
 	Context("When updating ServerClaimRef under CEL validation", func() {

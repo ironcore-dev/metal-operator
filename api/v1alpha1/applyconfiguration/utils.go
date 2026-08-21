@@ -67,20 +67,12 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ServerBootConfigurationSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerBootConfigurationStatus"):
 		return &apiv1alpha1.ServerBootConfigurationStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ServerBootConfigurationTemplate"):
-		return &apiv1alpha1.ServerBootConfigurationTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerClaim"):
 		return &apiv1alpha1.ServerClaimApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerClaimSpec"):
 		return &apiv1alpha1.ServerClaimSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerClaimStatus"):
 		return &apiv1alpha1.ServerClaimStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenance"):
-		return &apiv1alpha1.ServerMaintenanceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceSpec"):
-		return &apiv1alpha1.ServerMaintenanceSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceStatus"):
-		return &apiv1alpha1.ServerMaintenanceStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerReadinessRule"):
 		return &apiv1alpha1.ServerReadinessRuleApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerReadinessRuleSpec"):

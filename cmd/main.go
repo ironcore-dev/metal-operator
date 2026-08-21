@@ -493,13 +493,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "serverclaim")
 		os.Exit(1)
 	}
-	if err = (&controller.ServerMaintenanceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "servermaintenance")
-		os.Exit(1)
-	}
 	if err = (&controller.BMCUserReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),

@@ -20,7 +20,6 @@ var AllServerStates = []metalv1alpha1.ServerState{
 	metalv1alpha1.ServerStateAvailable,
 	metalv1alpha1.ServerStateReserved,
 	metalv1alpha1.ServerStateError,
-	metalv1alpha1.ServerStateMaintenance,
 }
 
 // AllServerPowerStates defines all possible server power states for enum metrics

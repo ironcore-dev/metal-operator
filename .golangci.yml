@@ -56,12 +56,6 @@ linters:
           - dupl
           - lll
         path: bmc/*
-      # ServerMaintenance is deprecated. The operator still serves and reconciles the
-      # existing resources, so these legacy consumers reference the type until it is
-      # fully removed.
-      - linters:
-          - staticcheck
-        text: "SA1019.*metalv1alpha1\\.(ServerMaintenance)\\b"
       # The BMCUser resource is deprecated (see issue #1033). The operator still
       # serves and reconciles existing BMCUser objects, so these legacy consumers
       # reference the type until the resource is fully removed.
@@ -82,16 +76,11 @@ linters:
         text: "SA1019.*\\.EndpointRef is deprecated"
       # Server.spec.power is deprecated. The field is an internal
       # actuator variable that controllers still write while traversing the state machine
-      # and as surrogate input from ServerClaim/ServerMaintenance. Legacy access remains
+      # and as surrogate input from ServerClaim. Legacy access remains
       # until the field is fully removed in a future release.
       - linters:
           - staticcheck
         text: "SA1019.*server\\.Spec\\.Power is deprecated"
-      # BMC.spec.bmcSettingsRef is deprecated. Legacy consumers still
-      # reference it until the field is fully removed.
-      - linters:
-          - staticcheck
-        text: "SA1019.*\\.BMCSettingRef is deprecated"
     paths:
       - builtin$
       - examples$

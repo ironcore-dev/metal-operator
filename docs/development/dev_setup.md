@@ -81,39 +81,26 @@ By default, Tilt runs against a local Redfish mock server. To point the environm
 
 Before connecting a real BMC to your local Tilt environment, make sure it is not actively reconciled by another `metal-operator` instance to avoid conflicts. Some common ways to achieve this:
 
-- **ServerMaintenance**: Create a `ServerMaintenance` resource on the production cluster to claim the server and optionally power it off.
+- **Parking**: Request the `Parked` state on the production cluster so reconcilers stand down and the server is powered off.
 - **Exclude from automation**: Remove the server from the production `metal-operator`'s scope, for example via label selectors or namespace isolation, so it is no longer reconciled.
 - **Decommission temporarily**: If the server is not in active use, you can power it off or disconnect it from the production cluster before testing.
 
 > **Note:** Refer to your production cluster's runbooks for the appropriate procedure.
 
-If you use the `ServerMaintenance` approach, apply a manifest like this on the cluster that currently owns the server:
-
-```yaml
-apiVersion: metal.ironcore.dev/v1alpha1
-kind: ServerMaintenance
-metadata:
-  name: <maintenance-name>
-  namespace: default
-  annotations:
-    metal.ironcore.dev/maintenance-reason: '<maintenance-name>'
-spec:
-  policy: Enforced
-  serverRef:
-    name: <server-name>
-  serverPower: 'Off'
-```
+If you use the parking approach, request it on the cluster that currently owns the server:
 
 ```shell
 # Run against the remote cluster
-kubectl apply -f servermaintenance-<node-name>.yaml
+kubectl annotate server <server-name> metal.ironcore.dev/operation=park
 ```
+
+Wait until `status.state` reports `Parked` (the server is powered off as part of parking).
 
 To release the server back when done:
 
 ```shell
 # Run against the remote cluster
-kubectl delete -f servermaintenance-<node-name>.yaml
+kubectl annotate server <server-name> metal.ironcore.dev/operation=unpark
 ```
 
 > **Note:** All `kubectl` commands from this point on target the **local** Kind cluster.

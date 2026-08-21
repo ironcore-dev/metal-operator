@@ -45,7 +45,6 @@ rules:
   - serverbootconfigurations
   - serverclaims
   - serverconfigurations
-  - servermaintenances
   - serverreadinessrules
   - servers
   verbs:
@@ -65,7 +64,6 @@ rules:
   - endpoints/finalizers
   - serverbootconfigurations/finalizers
   - serverclaims/finalizers
-  - servermaintenances/finalizers
   - serverreadinessrules/finalizers
   - servers/finalizers
   verbs:
@@ -79,7 +77,6 @@ rules:
   - endpoints/status
   - serverbootconfigurations/status
   - serverclaims/status
-  - servermaintenances/status
   - serverreadinessrules/status
   - servers/status
   verbs:

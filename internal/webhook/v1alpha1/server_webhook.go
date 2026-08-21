@@ -5,7 +5,6 @@ package v1alpha1
 
 import (
 	"context"
-	"fmt"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,9 +45,5 @@ func (v *ServerCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newO
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Server.
 func (v *ServerCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.Server) (admission.Warnings, error) {
 	serverlog.Info("Validation for Server upon deletion", "name", obj.GetName())
-
-	if obj.Status.State == metalv1alpha1.ServerStateMaintenance && !ShouldAllowForceDeleteInProgress(obj) {
-		return nil, fmt.Errorf("cannot delete Server %s in state %s", obj.GetName(), obj.Status.State)
-	}
 	return nil, nil
 }

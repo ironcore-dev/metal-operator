@@ -156,7 +156,6 @@ var _ = Describe("ServerStateCollector", func() {
 		Expect(stateMetrics[stateKey{server: "server1", state: "Available"}]).To(Equal(1.0))
 		Expect(stateMetrics[stateKey{server: "server1", state: "Reserved"}]).To(Equal(0.0))
 		Expect(stateMetrics[stateKey{server: "server1", state: "Error"}]).To(Equal(0.0))
-		Expect(stateMetrics[stateKey{server: "server1", state: "Maintenance"}]).To(Equal(0.0))
 
 		// server2 is Available
 		Expect(stateMetrics[stateKey{server: "server2", state: "Available"}]).To(Equal(1.0))
@@ -167,7 +166,7 @@ var _ = Describe("ServerStateCollector", func() {
 		Expect(stateMetrics[stateKey{server: "server3", state: "Reserved"}]).To(Equal(1.0))
 
 		// Total: 3 servers × 6 states = 18 state metrics
-		Expect(stateMetrics).To(HaveLen(18))
+		Expect(stateMetrics).To(HaveLen(15))
 	})
 
 	It("should emit enum metrics for all power states per server", func(ctx SpecContext) {
@@ -365,6 +364,6 @@ var _ = Describe("ServerStateCollector", func() {
 		// All states should be 0 since no state is set
 		Expect(stateMetrics[stateKey{server: "server1", state: "Initial"}]).To(Equal(0.0))
 		Expect(stateMetrics[stateKey{server: "server1", state: "Available"}]).To(Equal(0.0))
-		Expect(stateMetrics).To(HaveLen(6)) // All 6 states emitted
+		Expect(stateMetrics).To(HaveLen(5)) // All 5 states emitted
 	})
 })

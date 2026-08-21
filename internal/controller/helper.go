@@ -155,14 +155,6 @@ func isResetAnnotation(operation string) bool {
 	return ok
 }
 
-func isParkableState(state metalv1alpha1.ServerState) bool {
-	switch state {
-	case metalv1alpha1.ServerStateAvailable, metalv1alpha1.ServerStateReserved:
-		return true
-	}
-	return false
-}
-
 // shouldChildIgnoreReconciliation checks if the object Child should ignore reconciliation.
 // if Parent has OperationAnnotation set to ignore-child, Child should also ignore reconciliation.
 func shouldChildIgnoreReconciliation(parentObj client.Object) bool {

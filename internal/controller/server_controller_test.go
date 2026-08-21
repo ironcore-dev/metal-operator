@@ -1316,6 +1316,7 @@ passwd:
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
 				HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.PreParkStateAnnotation, string(metalv1alpha1.ServerStateAvailable))),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 			))
 
@@ -1328,6 +1329,7 @@ passwd:
 			Eventually(Object(server)).Should(SatisfyAll(
 				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.PreParkStateAnnotation))),
 			))
 
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
@@ -1364,6 +1366,7 @@ passwd:
 				HaveField("Status.State", metalv1alpha1.ServerStateParked),
 				HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.PreParkStateAnnotation, string(metalv1alpha1.ServerStateReserved))),
 			))
 			Eventually(Object(claim)).Should(HaveField("Status.Phase", metalv1alpha1.PhaseBound))
 
@@ -1412,7 +1415,7 @@ passwd:
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		})
 
-		It("should fall back to available on resume if the ServerClaimRef is gone while parked", func(ctx SpecContext) {
+		It("should resume via the stored pre-park state and settle available if the ServerClaimRef is gone while parked", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 
 			By("Driving the Server to available state and claiming it")
@@ -1447,8 +1450,44 @@ passwd:
 				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
 			})).Should(Succeed())
 
-			By("Ensuring the server resumes to available (not reserved) since the claim ref is gone")
-			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
+			By("Ensuring the server resumes and finally settles to available since the claim ref is gone")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.PreParkStateAnnotation))),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
+
+		It("should park a server in discovery state and resume to discovery", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to discovery state")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateDiscovery
+			})).Should(Succeed())
+
+			park(server)
+
+			By("Ensuring the server is parked and the pre-park state is recorded")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateParked),
+				HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.ParkedAnnotation, Not(BeEmpty()))),
+				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.PreParkStateAnnotation, string(metalv1alpha1.ServerStateDiscovery))),
+			))
+
+			By("Requesting unpark to resume")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
+			})).Should(Succeed())
+
+			By("Ensuring the server resumes to discovery and the pre-park annotation is removed")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.PreParkStateAnnotation))),
+			))
 
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
@@ -1535,17 +1574,20 @@ passwd:
 		It("should defer a park request on a non-parkable state and park once parkable", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 
-			By("Ensuring the server reaches Discovery (a non-parkable state)")
-			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+			By("Driving the Server to Error (a stable non-parkable state)")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateError
+			})).Should(Succeed())
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateError))
 
-			By("Requesting the server to be parked while still in Discovery")
+			By("Requesting the server to be parked while still in Error")
 			Eventually(Update(server, func() {
 				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
 			})).Should(Succeed())
 
 			By("Ensuring the server is not parked and the request is left in place")
 			Consistently(Object(server)).Should(SatisfyAll(
-				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+				HaveField("Status.State", metalv1alpha1.ServerStateError),
 				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.ParkedAnnotation))),
 			))

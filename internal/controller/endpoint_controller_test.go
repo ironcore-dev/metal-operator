@@ -34,6 +34,11 @@ var _ = Describe("Endpoints Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
 
+		By("Ensuring that the Endpoint has the finalizer set")
+		Eventually(Object(endpoint)).Should(
+			HaveField("ObjectMeta.Finalizers", ContainElement(endpointFinalizer)),
+		)
+
 		By("Ensuring that the BMC secret has been created")
 		bmcSecret := &metalv1alpha1.BMCSecret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -41,14 +46,7 @@ var _ = Describe("Endpoints Controller", func() {
 			},
 		}
 		Eventually(Object(bmcSecret)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "Endpoint",
-				Name:               endpoint.Name,
-				UID:                endpoint.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Data", Equal(map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -61,14 +59,7 @@ var _ = Describe("Endpoints Controller", func() {
 			},
 		}
 		Eventually(Object(bmcObj)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "Endpoint",
-				Name:               endpoint.Name,
-				UID:                endpoint.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Spec.EndpointRef.Name", Equal(endpoint.Name)),
 			HaveField("Spec.BMCSecretRef.Name", Equal(bmcObj.Name)),
 			HaveField("Spec.Protocol", metalv1alpha1.Protocol{
@@ -93,8 +84,80 @@ var _ = Describe("Endpoints Controller", func() {
 		By("Cleaning up the created Endpoint")
 		Expect(k8sClient.Delete(ctx, endpoint)).To(Succeed())
 
-		By("Ensuring that all subsequent objects have been removed")
+		By("Ensuring that the Endpoint has been removed")
 		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Ensuring that the BMC and BMCSecret objects are not garbage collected with the Endpoint")
+		Consistently(Get(bmcObj)).Should(Succeed())
+		Consistently(Get(bmcSecret)).Should(Succeed())
+
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcObj))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
+		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
+	})
+
+	It("should remove legacy Endpoint owner references from BMC and BMCSecret on deletion", func(ctx SpecContext) {
+		By("Creating an Endpoints object")
+		endpoint := &metalv1alpha1.Endpoint{
+			ObjectMeta: metav1.ObjectMeta{
+				GenerateName: "test-endpoint-",
+			},
+			Spec: metalv1alpha1.EndpointSpec{
+				MACAddress: "23:11:8A:33:CF:EA",
+				IP:         metalv1alpha1.MustParseIP(MockServerIP),
+			},
+		}
+		Expect(k8sClient.Create(ctx, endpoint)).To(Succeed())
+
+		By("Ensuring that the BMC and BMCSecret have been created")
+		bmcObj := &metalv1alpha1.BMC{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: endpoint.Name,
+			},
+		}
+		bmcSecret := &metalv1alpha1.BMCSecret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: endpoint.Name,
+			},
+		}
+		Eventually(Get(bmcObj)).Should(Succeed())
+		Eventually(Get(bmcSecret)).Should(Succeed())
+
+		By("Adding legacy Endpoint owner references to BMC and BMCSecret")
+		legacyOwnerRef := metav1.OwnerReference{
+			APIVersion:         metalv1alpha1.GroupVersion.String(),
+			Kind:               "Endpoint",
+			Name:               endpoint.Name,
+			UID:                endpoint.UID,
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
+		}
+		for _, obj := range []client.Object{bmcObj, bmcSecret} {
+			Eventually(func() error {
+				if err := k8sClient.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
+					return err
+				}
+				obj.SetOwnerReferences(append(obj.GetOwnerReferences(), legacyOwnerRef))
+				return k8sClient.Update(ctx, obj)
+			}).Should(Succeed())
+		}
+
+		By("Deleting the Endpoint")
+		Expect(k8sClient.Delete(ctx, endpoint)).To(Succeed())
+		Eventually(Get(endpoint)).Should(Satisfy(apierrors.IsNotFound))
+
+		By("Ensuring the BMC and BMCSecret survived without Endpoint owner references")
+		Consistently(Get(bmcObj)).Should(Succeed())
+		Consistently(Get(bmcSecret)).Should(Succeed())
+		Eventually(Object(bmcObj)).Should(HaveField("OwnerReferences", BeEmpty()))
+		Eventually(Object(bmcSecret)).Should(HaveField("OwnerReferences", BeEmpty()))
+
+		By("Cleaning up the created objects")
+		server := &metalv1alpha1.Server{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
+			},
+		}
 		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcObj))).To(Succeed())
 		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
 		Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())

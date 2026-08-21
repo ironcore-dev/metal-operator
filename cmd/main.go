@@ -500,26 +500,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "servermaintenance")
 		os.Exit(1)
 	}
-	if err = (&controller.BMCVersionReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		ManagerNamespace:   managerNamespace,
-		DefaultProtocol:    effectiveProtocol,
-		SkipCertValidation: effectiveSkipCert,
-		ResyncInterval:     maintenanceResyncInterval,
-		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "bmcversion")
-		os.Exit(1)
-	}
 	if err = (&controller.BMCUserReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -573,12 +553,6 @@ func main() { // nolint: gocyclo
 	}
 	// nolint:goconst
 	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcversion")
-			os.Exit(1)
-		}
-	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "Failed to set up health check")

@@ -14,7 +14,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCUser](#bmcuser)
-- [BMCVersion](#bmcversion)
 - [Endpoint](#endpoint)
 - [Server](#server)
 - [ServerBootConfiguration](#serverbootconfiguration)
@@ -232,108 +231,6 @@ _Appears in:_
 | `id` _string_ | ID is the identifier of the user in the BMC system. |  |  |
 
 
-#### BMCVersion
-
-
-
-BMCVersion is the Schema for the bmcversions API.
-
-Deprecated: The BMCVersion resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BMCVersion` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BMCVersionSpec](#bmcversionspec)_ |  |  |  |
-| `status` _[BMCVersionStatus](#bmcversionstatus)_ |  |  |  |
-
-
-#### BMCVersionSpec
-
-
-
-BMCVersionSpec defines the desired state of BMCVersion.
-
-
-
-_Appears in:_
-- [BMCVersion](#bmcversion)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
-| `serverMaintenanceRefs` _[ObjectReference](#objectreference) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects that the controller has requested for the related servers. |  |  |
-| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply BMC upgrade on. |  |  |
-
-
-#### BMCVersionState
-
-_Underlying type:_ _string_
-
-
-
-
-
-_Appears in:_
-- [BMCVersionStatus](#bmcversionstatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | BMCVersionStatePending specifies that the BMC upgrade is waiting.<br /> |
-| `InProgress` | BMCVersionStateInProgress specifies that upgrading BMC is in progress.<br /> |
-| `Completed` | BMCVersionStateCompleted specifies that the BMC upgrade maintenance has been completed.<br /> |
-| `Failed` | BMCVersionStateFailed specifies that the BMC upgrade maintenance has failed.<br /> |
-
-
-#### BMCVersionStatus
-
-
-
-BMCVersionStatus defines the observed state of BMCVersion.
-
-
-
-_Appears in:_
-- [BMCVersion](#bmcversion)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `state` _[BMCVersionState](#bmcversionstate)_ | State represents the current state of the BMC configuration task. |  |  |
-| `upgradeTask` _[Task](#task)_ | UpgradeTask contains the state of the upgrade task created by the BMC. |  |  |
-| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
-| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC version upgrade state. |  |  |
-
-
-#### BMCVersionTemplate
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC version to upgrade to. |  |  |
-| `updatePolicy` _[UpdatePolicy](#updatepolicy)_ | UpdatePolicy indicates whether the server's upgrade service should bypass vendor update policies. |  |  |
-| `image` _[ImageSpec](#imagespec)_ | Image specifies the image to use to upgrade to the given BMC version. |  |  |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be enforced on the server managed by referred BMC. |  |  |
-
-
 #### BootOrder
 
 
@@ -496,25 +393,6 @@ _Appears in:_
 
 
 
-#### ImageSpec
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
-- [BMCVersionTemplate](#bmcversiontemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `secretRef` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secretreference-v1-core)_ | SecretRef is a reference to the Secret containing the credentials to access the image URI. |  |  |
-| `transferProtocol` _string_ | TransferProtocol is the network protocol used to retrieve the image URI. |  |  |
-| `URI` _string_ | URI is the URI of the software image to install. |  |  |
-
-
 #### ImmutableObjectReference
 
 
@@ -621,7 +499,6 @@ ObjectReference is the namespaced name reference to an object.
 
 
 _Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Default | Validation |
@@ -744,21 +621,6 @@ _Appears in:_
 | `https` | HTTPSProtocolScheme is the https protocol scheme<br /> |
 
 
-#### RetryPolicy
-
-
-
-RetryPolicy defines the retry behavior on transient failures.
-
-
-
-_Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
-- [BMCVersionTemplate](#bmcversiontemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `maxAttempts` _integer_ | MaxAttempts is the maximum number of automatic retry attempts after failure.<br />0 means no automatic retries. Must be between 0 and 10 inclusive.<br />If not set, the operator-level default is used. |  | Maximum: 10 <br />Minimum: 0 <br /> |
 
 
 #### Server
@@ -957,8 +819,6 @@ ServerMaintenancePolicy specifies the maintenance policy to be enforced on the s
 
 
 _Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
-- [BMCVersionTemplate](#bmcversiontemplate)
 - [ServerMaintenanceSpec](#servermaintenancespec)
 
 | Field | Description |
@@ -1315,25 +1175,6 @@ _Appears in:_
 
 
 
-#### Task
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCVersionStatus](#bmcversionstatus)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `URI` _string_ | URI is the URI of the task created by the BMC for the upgrade. |  |  |
-| `state` _[TaskState](#taskstate)_ | State is the current state of the task. |  |  |
-| `status` _[Health](#health)_ | Status is the current status of the task. |  |  |
-| `percentageComplete` _integer_ | PercentComplete is the percentage of completion of the task. |  |  |
-
-
 #### Toleration
 
 
@@ -1370,22 +1211,5 @@ _Appears in:_
 | --- | --- |
 | `Equal` | TolerationOperatorEqual requires that the key and value of the toleration<br />match those of the taint exactly.<br /> |
 | `Exists` | TolerationOperatorExists matches any taint with the specified key,<br />regardless of value.<br /> |
-
-
-#### UpdatePolicy
-
-_Underlying type:_ _string_
-
-
-
-
-
-_Appears in:_
-- [BMCVersionSpec](#bmcversionspec)
-- [BMCVersionTemplate](#bmcversiontemplate)
-
-| Field | Description |
-| --- | --- |
-| `Force` |  |
 
 

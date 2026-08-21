@@ -212,74 +212,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: passwordExpiration
       type:
         namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersion
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSpec
-  map:
-    fields:
-    - name: bmcRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: image
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: serverMaintenanceRefs
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
-          elementRelationship: atomic
-    - name: updatePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
-    - name: version
-      type:
-        scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionState
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
-    - name: failedAttempts
-      type:
-        scalar: numeric
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: state
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionState
-    - name: upgradeTask
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
   map:
     fields:
@@ -355,18 +287,6 @@ var schemaYAML = typed.YAMLObject(`types:
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
   scalar: untyped
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
-  map:
-    fields:
-    - name: URI
-      type:
-        scalar: string
-    - name: secretRef
-      type:
-        namedType: io.k8s.api.core.v1.SecretReference
-    - name: transferProtocol
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
   map:
     fields:
@@ -491,12 +411,6 @@ var schemaYAML = typed.YAMLObject(`types:
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolScheme
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-  map:
-    fields:
-    - name: maxAttempts
-      type:
-        scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Server
   map:
     fields:
@@ -911,21 +825,6 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TaintEffect
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
-  map:
-    fields:
-    - name: URI
-      type:
-        scalar: string
-    - name: percentageComplete
-      type:
-        scalar: numeric
-    - name: state
-      type:
-        namedType: com.github.stmcginnis.gofish.schemas.TaskState
-    - name: status
-      type:
-        namedType: com.github.stmcginnis.gofish.schemas.Health
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Toleration
   map:
     fields:
@@ -943,12 +842,6 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TolerationOperator
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
-  scalar: string
-- name: com.github.stmcginnis.gofish.schemas.Health
-  scalar: string
-- name: com.github.stmcginnis.gofish.schemas.TaskState
-  scalar: string
 - name: io.k8s.api.core.v1.LocalObjectReference
   map:
     fields:
@@ -956,16 +849,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
       default: ""
-    elementRelationship: atomic
-- name: io.k8s.api.core.v1.SecretReference
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
     elementRelationship: atomic
 - name: io.k8s.api.core.v1.SecretType
   scalar: string

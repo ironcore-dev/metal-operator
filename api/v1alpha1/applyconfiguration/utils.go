@@ -35,14 +35,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCUserSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserStatus"):
 		return &apiv1alpha1.BMCUserStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersion"):
-		return &apiv1alpha1.BMCVersionApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersionSpec"):
-		return &apiv1alpha1.BMCVersionSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersionStatus"):
-		return &apiv1alpha1.BMCVersionStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCVersionTemplate"):
-		return &apiv1alpha1.BMCVersionTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BootOrder"):
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConditionRequirement"):
@@ -53,8 +45,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.EndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EndpointSpec"):
 		return &apiv1alpha1.EndpointSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ImageSpec"):
-		return &apiv1alpha1.ImageSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImmutableObjectReference"):
 		return &apiv1alpha1.ImmutableObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("InlineEndpoint"):
@@ -69,8 +59,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ProcessorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Protocol"):
 		return &apiv1alpha1.ProtocolApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("RetryPolicy"):
-		return &apiv1alpha1.RetryPolicyApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Server"):
 		return &apiv1alpha1.ServerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerBootConfiguration"):
@@ -111,8 +99,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.StorageVolumeApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Taint"):
 		return &apiv1alpha1.TaintApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("Task"):
-		return &apiv1alpha1.TaskApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Toleration"):
 		return &apiv1alpha1.TolerationApplyConfiguration{}
 

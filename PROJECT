@@ -74,15 +74,6 @@ resources:
   version: v1alpha1
 - api:
     crdVersion: v1
-    namespaced: true
-  controller: true
-  domain: ironcore.dev
-  group: metal
-  kind: ServerMaintenance
-  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
   controller: true
   domain: ironcore.dev
   group: metal

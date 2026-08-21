@@ -60,11 +60,7 @@ A server undergoes the following phases:
     - The server stays in `Released` until an operator manually clears `spec.serverClaimRef`, at which point it transitions back to `Available`.
     - See [Reclaim Policy](#reclaim-policy) below.
 
-6. **Maintenance**:
-    - Servers in the `Available` state can transition to `Maintenance`.
-    - Maintenance tasks such as BIOS updates or hardware repairs are performed.
-
-7. **Parked**:
+6. **Parked**:
     - An overlay state a server enters when it is **parked** out of the `ServerClaim` lifecycle so an
       external component can run an out-of-band **day-2 operation** (a firmware or BIOS/BMC update,
       hardware rework, diagnostics, or low-level storage reconfiguration) that must not be fought by
@@ -78,7 +74,7 @@ A server undergoes the following phases:
       any other state is deferred until it reaches a parkable state.
     - See [Parking](#parking) below.
 
-8. **Error**:
+7. **Error**:
     - The server has encountered an error.
     - Requires intervention to resolve issues before it can return to `Available`.
 
@@ -90,13 +86,9 @@ stateDiagram-v2
     Initial --> Discovery : Server object created
     Discovery --> Available : Discovery complete
     Available --> Reserved : ServerClaim created
-    Reserved --> Maintenance : Maintenance initiated
-    Maintenance --> Reserved : Maintenance complete
     Reserved --> Available : ServerClaim removed (reclaimPolicy is Recycle)
     Reserved --> Released : ServerClaim removed (reclaimPolicy is Retain)
     Released --> Available : serverClaimRef cleared manually
-    Available --> Maintenance : Maintenance initiated
-    Maintenance --> Initial : Maintenance complete
     Available --> Parked : Park requested
     Reserved --> Parked : Park requested
     Parked --> Available : Unpark requested (no ServerClaimRef)
@@ -105,8 +97,6 @@ stateDiagram-v2
     Reserved --> Error : Error detected
     Discovery --> Error : Error detected
     Released --> Error : Error detected
-    Maintenance --> Error : Error detected
-    Error --> Maintenance : Enter maintenance to fix error
     Error --> Initial : Error resolved
 ```
 
@@ -268,7 +258,7 @@ and the parked marker stay the same regardless of how the request arrives.
 ### Admission control
 
 Parking is admitted only from the `Available` and `Reserved` states, the in-use states. A `park`
-request on a server in any other state (`Initial`, `Discovery`, `Released`, `Maintenance`, `Error`)
+request on a server in any other state (`Initial`, `Discovery`, `Released`, `Error`)
 is **deferred**: the request annotation is left in place and retried on the next resync, so a server
 that is still discovering (or otherwise not yet parkable) is parked automatically once it reaches a
 parkable state, without the requestor having to re-issue the request.

@@ -9,5 +9,4 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**Server**](/concepts/servers): Represents physical servers, managing their state, power, and configurations.
 - [**ServerClaim**](/concepts/serverclaims): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](/concepts/serverbootconfigurations): Signals the need to prepare the boot environment for a server.
-- [**ServerMaintenance**](/concepts/servermaintenance): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BMCUser**](/concepts/bmcusers): Deprecated. Manages user accounts on a BMC, including credential management and password rotation.

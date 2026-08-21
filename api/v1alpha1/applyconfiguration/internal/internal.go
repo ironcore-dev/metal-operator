@@ -473,15 +473,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationState
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationTemplate
-  map:
-    fields:
-    - name: name
-      type:
-        scalar: string
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationSpec
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaim
   map:
     fields:
@@ -533,56 +524,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: phase
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Phase
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenance
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
-  map:
-    fields:
-    - name: locatorLED
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
-    - name: policy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: priority
-      type:
-        scalar: numeric
-      default: 0
-    - name: serverBootConfigurationTemplate
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerBootConfigurationTemplate
-    - name: serverPower
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
-    - name: serverRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceStatus
-  map:
-    fields:
-    - name: state
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceState
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReadinessRule
@@ -657,9 +598,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: indicatorLED
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
-    - name: maintenanceBootConfigurationRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
     - name: power
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
@@ -670,9 +608,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: serverClaimRef
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
-    - name: serverMaintenanceRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
     - name: systemURI
       type:
         scalar: string

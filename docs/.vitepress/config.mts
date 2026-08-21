@@ -68,7 +68,6 @@ export default withMermaid({
           { text: 'Servers', link: '/concepts/servers' },
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
-          { text: 'ServerMaintenance', link: '/concepts/servermaintenance' },
         ]
       },
       {

@@ -178,21 +178,6 @@ spec:
                 description: IndicatorLED specifies the desired state of the server's
                   indicator LED.
                 type: string
-              maintenanceBootConfigurationRef:
-                description: |-
-                  MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-                  the boot configuration for this server during maintenance.
-                properties:
-                  name:
-                    description: Name is the name of the referenced object.
-                    type: string
-                  namespace:
-                    description: Namespace is the namespace of the referenced object.
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
               power:
                 description: |-
                   Power specifies the desired power state of the server.
@@ -200,10 +185,10 @@ spec:
                   Deprecated: This field is an internal actuator variable exposed as
                   user-facing API. It is written almost exclusively by controllers
                   (the ServerReconciler while traversing the state machine, and the
-                  ServerClaim/ServerMaintenance reconcilers as surrogate input), and
+                  ServerClaim reconciler as surrogate input), and
                   every write patches the Server object, racing with its actual owner.
                   The desired power state is expressed more precisely through
-                  ServerClaim, ServerMaintenance, and the server state machine itself;
+                  ServerClaim and the server state machine itself;
                   the genuinely observed value is status.powerState. Do not set this
                   field on new Server resources; it will be removed in a future release.
                 type: string
@@ -235,20 +220,6 @@ spec:
                     type: string
                     x-kubernetes-validations:
                     - rule: self == oldSelf
-                required:
-                - name
-                - namespace
-                type: object
-              serverMaintenanceRef:
-                description: ServerMaintenanceRef is a reference to a ServerMaintenance
-                  object that maintains this server.
-                properties:
-                  name:
-                    description: Name is the name of the referenced object.
-                    type: string
-                  namespace:
-                    description: Namespace is the namespace of the referenced object.
-                    type: string
                 required:
                 - name
                 - namespace

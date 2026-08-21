@@ -18,7 +18,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [Server](#server)
 - [ServerBootConfiguration](#serverbootconfiguration)
 - [ServerClaim](#serverclaim)
-- [ServerMaintenance](#servermaintenance)
 - [ServerReadinessRule](#serverreadinessrule)
 
 
@@ -420,7 +419,6 @@ IndicatorLED represents LED indicator states
 
 
 _Appears in:_
-- [ServerMaintenanceSpec](#servermaintenancespec)
 - [ServerSpec](#serverspec)
 - [ServerStatus](#serverstatus)
 
@@ -534,7 +532,6 @@ Power defines the possible power states for a device.
 
 _Appears in:_
 - [ServerClaimSpec](#serverclaimspec)
-- [ServerMaintenanceSpec](#servermaintenancespec)
 - [ServerSpec](#serverspec)
 
 | Field | Description |
@@ -671,7 +668,6 @@ ServerBootConfigurationSpec defines the desired state of ServerBootConfiguration
 
 _Appears in:_
 - [ServerBootConfiguration](#serverbootconfiguration)
-- [ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
@@ -713,23 +709,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `state` _[ServerBootConfigurationState](#serverbootconfigurationstate)_ | State represents the current state of the boot configuration. |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the ServerBootConfig's current state. |  |  |
-
-
-#### ServerBootConfigurationTemplate
-
-
-
-ServerBootConfigurationTemplate defines the parameters to be used for rendering a boot configuration.
-
-
-
-_Appears in:_
-- [ServerMaintenanceSpec](#servermaintenancespec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `name` _string_ | Name specifies the name of the boot configuration. |  |  |
-| `spec` _[ServerBootConfigurationSpec](#serverbootconfigurationspec)_ | Spec specifies the boot configuration to be rendered. |  |  |
 
 
 #### ServerClaim
@@ -787,99 +766,6 @@ _Appears in:_
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
 | `phase` _[Phase](#phase)_ | Phase represents the current phase of the server claim. |  |  |
-
-
-#### ServerMaintenance
-
-
-
-ServerMaintenance is the Schema for the ServerMaintenance API
-
-Deprecated: The ServerMaintenance resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `ServerMaintenance` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[ServerMaintenanceSpec](#servermaintenancespec)_ |  |  |  |
-| `status` _[ServerMaintenanceStatus](#servermaintenancestatus)_ |  |  |  |
-
-
-#### ServerMaintenancePolicy
-
-_Underlying type:_ _string_
-
-ServerMaintenancePolicy specifies the maintenance policy to be enforced on the server.
-
-
-
-_Appears in:_
-- [ServerMaintenanceSpec](#servermaintenancespec)
-
-| Field | Description |
-| --- | --- |
-| `OwnerApproval` | ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.<br /> |
-| `Enforced` | ServerMaintenancePolicyEnforced specifies that the maintenance policy is enforced.<br /> |
-
-
-#### ServerMaintenanceSpec
-
-
-
-ServerMaintenanceSpec defines the desired state of a ServerMaintenance
-
-
-
-_Appears in:_
-- [ServerMaintenance](#servermaintenance)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `policy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | Policy specifies the maintenance policy to be enforced on the server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to the server that is to be maintained. |  |  |
-| `serverPower` _[Power](#power)_ | ServerPower specifies the power state of the server during maintenance. |  |  |
-| `locatorLED` _[IndicatorLED](#indicatorled)_ | LocatorLED specifies the desired state of the server's locator LED during maintenance.<br />When maintenance ends, the locator LED is turned off. |  |  |
-| `priority` _integer_ | Priority determines ordering when multiple ServerMaintenance resources target the same server.<br />Higher values are processed first. If priorities are equal, older resources are processed first.<br />If omitted, priority is treated as 0. | 0 |  |
-| `serverBootConfigurationTemplate` _[ServerBootConfigurationTemplate](#serverbootconfigurationtemplate)_ | ServerBootConfigurationTemplate specifies the boot configuration to be applied to the server during maintenance. |  |  |
-
-
-#### ServerMaintenanceState
-
-_Underlying type:_ _string_
-
-ServerMaintenanceState specifies the current state of the server maintenance.
-
-
-
-_Appears in:_
-- [ServerMaintenanceStatus](#servermaintenancestatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | ServerMaintenanceStatePending specifies that the server maintenance is pending.<br /> |
-| `InMaintenance` | ServerMaintenanceStateInMaintenance specifies that the server is in maintenance.<br /> |
-| `Failed` | ServerMaintenanceStateFailed specifies that the server maintenance has failed.<br /> |
-
-
-#### ServerMaintenanceStatus
-
-
-
-ServerMaintenanceStatus defines the observed state of a ServerMaintenance
-
-
-
-_Appears in:_
-- [ServerMaintenance](#servermaintenance)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `state` _[ServerMaintenanceState](#servermaintenancestate)_ | State specifies the current state of the server maintenance. |  |  |
 
 
 #### ServerPowerState
@@ -988,15 +874,13 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  |  |
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
-| `power` _[Power](#power)_ | Power specifies the desired power state of the server.<br />Deprecated: This field is an internal actuator variable exposed as<br />user-facing API. It is written almost exclusively by controllers<br />(the ServerReconciler while traversing the state machine, and the<br />ServerClaim/ServerMaintenance reconcilers as surrogate input), and<br />every write patches the Server object, racing with its actual owner.<br />The desired power state is expressed more precisely through<br />ServerClaim, ServerMaintenance, and the server state machine itself;<br />the genuinely observed value is status.powerState. Do not set this<br />field on new Server resources; it will be removed in a future release. |  |  |
+| `power` _[Power](#power)_ | Power specifies the desired power state of the server.<br />Deprecated: This field is an internal actuator variable exposed as<br />user-facing API. It is written almost exclusively by controllers<br />(the ServerReconciler while traversing the state machine, and the<br />ServerClaim reconciler as surrogate input), and<br />every write patches the Server object, racing with its actual owner.<br />The desired power state is expressed more precisely through<br />ServerClaim and the server state machine itself;<br />the genuinely observed value is status.powerState. Do not set this<br />field on new Server resources; it will be removed in a future release. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
 | `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />- Recycle (default), immediately transitioning the server to `Available` after use.<br />- Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
 | `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server. |  |  |
 | `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
 | `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC. |  |  |
 | `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
-| `maintenanceBootConfigurationRef` _[ObjectReference](#objectreference)_ | MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server during maintenance. |  |  |
 | `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
 | `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
 | `unclaimable` _boolean_ | Unclaimable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false |  |
@@ -1021,7 +905,6 @@ _Appears in:_
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
 | `Released` | ServerStateReleased indicates that the server is released after use.<br /> |
 | `Error` | ServerStateError indicates that there is an error with the server.<br /> |
-| `Maintenance` | ServerStateMaintenance indicates that the server is in maintenance.<br /> |
 | `Parked` | ServerStateParked indicates that the server is parked out of the ServerClaim lifecycle so an<br />external component can run out-of-band day-2 operations. Parked is an overlay state: while<br />active, normal state-machine progression, boot, and power healing are suspended.<br /> |
 
 

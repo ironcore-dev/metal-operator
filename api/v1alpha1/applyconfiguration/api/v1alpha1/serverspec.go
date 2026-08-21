@@ -24,10 +24,10 @@ type ServerSpecApplyConfiguration struct {
 	// Deprecated: This field is an internal actuator variable exposed as
 	// user-facing API. It is written almost exclusively by controllers
 	// (the ServerReconciler while traversing the state machine, and the
-	// ServerClaim/ServerMaintenance reconcilers as surrogate input), and
+	// ServerClaim reconciler as surrogate input), and
 	// every write patches the Server object, racing with its actual owner.
 	// The desired power state is expressed more precisely through
-	// ServerClaim, ServerMaintenance, and the server state machine itself;
+	// ServerClaim and the server state machine itself;
 	// the genuinely observed value is status.powerState. Do not set this
 	// field on new Server resources; it will be removed in a future release.
 	Power *apiv1alpha1.Power `json:"power,omitempty"`
@@ -41,8 +41,6 @@ type ServerSpecApplyConfiguration struct {
 	ReclaimPolicy *apiv1alpha1.ServerReclaimPolicy `json:"reclaimPolicy,omitempty"`
 	// ServerClaimRef is a reference to a ServerClaim object that claims this server.
 	ServerClaimRef *ImmutableObjectReferenceApplyConfiguration `json:"serverClaimRef,omitempty"`
-	// ServerMaintenanceRef is a reference to a ServerMaintenance object that maintains this server.
-	ServerMaintenanceRef *ObjectReferenceApplyConfiguration `json:"serverMaintenanceRef,omitempty"`
 	// BMCRef is a reference to the BMC object associated with this server.
 	BMCRef *v1.LocalObjectReference `json:"bmcRef,omitempty"`
 	// BMC contains the access details for the BMC.
@@ -50,9 +48,6 @@ type ServerSpecApplyConfiguration struct {
 	// BootConfigurationRef is a reference to a BootConfiguration object that specifies
 	// the boot configuration for this server.
 	BootConfigurationRef *ObjectReferenceApplyConfiguration `json:"bootConfigurationRef,omitempty"`
-	// MaintenanceBootConfigurationRef is a reference to a BootConfiguration object that specifies
-	// the boot configuration for this server during maintenance.
-	MaintenanceBootConfigurationRef *ObjectReferenceApplyConfiguration `json:"maintenanceBootConfigurationRef,omitempty"`
 	// BootOrder specifies the boot order of the server.
 	BootOrder []BootOrderApplyConfiguration `json:"bootOrder,omitempty"`
 	// Taints control which ServerClaims can be bound to this server.
@@ -116,14 +111,6 @@ func (b *ServerSpecApplyConfiguration) WithServerClaimRef(value *ImmutableObject
 	return b
 }
 
-// WithServerMaintenanceRef sets the ServerMaintenanceRef field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the ServerMaintenanceRef field is set to the value of the last call.
-func (b *ServerSpecApplyConfiguration) WithServerMaintenanceRef(value *ObjectReferenceApplyConfiguration) *ServerSpecApplyConfiguration {
-	b.ServerMaintenanceRef = value
-	return b
-}
-
 // WithBMCRef sets the BMCRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the BMCRef field is set to the value of the last call.
@@ -145,14 +132,6 @@ func (b *ServerSpecApplyConfiguration) WithBMC(value *BMCAccessApplyConfiguratio
 // If called multiple times, the BootConfigurationRef field is set to the value of the last call.
 func (b *ServerSpecApplyConfiguration) WithBootConfigurationRef(value *ObjectReferenceApplyConfiguration) *ServerSpecApplyConfiguration {
 	b.BootConfigurationRef = value
-	return b
-}
-
-// WithMaintenanceBootConfigurationRef sets the MaintenanceBootConfigurationRef field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MaintenanceBootConfigurationRef field is set to the value of the last call.
-func (b *ServerSpecApplyConfiguration) WithMaintenanceBootConfigurationRef(value *ObjectReferenceApplyConfiguration) *ServerSpecApplyConfiguration {
-	b.MaintenanceBootConfigurationRef = value
 	return b
 }
 

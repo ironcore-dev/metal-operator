@@ -4,11 +4,9 @@
 package controller
 
 import (
-	"context"
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"slices"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -18,56 +16,13 @@ const (
 	fieldOwner = client.FieldOwner("metal.ironcore.dev/controller-manager")
 )
 
-type BMCTaskFetchFailedError struct {
-	TaskURI  string
-	Resource string
-	Err      error
-}
-
-func (e BMCTaskFetchFailedError) Error() string {
-	return e.Err.Error()
-}
-
-type MultiErrorTracker struct {
-	Identifier string
-	Err        error
-}
-
-func (e MultiErrorTracker) Error() string {
-	return e.Err.Error()
-}
-
-// GetServerMaintenanceForObjectReference returns a ServerMaintenance object for a given reference.
-func GetServerMaintenanceForObjectReference(ctx context.Context, c client.Client, ref *metalv1alpha1.ObjectReference) (*metalv1alpha1.ServerMaintenance, error) {
-	if ref == nil {
-		return nil, fmt.Errorf("got nil reference")
-	}
-	maintenance := &metalv1alpha1.ServerMaintenance{}
-	if err := c.Get(ctx, client.ObjectKey{Name: ref.Name, Namespace: ref.Namespace}, maintenance); err != nil {
-		return nil, fmt.Errorf("failed to get ServerMaintenance: %w", err)
-	}
-
-	return maintenance, nil
-}
-
-// GetServerByName returns a Server object by its name or an error in case the object can not be found.
-func GetServerByName(ctx context.Context, c client.Client, serverName string) (*metalv1alpha1.Server, error) {
-	server := &metalv1alpha1.Server{}
-	if err := c.Get(ctx, client.ObjectKey{Name: serverName}, server); err != nil {
-		return nil, err
-	}
-	return server, nil
-}
-
 // shouldIgnoreReconciliation checks if the object should be ignored during reconciliation.
 func shouldIgnoreReconciliation(obj client.Object) bool {
-	val, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
+	op, found := obj.GetAnnotations()[metalv1alpha1.OperationAnnotation]
 	if !found {
 		return false
 	}
-	return slices.Contains([]string{
-		metalv1alpha1.OperationAnnotationIgnore,
-	}, val)
+	return op == metalv1alpha1.OperationAnnotationIgnore
 }
 
 func isServerParked(server *metalv1alpha1.Server) bool {

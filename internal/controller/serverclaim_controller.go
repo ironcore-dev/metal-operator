@@ -343,28 +343,6 @@ func (r *ServerClaimReconciler) claimServer(ctx context.Context, claim *metalv1a
 	return selectedServer, nil
 }
 
-func (r *ServerClaimReconciler) isUnderMaintenanceQueue(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
-		log.V(1).Info("Server in or entering Maintenance, Hence can not be claimed")
-		return true, nil
-	}
-	// check if the current available state is a temporary state between multiple Maintenances states.
-	// We do not want to claim server while it is undergoing series of Maintenance in sequence.
-	serverMaintenancesList := &metalv1alpha1.ServerMaintenanceList{}
-	if err := clientutils.ListAndFilter(ctx, r.Client, serverMaintenancesList, func(object client.Object) (bool, error) {
-		serverMaintenance := object.(*metalv1alpha1.ServerMaintenance)
-		return serverMaintenance.Spec.ServerRef.Name == server.Name, nil
-	}); err != nil {
-		return true, err
-	}
-	if len(serverMaintenancesList.Items) == 0 {
-		return false, nil
-	}
-	log.V(1).Info("Server has ongoing Maintenances, Hence can not be claimed")
-	return true, nil
-}
-
 func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) bool {
 	log := ctrl.LoggerFrom(ctx)
 	if claimRef := server.Spec.ServerClaimRef; claimRef != nil && (claimRef.Name != claim.Name || claimRef.Namespace != claim.Namespace) {
@@ -381,12 +359,6 @@ func (r *ServerClaimReconciler) isServerClaimable(ctx context.Context, server *m
 	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		log.V(1).Info("Server is not powered off", "Server", server.Name, "PowerState", server.Status.PowerState)
-		return false
-	}
-	isUnderMaintenance, err := r.isUnderMaintenanceQueue(ctx, server)
-	// is undergoing maintenance and not in Reserved State, we should not claim this server
-	if err != nil || isUnderMaintenance {
-		log.V(1).Info("Server is undergoing Maintenances", "Server", server.Name, "error", err)
 		return false
 	}
 	if !tolerates(server.Spec.Taints, claim.Spec.Tolerations) {
@@ -414,9 +386,6 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 
 		server := object.(*metalv1alpha1.Server)
 
-		if server.Status.State == metalv1alpha1.ServerStateMaintenance || server.Spec.ServerMaintenanceRef != nil {
-			return nil
-		}
 		var req []reconcile.Request
 		claimList := &metalv1alpha1.ServerClaimList{}
 		if err := r.List(ctx, claimList); err != nil {

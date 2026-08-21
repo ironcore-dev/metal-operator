@@ -24,13 +24,6 @@ flowchart LR
     ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
     
-    ServerMaintenanceReconciler -- Manages --> ServerMaintenance
-    ServerMaintenanceReconciler -- Creates/Deletes --> ServerBootConfiguration
-    ServerMaintenanceReconciler -- Ensures Power --> Server
-    ServerMaintenanceReconciler -- Patches Maintenace on --> Server
-
-    ServerMaintenance -- References <--> Server
-
     ServerClaimReconciler -- Manages --> ServerClaim
     ServerClaim -- References --> Server
     ServerClaimReconciler -- Creates --> ServerBootConfiguration
@@ -43,8 +36,8 @@ flowchart LR
     classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
     classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler operator;
-    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance crd;
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration crd;
     class BootOperator external;
 ```
 
@@ -58,7 +51,6 @@ flowchart LR
 - [**Server**](concepts/servers.md): Represents physical servers, managing their state, power, and configurations.
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
-- [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 
 ### 2. Controllers
 
@@ -102,7 +94,7 @@ flowchart LR
 7. **Cleanup and Maintenance**:
     - When a `ServerClaim` is deleted, the server transitions to the **Cleanup** state.
     - The **ServerReconciler** performs sanitization tasks (e.g., wiping disks, resetting configurations) before returning the server to the **Available** state.
-    - Servers can enter the **Maintenance** state for updates or repairs.
+    - Servers can be **Parked** for out-of-band day-2 operations (updates or repairs) driven by external components.
 
 ## Architectural Benefits
 

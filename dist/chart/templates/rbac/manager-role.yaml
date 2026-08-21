@@ -13,14 +13,6 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - secrets
   verbs:
   - create
@@ -54,7 +46,6 @@ rules:
   resources:
   - bmcs
   - bmcsecrets
-  - bmcsettings
   - bmcusers
   - bmcversions
   - bmcversionsets
@@ -78,7 +69,6 @@ rules:
   resources:
   - bmcs/finalizers
   - bmcsecrets/finalizers
-  - bmcsettings/finalizers
   - bmcusers/finalizers
   - bmcversions/finalizers
   - bmcversionsets/finalizers
@@ -95,7 +85,6 @@ rules:
   resources:
   - bmcs/status
   - bmcsecrets/status
-  - bmcsettings/status
   - bmcusers/status
   - bmcversions/status
   - bmcversionsets/status

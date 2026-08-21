@@ -86,76 +86,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: type
       type:
         namedType: io.k8s.api.core.v1.SecretType
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettings
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSpec
-  map:
-    fields:
-    - name: BMCRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: serverMaintenanceRefs
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceRefItem
-          elementRelationship: atomic
-    - name: settings
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: variables
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
-          elementRelationship: atomic
-    - name: version
-      type:
-        scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsState
-  scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
-  map:
-    fields:
-    - name: conditions
-      type:
-        list:
-          elementType:
-            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
-          elementRelationship: atomic
-    - name: failedAttempts
-      type:
-        scalar: numeric
-    - name: observedGeneration
-      type:
-        scalar: numeric
-    - name: state
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsState
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSpec
   map:
     fields:
@@ -163,9 +93,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.InlineEndpoint
     - name: bmcSecretRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: bmcSettingsRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
     - name: bmcUUID
@@ -492,12 +419,6 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EnforcementMode
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.FieldRefSelector
-  map:
-    fields:
-    - name: fieldPath
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
   scalar: untyped
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
@@ -550,18 +471,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: systemName
       type:
         scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
-  map:
-    fields:
-    - name: key
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-    - name: namespace
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.NetworkInterface
   map:
     fields:
@@ -589,18 +498,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
           elementRelationship: atomic
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectFieldRefSelector
-  map:
-    fields:
-    - name: fieldPath
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
   map:
     fields:
@@ -808,12 +705,6 @@ var schemaYAML = typed.YAMLObject(`types:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceStatus
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceRefItem
-  map:
-    fields:
-    - name: serverMaintenanceRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenanceSpec
   map:
     fields:
@@ -1120,30 +1011,6 @@ var schemaYAML = typed.YAMLObject(`types:
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
-  map:
-    fields:
-    - name: key
-      type:
-        scalar: string
-    - name: valueFrom
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.VariableSourceValueFrom
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.VariableSourceValueFrom
-  map:
-    fields:
-    - name: configMapKeyRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
-    - name: fieldRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.FieldRefSelector
-    - name: objectFieldRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectFieldRefSelector
-    - name: secretKeyRef
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NamespacedKeySelector
 - name: com.github.stmcginnis.gofish.schemas.Health
   scalar: string
 - name: com.github.stmcginnis.gofish.schemas.TaskState

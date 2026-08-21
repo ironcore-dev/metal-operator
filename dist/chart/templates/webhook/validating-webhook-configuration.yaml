@@ -43,27 +43,6 @@ webhooks:
     service:
       name: {{ include "metal-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}
       namespace: {{ .Release.Namespace }}
-      path: /validate-metal-ironcore-dev-v1alpha1-bmcsettings
-  failurePolicy: Fail
-  name: vbmcsettings-v1alpha1.kb.io
-  rules:
-  - apiGroups:
-    - metal.ironcore.dev
-    apiVersions:
-    - v1alpha1
-    operations:
-    - CREATE
-    - UPDATE
-    - DELETE
-    resources:
-    - bmcsettings
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: {{ include "metal-operator.resourceName" (dict "suffix" "webhook-service" "context" $) }}
-      namespace: {{ .Release.Namespace }}
       path: /validate-metal-ironcore-dev-v1alpha1-bmcversion
   failurePolicy: Fail
   name: vbmcversion-v1alpha1.kb.io

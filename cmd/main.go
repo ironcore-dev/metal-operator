@@ -500,26 +500,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "servermaintenance")
 		os.Exit(1)
 	}
-	if err = (&controller.BMCSettingsReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		ManagerNamespace:   managerNamespace,
-		ResyncInterval:     maintenanceResyncInterval,
-		DefaultProtocol:    effectiveProtocol,
-		SkipCertValidation: effectiveSkipCert,
-		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-		DefaultFailedAutoRetryCount: int32(defaultFailedAutoRetryCount),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "bmcsettings")
-		os.Exit(1)
-	}
 	if err = (&controller.BMCVersionReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
@@ -600,12 +580,6 @@ func main() { // nolint: gocyclo
 		}
 	}
 	// nolint:goconst
-	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
-		if err := webhookv1alpha1.SetupBMCSettingsWebhookWithManager(mgr); err != nil {
-			setupLog.Error(err, "Failed to create webhook", "webhook", "bmcsettings")
-			os.Exit(1)
-		}
-	}
 	// nolint:goconst
 	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
 		if err := webhookv1alpha1.SetupBMCVersionWebhookWithManager(mgr); err != nil {

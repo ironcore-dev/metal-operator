@@ -13,7 +13,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 ### Resource Types
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
-- [BMCSettings](#bmcsettings)
 - [BMCUser](#bmcuser)
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
@@ -105,107 +104,6 @@ BMCSecret is the Schema for the bmcsecrets API
 | `type` _[SecretType](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secrettype-v1-core)_ | Used to facilitate programmatic handling of secret data.<br />More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types |  |  |
 
 
-#### BMCSettings
-
-
-
-BMCSettings is the Schema for the BMCSettings API.
-
-Deprecated: The BMCSettings resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BMCSettings` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BMCSettingsSpec](#bmcsettingsspec)_ |  |  |  |
-| `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
-
-
-#### BMCSettingsSpec
-
-
-
-BMCSettingsSpec defines the desired state of BMCSettings.
-
-
-
-_Appears in:_
-- [BMCSettings](#bmcsettings)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
-| `serverMaintenanceRefs` _[ServerMaintenanceRefItem](#servermaintenancerefitem) array_ | ServerMaintenanceRefs are references to ServerMaintenance objects which are created by the controller for each<br />server that needs to be updated with the BMC settings. |  |  |
-| `BMCRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to a specific BMC to apply settings to. |  |  |
-
-
-#### BMCSettingsState
-
-_Underlying type:_ _string_
-
-BMCSettingsState specifies the current state of the server maintenance.
-
-
-
-_Appears in:_
-- [BMCSettingsStatus](#bmcsettingsstatus)
-
-| Field | Description |
-| --- | --- |
-| `Pending` | BMCSettingsStatePending specifies that the BMC settings update is waiting.<br /> |
-| `InProgress` | BMCSettingsStateInProgress specifies that the BMC settings changes are in progress.<br /> |
-| `Applied` | BMCSettingsStateApplied specifies that the BMC settings have been applied.<br /> |
-| `Failed` | BMCSettingsStateFailed specifies that the BMC settings update has failed.<br /> |
-
-
-#### BMCSettingsStatus
-
-
-
-BMCSettingsStatus defines the observed state of BMCSettings.
-
-
-
-_Appears in:_
-- [BMCSettings](#bmcsettings)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `state` _[BMCSettingsState](#bmcsettingsstate)_ | State represents the current state of the BMC configuration task. |  |  |
-| `failedAttempts` _integer_ | FailedAttempts is the number of automatic retry attempts made after failure. |  |  |
-| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed by the controller. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC Settings Resource state. |  |  |
-
-
-#### BMCSettingsTemplate
-
-
-
-BMCSettingsTemplate defines the template for BMC settings to be applied.
-
-
-
-_Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `version` _string_ | Version specifies the BMC firmware version for which the settings should be applied. |  |  |
-| `settings` _object (keys:string, values:string)_ | SettingsMap contains BMC settings as a map. |  |  |
-| `variables` _[Variable](#variable) array_ | Variables is a list of variables that can be used in the settings for templating. |  | MaxItems: 64 <br /> |
-| `retryPolicy` _[RetryPolicy](#retrypolicy)_ | RetryPolicy defines the retry behavior for automatic retries on transient failures. |  |  |
-| `serverMaintenancePolicy` _[ServerMaintenancePolicy](#servermaintenancepolicy)_ | ServerMaintenancePolicy is a maintenance policy to be applied on the server. |  |  |
-
-
 #### BMCSpec
 
 
@@ -225,7 +123,6 @@ _Appears in:_
 | `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
 | `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
 | `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `bmcSettingsRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSettingRef is a reference to a BMCSettings object that specifies<br />the BMC configuration for this BMC.<br />Deprecated: This field is being deprecated and shall not be used going<br />forward, as it will be removed in a future release. |  |  |
 | `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
 
 
@@ -640,22 +537,6 @@ _Appears in:_
 | `Continuous` | EnforcementModeContinuous continuously monitors and enforces the configuration.<br /> |
 
 
-#### FieldRefSelector
-
-
-
-
-
-
-
-_Appears in:_
-- [VariableSourceValueFrom](#variablesourcevaluefrom)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fieldPath` _string_ | FieldPath is the path of the field on the BMCSettings object to select (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  | MaxLength: 256 <br />MinLength: 1 <br /> |
-
-
 #### IP
 
 
@@ -771,24 +652,6 @@ _Appears in:_
 | `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
 
 
-#### NamespacedKeySelector
-
-
-
-
-
-
-
-_Appears in:_
-- [VariableSourceValueFrom](#variablesourcevaluefrom)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `name` _string_ | Name is the referenced object name. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
-| `namespace` _string_ | Namespace is the referenced object namespace. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
-| `key` _string_ | Key is the key within the referenced object. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
-
-
 #### NetworkInterface
 
 
@@ -810,26 +673,6 @@ _Appears in:_
 | `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 
-#### ObjectFieldRefSelector
-
-
-
-ObjectFieldRefSelector selects a field from a named cluster-scoped object.
-It is intentionally generic; the allowed kinds are constrained at the usage site
-via kubebuilder CEL rules on the parent type.
-
-
-
-_Appears in:_
-- [VariableSourceValueFrom](#variablesourcevaluefrom)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `kind` _string_ | Kind is the API kind of the object to read the field from (e.g. "BMC"). |  | MaxLength: 63 <br />MinLength: 1 <br /> |
-| `name` _string_ | Name is the name of the object to read the field from.<br />Supports $(VAR) substitution using previously resolved variables in declaration order. |  | MaxLength: 253 <br />MinLength: 1 <br /> |
-| `fieldPath` _string_ | FieldPath is the path of the field to select on the target object.<br />Supports dot-path navigation (e.g. metadata.name) and bracket notation for map<br />keys containing dots or slashes (e.g. metadata.labels[topology.kubernetes.io/region]). |  | MaxLength: 256 <br />MinLength: 1 <br /> |
-
-
 #### ObjectReference
 
 
@@ -840,7 +683,6 @@ ObjectReference is the namespaced name reference to an object.
 
 _Appears in:_
 - [BMCVersionSpec](#bmcversionspec)
-- [ServerMaintenanceRefItem](#servermaintenancerefitem)
 - [ServerSpec](#serverspec)
 
 | Field | Description | Default | Validation |
@@ -972,8 +814,6 @@ RetryPolicy defines the retry behavior on transient failures.
 
 
 _Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-- [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 
@@ -1178,8 +1018,6 @@ ServerMaintenancePolicy specifies the maintenance policy to be enforced on the s
 
 
 _Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-- [BMCSettingsTemplate](#bmcsettingstemplate)
 - [BMCVersionSpec](#bmcversionspec)
 - [BMCVersionTemplate](#bmcversiontemplate)
 - [ServerMaintenanceSpec](#servermaintenancespec)
@@ -1188,22 +1026,6 @@ _Appears in:_
 | --- | --- |
 | `OwnerApproval` | ServerMaintenancePolicyOwnerApproval specifies that the maintenance policy requires owner approval.<br /> |
 | `Enforced` | ServerMaintenancePolicyEnforced specifies that the maintenance policy is enforced.<br /> |
-
-
-#### ServerMaintenanceRefItem
-
-
-
-ServerMaintenanceRefItem is a reference to a ServerMaintenance object.
-
-
-
-_Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `serverMaintenanceRef` _[ObjectReference](#objectreference)_ | ServerMaintenanceRef is a reference to a ServerMaintenance object that the BMCSettings has requested for the referred server. |  |  |
 
 
 #### ServerMaintenanceSpec
@@ -1626,42 +1448,5 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `Force` |  |
-
-
-#### Variable
-
-
-
-
-
-
-
-_Appears in:_
-- [BMCSettingsSpec](#bmcsettingsspec)
-- [BMCSettingsTemplate](#bmcsettingstemplate)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `key` _string_ | Key is the name of the variable to be used in the BMCSettingsTemplate format. |  | MaxLength: 63 <br />MinLength: 1 <br /> |
-| `valueFrom` _[VariableSourceValueFrom](#variablesourcevaluefrom)_ | ValueFrom defines a simple single source for the variable value. |  |  |
-
-
-#### VariableSourceValueFrom
-
-
-
-
-
-
-
-_Appears in:_
-- [Variable](#variable)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fieldRef` _[FieldRefSelector](#fieldrefselector)_ | FieldRef sources the value from a field of the BMCSettings object itself (e.g. spec.BMCRef.name).<br />Only string-typed fields are supported; integer, bool, or map fields will cause a resolution error. |  |  |
-| `objectFieldRef` _[ObjectFieldRefSelector](#objectfieldrefselector)_ | ObjectFieldRef sources the value from a field of a named related object.<br />The kind must be "BMC". Supports dot-path navigation and bracket notation for map keys<br />containing dots or slashes (e.g. metadata.labels[kubernetes.metal.cloud.sap/nodename]). |  |  |
-| `configMapKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | ConfigMapKeyRef points to a namespaced ConfigMap key. |  |  |
-| `secretKeyRef` _[NamespacedKeySelector](#namespacedkeyselector)_ | SecretKeyRef points to a namespaced Secret key. |  |  |
 
 

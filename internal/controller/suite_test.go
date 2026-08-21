@@ -253,23 +253,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BMCSettingsReconciler{
-			Client:             k8sManager.GetClient(),
-			ManagerNamespace:   ns.Name,
-			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
-			SkipCertValidation: true,
-			Scheme:             k8sManager.GetScheme(),
-			ResyncInterval:     10 * time.Millisecond,
-			Conditions:         accessor,
-			BMCOptions: bmc.Options{
-				ResourcePollingInterval: 50 * time.Millisecond,
-				ResourcePollingTimeout:  200 * time.Millisecond,
-				PowerPollingInterval:    50 * time.Millisecond,
-				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
-			},
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
 		Expect((&BMCVersionReconciler{
 			Client:             k8sManager.GetClient(),
 			ManagerNamespace:   ns.Name,
@@ -368,7 +351,6 @@ func EnsureCleanState(ctx context.Context) {
 	objectLists := []client.ObjectList{
 		&metalv1alpha1.EndpointList{},
 		&metalv1alpha1.BMCList{},
-		&metalv1alpha1.BMCSettingsList{},
 		&metalv1alpha1.BMCVersionSetList{},
 		&metalv1alpha1.BMCVersionList{},
 		&metalv1alpha1.ServerClaimList{},

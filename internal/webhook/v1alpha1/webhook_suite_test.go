@@ -120,9 +120,6 @@ var _ = BeforeSuite(func() {
 	err = SetupBMCSecretWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 
-	err = SetupBMCSettingsWebhookWithManager(mgr)
-	Expect(err).NotTo(HaveOccurred())
-
 	err = SetupBMCVersionWebhookWithManager(mgr)
 	Expect(err).NotTo(HaveOccurred())
 

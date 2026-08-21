@@ -31,24 +31,6 @@ const (
 	// OperationAnnotationIgnore makes the reconciler skip a resource entirely when set on it.
 	OperationAnnotationIgnore = "ignore"
 
-	// OperationAnnotationIgnorePropagated is set by the controller on a child resource to make the
-	// child's reconciler skip it, after the parent requested ignoring its children via ignore-child
-	// or ignore-child-and-self. It is controller-set state, not user-facing input.
-	OperationAnnotationIgnorePropagated = "ignore-propagated"
-
-	// OperationAnnotationIgnoreChild makes the controller skip reconciling a parent resource's
-	// children while still reconciling the parent itself.
-	OperationAnnotationIgnoreChild = "ignore-child"
-	// OperationAnnotationIgnoreChildAndSelf makes the controller skip reconciling both a parent
-	// resource's children and the parent itself.
-	OperationAnnotationIgnoreChildAndSelf = "ignore-child-and-self"
-	// OperationAnnotationRetryChild restarts the reconciliation of a parent resource's children
-	// from failed state back to initial state.
-	OperationAnnotationRetryChild = "retry-child"
-	// OperationAnnotationRetryChildAndSelf restarts the reconciliation of both a parent resource's
-	// children and the parent itself from failed state back to initial state.
-	OperationAnnotationRetryChildAndSelf = "retry-child-and-self"
-
 	// OperationAnnotationForceUpdateOrDeleteInProgress allows a resource to be deleted even while an
 	// operation is still in progress.
 	OperationAnnotationForceUpdateOrDeleteInProgress = "allow-in-progress-delete"

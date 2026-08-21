@@ -65,7 +65,6 @@ flowchart LR
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
-- [**BMCVersionSet**](concepts/bmcversionset.md): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
 
 ### 2. Controllers
 
@@ -78,7 +77,6 @@ flowchart LR
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
-- **BMCVersionSetReconciler**: Handles [`BMCVersionSet`](concepts/bmcversionset.md) resource. Provides ability to upgrade the BMC version on several physical server's BMC at a time through selecting BMC's through labels.
 
 - **Boot Operator (External Component)**: Monitors `ServerBootConfiguration` resources to prepare the boot environment (e.g., configuring DHCP, PXE servers). Once the boot environment is ready, it updates the `ServerBootConfiguration` status to **Ready**.
 

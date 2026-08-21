@@ -230,54 +230,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSet
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetSpec
-  map:
-    fields:
-    - name: bmcSelector
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
-    - name: bmcVersionTemplate
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionTemplate
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSetStatus
-  map:
-    fields:
-    - name: availableBMCVersion
-      type:
-        scalar: numeric
-    - name: completedBMCVersion
-      type:
-        scalar: numeric
-    - name: failedBMCVersion
-      type:
-        scalar: numeric
-    - name: fullyLabeledBMCs
-      type:
-        scalar: numeric
-    - name: inProgressBMCVersion
-      type:
-        scalar: numeric
-    - name: pendingBMCVersion
-      type:
-        scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionSpec
   map:
     fields:
@@ -328,24 +280,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: upgradeTask
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Task
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCVersionTemplate
-  map:
-    fields:
-    - name: image
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageSpec
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: updatePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.UpdatePolicy
-    - name: version
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
   map:
     fields:

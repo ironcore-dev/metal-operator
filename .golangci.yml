@@ -62,7 +62,7 @@ linters:
       # are fully removed.
       - linters:
           - staticcheck
-        text: "SA1019.*metalv1alpha1\\.(ServerMaintenance|BMCVersionSet|BMCVersion)\\b"
+        text: "SA1019.*metalv1alpha1\\.(ServerMaintenance|BMCVersion)\\b"
       # The BMCUser resource is deprecated (see issue #1033). The operator still
       # serves and reconciles existing BMCUser objects, so these legacy consumers
       # reference the type until the resource is fully removed.

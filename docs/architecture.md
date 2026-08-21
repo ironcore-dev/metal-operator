@@ -39,17 +39,12 @@ flowchart LR
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
-    BMCVersionReconciler -- Discovers --> BMCVersion
-    BMCVersionReconciler -- Creates/Deletes --> ServerMaintenance
-    BMCVersion -- References --> Server
-    BMCVersion -- References --> BMC
-
     classDef operator fill:#9575cd, stroke:#000, stroke-width:2px, color:#000;
     classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
     classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BMCVersionReconciler operator;
-    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCVersion crd;
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance crd;
     class BootOperator external;
 ```
 
@@ -64,7 +59,6 @@ flowchart LR
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
-- [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
 
 ### 2. Controllers
 
@@ -76,7 +70,6 @@ flowchart LR
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
-- **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
 
 - **Boot Operator (External Component)**: Monitors `ServerBootConfiguration` resources to prepare the boot environment (e.g., configuring DHCP, PXE servers). Once the boot environment is ready, it updates the `ServerBootConfiguration` status to **Ready**.
 

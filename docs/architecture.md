@@ -39,11 +39,6 @@ flowchart LR
     BootOperator -- Prepares --> BootEnvironment
     BootOperator -- Updates --> ServerBootConfiguration
 
-    BMCSettingsReconciler -- Discovers --> BMCSettings
-    BMCSettingsReconciler -- Creates/Deletes --> ServerMaintenance
-    BMCSettings -- References --> Server
-    BMCSettings -- References <--> BMC
-
     BMCVersionReconciler -- Discovers --> BMCVersion
     BMCVersionReconciler -- Creates/Deletes --> ServerMaintenance
     BMCVersion -- References --> Server
@@ -53,8 +48,8 @@ flowchart LR
     classDef crd fill:#4db6ac, stroke:#000, stroke-width:2px, color:#000;
     classDef external fill:#f48fb1, stroke:#000, stroke-width:2px, color:#000;
 
-    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BMCSettingsReconciler,BMCVersionReconciler operator;
-    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCSettings,BMCVersion crd;
+    class EndpointReconciler,BMCReconciler,ServerReconciler,ServerClaimReconciler,ServerMaintenanceReconciler,BMCVersionReconciler operator;
+    class Endpoint,BMC,BMCSecret,Server,ServerClaim,ServerBootConfiguration,ServerMaintenance,BMCVersion crd;
     class BootOperator external;
 ```
 
@@ -69,7 +64,6 @@ flowchart LR
 - [**ServerClaim**](concepts/serverclaims.md): Allows users to reserve servers by specifying desired configurations and boot images.
 - [**ServerBootConfiguration**](concepts/serverbootconfigurations.md): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](concepts/servermaintenance.md): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
-- [**BMCSettings**](concepts/bmcsettings.md): Handles updating the BMC setting on the physical server's Manager.
 - [**BMCVersion**](concepts/bmcversion.md): Handles upgrading the BMC Version on the physical server's Manager.
 - [**BMCVersionSet**](concepts/bmcversionset.md): Handles creation of multiple `BMCVersion` by selecting BMC's through labels.
 
@@ -83,7 +77,6 @@ flowchart LR
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
-- **BMCSettingsReconciler**: Handles [`BMCSettings`](concepts/bmcsettings.md) resource. Provides ability to update the bmc settings on physical server's Manager.
 - **BMCVersionReconciler**: Handles [`BMCVersion`](concepts/bmcversion.md) resource. Provides ability to upgrade the bmc version on physical server's Manager.
 - **BMCVersionSetReconciler**: Handles [`BMCVersionSet`](concepts/bmcversionset.md) resource. Provides ability to upgrade the BMC version on several physical server's BMC at a time through selecting BMC's through labels.
 

@@ -25,14 +25,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCAccessApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCSecret"):
 		return &apiv1alpha1.BMCSecretApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettings"):
-		return &apiv1alpha1.BMCSettingsApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsSpec"):
-		return &apiv1alpha1.BMCSettingsSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsStatus"):
-		return &apiv1alpha1.BMCSettingsStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCSettingsTemplate"):
-		return &apiv1alpha1.BMCSettingsTemplateApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCSpec"):
 		return &apiv1alpha1.BMCSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCStatus"):
@@ -67,8 +59,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.EndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EndpointSpec"):
 		return &apiv1alpha1.EndpointSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("FieldRefSelector"):
-		return &apiv1alpha1.FieldRefSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImageSpec"):
 		return &apiv1alpha1.ImageSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImmutableObjectReference"):
@@ -77,12 +67,8 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.InlineEndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("LLDPNeighbor"):
 		return &apiv1alpha1.LLDPNeighborApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("NamespacedKeySelector"):
-		return &apiv1alpha1.NamespacedKeySelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("NetworkInterface"):
 		return &apiv1alpha1.NetworkInterfaceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ObjectFieldRefSelector"):
-		return &apiv1alpha1.ObjectFieldRefSelectorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &apiv1alpha1.ObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Processor"):
@@ -109,8 +95,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ServerClaimStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenance"):
 		return &apiv1alpha1.ServerMaintenanceApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceRefItem"):
-		return &apiv1alpha1.ServerMaintenanceRefItemApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceSpec"):
 		return &apiv1alpha1.ServerMaintenanceSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerMaintenanceStatus"):
@@ -137,10 +121,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.TaskApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Toleration"):
 		return &apiv1alpha1.TolerationApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("Variable"):
-		return &apiv1alpha1.VariableApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("VariableSourceValueFrom"):
-		return &apiv1alpha1.VariableSourceValueFromApplyConfiguration{}
 
 	}
 	return nil

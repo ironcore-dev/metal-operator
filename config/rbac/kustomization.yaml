@@ -28,9 +28,6 @@ resources:
   - bmcsecret_admin_role.yaml
   - bmcsecret_editor_role.yaml
   - bmcsecret_viewer_role.yaml
-  - bmcsettings_admin_role.yaml
-  - bmcsettings_editor_role.yaml
-  - bmcsettings_viewer_role.yaml
   - bmcuser_admin_role.yaml
   - bmcuser_editor_role.yaml
   - bmcuser_viewer_role.yaml

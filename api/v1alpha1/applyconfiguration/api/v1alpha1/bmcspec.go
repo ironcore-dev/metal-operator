@@ -31,12 +31,6 @@ type BMCSpecApplyConfiguration struct {
 	Protocol *ProtocolApplyConfiguration `json:"protocol,omitempty"`
 	// ConsoleProtocol specifies the protocol to be used for console access to the BMC.
 	ConsoleProtocol *ConsoleProtocolApplyConfiguration `json:"consoleProtocol,omitempty"`
-	// BMCSettingRef is a reference to a BMCSettings object that specifies
-	// the BMC configuration for this BMC.
-	//
-	// Deprecated: This field is being deprecated and shall not be used going
-	// forward, as it will be removed in a future release.
-	BMCSettingRef *v1.LocalObjectReference `json:"bmcSettingsRef,omitempty"`
 	// Hostname is the hostname of the BMC.
 	Hostname *string `json:"hostname,omitempty"`
 }
@@ -92,14 +86,6 @@ func (b *BMCSpecApplyConfiguration) WithProtocol(value *ProtocolApplyConfigurati
 // If called multiple times, the ConsoleProtocol field is set to the value of the last call.
 func (b *BMCSpecApplyConfiguration) WithConsoleProtocol(value *ConsoleProtocolApplyConfiguration) *BMCSpecApplyConfiguration {
 	b.ConsoleProtocol = value
-	return b
-}
-
-// WithBMCSettingRef sets the BMCSettingRef field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the BMCSettingRef field is set to the value of the last call.
-func (b *BMCSpecApplyConfiguration) WithBMCSettingRef(value v1.LocalObjectReference) *BMCSpecApplyConfiguration {
-	b.BMCSettingRef = &value
 	return b
 }
 

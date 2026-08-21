@@ -104,54 +104,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: status
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSet
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetSpec
-  map:
-    fields:
-    - name: bmcSelector
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.LabelSelector
-    - name: bmcSettingsTemplate
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsTemplate
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSetStatus
-  map:
-    fields:
-    - name: availableBMCSettings
-      type:
-        scalar: numeric
-    - name: completedBMCSettings
-      type:
-        scalar: numeric
-    - name: failedBMCSettings
-      type:
-        scalar: numeric
-    - name: fullyLabeledBMCs
-      type:
-        scalar: numeric
-    - name: inProgressBMCSettings
-      type:
-        scalar: numeric
-    - name: pendingBMCSettings
-      type:
-        scalar: numeric
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsSpec
   map:
     fields:
@@ -204,29 +156,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: state
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsState
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSettingsTemplate
-  map:
-    fields:
-    - name: retryPolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.RetryPolicy
-    - name: serverMaintenancePolicy
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerMaintenancePolicy
-    - name: settings
-      type:
-        map:
-          elementType:
-            scalar: string
-    - name: variables
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Variable
-          elementRelationship: atomic
-    - name: version
-      type:
-        scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCSpec
   map:
     fields:

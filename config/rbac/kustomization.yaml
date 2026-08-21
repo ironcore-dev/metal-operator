@@ -31,9 +31,6 @@ resources:
   - bmcsettings_admin_role.yaml
   - bmcsettings_editor_role.yaml
   - bmcsettings_viewer_role.yaml
-  - bmcsettingsset_admin_role.yaml
-  - bmcsettingsset_editor_role.yaml
-  - bmcsettingsset_viewer_role.yaml
   - bmcuser_admin_role.yaml
   - bmcuser_editor_role.yaml
   - bmcuser_viewer_role.yaml

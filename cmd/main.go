@@ -548,14 +548,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "bmcversionset")
 		os.Exit(1)
 	}
-	if err := (&controller.BMCSettingsSetReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		ResyncInterval: maintenanceResyncInterval,
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "bmcsettingsset")
-		os.Exit(1)
-	}
 	if err = (&controller.BMCUserReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),

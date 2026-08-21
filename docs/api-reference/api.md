@@ -14,7 +14,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMC](#bmc)
 - [BMCSecret](#bmcsecret)
 - [BMCSettings](#bmcsettings)
-- [BMCSettingsSet](#bmcsettingsset)
 - [BMCUser](#bmcuser)
 - [BMCVersion](#bmcversion)
 - [BMCVersionSet](#bmcversionset)
@@ -127,65 +126,6 @@ Deprecated: The BMCSettings resource is deprecated.
 | `status` _[BMCSettingsStatus](#bmcsettingsstatus)_ |  |  |  |
 
 
-#### BMCSettingsSet
-
-
-
-BMCSettingsSet is the Schema for the bmcsettingssets API.
-
-Deprecated: The BMCSettingsSet resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BMCSettingsSet` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BMCSettingsSetSpec](#bmcsettingssetspec)_ |  |  |  |
-| `status` _[BMCSettingsSetStatus](#bmcsettingssetstatus)_ |  |  |  |
-
-
-#### BMCSettingsSetSpec
-
-
-
-BMCSettingsSetSpec defines the desired state of BMCSettingsSet.
-
-
-
-_Appears in:_
-- [BMCSettingsSet](#bmcsettingsset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `bmcSettingsTemplate` _[BMCSettingsTemplate](#bmcsettingstemplate)_ | BMCSettingsTemplate defines the template for the BMCSettings resource to be applied to the BMCs. |  |  |
-| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
-
-
-#### BMCSettingsSetStatus
-
-
-
-BMCSettingsSetStatus defines the observed state of BMCSettingsSet.
-
-
-
-_Appears in:_
-- [BMCSettingsSet](#bmcsettingsset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMCs in the set. |  |  |
-| `availableBMCSettings` _integer_ | AvailableBMCSettings is the number of BMCSettings currently created by the set. |  |  |
-| `pendingBMCSettings` _integer_ | PendingBMCSettings is the total number of pending BMCSettings in the set. |  |  |
-| `inProgressBMCSettings` _integer_ | InProgressBMCSettings is the total number of BMCSettings in the set that are currently in progress. |  |  |
-| `completedBMCSettings` _integer_ | CompletedBMCSettings is the total number of completed BMCSettings in the set. |  |  |
-| `failedBMCSettings` _integer_ | FailedBMCSettings is the total number of failed BMCSettings in the set. |  |  |
-
-
 #### BMCSettingsSpec
 
 
@@ -255,7 +195,6 @@ BMCSettingsTemplate defines the template for BMC settings to be applied.
 
 
 _Appears in:_
-- [BMCSettingsSetSpec](#bmcsettingssetspec)
 - [BMCSettingsSpec](#bmcsettingsspec)
 
 | Field | Description | Default | Validation |

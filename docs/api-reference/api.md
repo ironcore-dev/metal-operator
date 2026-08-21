@@ -15,7 +15,6 @@ Package v1alpha1 contains API Schema definitions for the metal v1alpha1 API grou
 - [BMCSecret](#bmcsecret)
 - [BMCUser](#bmcuser)
 - [BMCVersion](#bmcversion)
-- [BMCVersionSet](#bmcversionset)
 - [Endpoint](#endpoint)
 - [Server](#server)
 - [ServerBootConfiguration](#serverbootconfiguration)
@@ -254,65 +253,6 @@ Deprecated: The BMCVersion resource is deprecated.
 | `status` _[BMCVersionStatus](#bmcversionstatus)_ |  |  |  |
 
 
-#### BMCVersionSet
-
-
-
-BMCVersionSet is the Schema for the bmcversionsets API.
-
-Deprecated: The BMCVersionSet resource is deprecated.
-
-
-
-
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
-| `kind` _string_ | `BMCVersionSet` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[BMCVersionSetSpec](#bmcversionsetspec)_ |  |  |  |
-| `status` _[BMCVersionSetStatus](#bmcversionsetstatus)_ |  |  |  |
-
-
-#### BMCVersionSetSpec
-
-
-
-BMCVersionSetSpec defines the desired state of BMCVersionSet.
-
-
-
-_Appears in:_
-- [BMCVersionSet](#bmcversionset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `bmcSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | BMCSelector specifies a label selector to identify the BMCs to be selected. |  |  |
-| `bmcVersionTemplate` _[BMCVersionTemplate](#bmcversiontemplate)_ | BMCVersionTemplate defines the template for the BMCVersion resource to be applied to the BMCs. |  |  |
-
-
-#### BMCVersionSetStatus
-
-
-
-BMCVersionSetStatus defines the observed state of BMCVersionSet.
-
-
-
-_Appears in:_
-- [BMCVersionSet](#bmcversionset)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `fullyLabeledBMCs` _integer_ | FullyLabeledBMCs is the number of BMCs in the set. |  |  |
-| `availableBMCVersion` _integer_ | AvailableBMCVersion is the number of BMCVersion resources currently created by the set. |  |  |
-| `pendingBMCVersion` _integer_ | PendingBMCVersion is the total number of pending BMCVersion resources in the set. |  |  |
-| `inProgressBMCVersion` _integer_ | InProgressBMCVersion is the total number of BMCVersion resources in the set that are currently in progress. |  |  |
-| `completedBMCVersion` _integer_ | CompletedBMCVersion is the total number of completed BMCVersion resources in the set. |  |  |
-| `failedBMCVersion` _integer_ | FailedBMCVersion is the total number of failed BMCVersion resources in the set. |  |  |
-
-
 #### BMCVersionSpec
 
 
@@ -383,7 +323,6 @@ _Appears in:_
 
 
 _Appears in:_
-- [BMCVersionSetSpec](#bmcversionsetspec)
 - [BMCVersionSpec](#bmcversionspec)
 
 | Field | Description | Default | Validation |

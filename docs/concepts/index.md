@@ -11,5 +11,4 @@ their relationships. Each concept is linked to its respective documentation for 
 - [**ServerBootConfiguration**](/concepts/serverbootconfigurations): Signals the need to prepare the boot environment for a server.
 - [**ServerMaintenance**](/concepts/servermaintenance): Represents maintenance tasks for servers, such as BIOS updates or hardware repairs.
 - [**BMCVersion**](/concepts/bmcversion): Handles upgrading the BMC Version on the physical server's Manager.
-- [**BMCVersionSet**](/concepts/bmcversionset): Handles creation of multiple `BMCVersion` by selecting BMCs through labels.
 - [**BMCUser**](/concepts/bmcusers): Deprecated. Manages user accounts on a BMC, including credential management and password rotation.

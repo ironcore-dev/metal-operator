@@ -89,7 +89,7 @@ func isResetAnnotation(operation string) bool {
 
 func isParkableState(state metalv1alpha1.ServerState) bool {
 	switch state {
-	case metalv1alpha1.ServerStateAvailable, metalv1alpha1.ServerStateReserved:
+	case metalv1alpha1.ServerStateAvailable, metalv1alpha1.ServerStateReserved, metalv1alpha1.ServerStateDiscovery:
 		return true
 	}
 	return false

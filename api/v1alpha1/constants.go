@@ -64,6 +64,10 @@ const (
 	// ParkedAnnotation is the durable, controller-set marker recording that a Server is parked.
 	ParkedAnnotation = "metal.ironcore.dev/parked"
 
+	// PreParkStateAnnotation is set by the controller at park time to record the state the Server
+	// was in before parking. Used by resolvePreParkState to restore the correct state on unpark.
+	PreParkStateAnnotation = "metal.ironcore.dev/pre-park-state"
+
 	// MetadataKeyPrefix is the shared prefix for labels and annotations on a Server
 	// whose suffix is exposed via the metaldata service to the booted server.
 	MetadataKeyPrefix = "metadata.metal.ironcore.dev/"

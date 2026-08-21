@@ -37,7 +37,6 @@ type ServerReadinessRuleSpec struct {
 	// Conditions contains a list of the Server conditions that defines the specific
 	// criteria that must be met for taints to be managed on the target Server.
 	// The presence or status of these conditions directly triggers the application or removal of Server taints.
-	//
 	// +required
 	// +listType=map
 	// +listMapKey=type
@@ -50,14 +49,12 @@ type ServerReadinessRuleSpec struct {
 	// enforcementMode is one of BootstrapOnly, Continuous.
 	// "BootstrapOnly" applies the configuration once during initial setup.
 	// "Continuous" ensures the state is monitored and corrected throughout the resource lifecycle.
-	//
 	// +required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="enforcementMode is immutable"
 	EnforcementMode EnforcementMode `json:"enforcementMode,omitempty"`
 
 	// Taint defines the specific Taint (Key, Value, and Effect) to be managed
 	// on Servers that meet the defined condition criteria.
-	//
 	// +required
 	// +kubebuilder:validation:XValidation:rule="self.key.size() <= 253",message="taint key length must be at most 253 characters"
 	// +kubebuilder:validation:XValidation:rule="!has(oldSelf.key) || self.key == oldSelf.key",message="taint key is immutable"
@@ -66,7 +63,6 @@ type ServerReadinessRuleSpec struct {
 	Taint Taint `json:"taint,omitempty,omitzero"`
 
 	// ServerSelector limits the scope of this rule to a specific subset of Servers.
-	//
 	// +required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="serverSelector is immutable"
 	ServerSelector metav1.LabelSelector `json:"serverSelector,omitempty,omitzero"`
@@ -78,14 +74,12 @@ type ConditionRequirement struct {
 	// Type of server condition
 	//
 	// Following kubebuilder validation is referred from https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition
-	//
 	// +required
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:MaxLength=316
 	Type string `json:"type,omitempty"`
 
 	// RequiredStatus is status of the condition, one of True, False, Unknown.
-	//
 	// +required
 	// +kubebuilder:validation:Enum=True;False;Unknown
 	RequiredStatus metav1.ConditionStatus `json:"requiredStatus,omitempty"`

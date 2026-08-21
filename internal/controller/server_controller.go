@@ -813,10 +813,20 @@ func (r *ServerReconciler) resumeParkedServer(ctx context.Context, bmcClient bmc
 	}
 
 	modified, err := r.patchServerState(ctx, server, prePark)
-	if err == nil && modified {
+	if err != nil {
+		return false, err
+	}
+	if modified {
 		r.Recorder.Eventf(server, nil, v1.EventTypeNormal, "Resumed", "Resume", "Resumed Server from Parked state to %s", prePark)
 	}
-	return modified, err
+
+	serverBase := server.DeepCopy()
+	metautils.DeleteAnnotation(server, metalv1alpha1.PreParkStateAnnotation)
+	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil && !apierrors.IsNotFound(err) {
+		return false, fmt.Errorf("failed to remove pre-park state annotation: %w", err)
+	}
+
+	return modified, nil
 }
 
 func (r *ServerReconciler) stayParked(ctx context.Context, server *metalv1alpha1.Server) error {
@@ -867,6 +877,7 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 	}
 
 	serverBase := server.DeepCopy()
+	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.PreParkStateAnnotation, string(server.Status.State))
 	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, "true")
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, false, fmt.Errorf("failed to patch parked annotations: %w", err)
@@ -878,6 +889,15 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 }
 
 func (r *ServerReconciler) resolvePreParkState(server *metalv1alpha1.Server) metalv1alpha1.ServerState {
+	if state, ok := server.GetAnnotations()[metalv1alpha1.PreParkStateAnnotation]; ok {
+		s := metalv1alpha1.ServerState(state)
+		if isParkableState(s) {
+			if s == metalv1alpha1.ServerStateReserved && server.Spec.ServerClaimRef == nil {
+				return metalv1alpha1.ServerStateAvailable
+			}
+			return s
+		}
+	}
 	if server.Spec.ServerClaimRef != nil {
 		return metalv1alpha1.ServerStateReserved
 	}

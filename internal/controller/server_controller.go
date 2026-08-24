@@ -826,6 +826,13 @@ func (r *ServerReconciler) resumeParkedServer(ctx context.Context, bmcClient bmc
 
 	modified, err := r.patchServerState(ctx, server, prePark)
 	if err == nil && modified {
+		if _, ok := server.GetAnnotations()[metalv1alpha1.PreParkStateAnnotation]; ok {
+			serverBase := server.DeepCopy()
+			metautils.DeleteAnnotation(server, metalv1alpha1.PreParkStateAnnotation)
+			if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+				return true, fmt.Errorf("failed to remove pre-park state annotation: %w", err)
+			}
+		}
 		r.Recorder.Eventf(server, nil, v1.EventTypeNormal, "Resumed", "Resume", "Resumed Server from Parked state to %s", prePark)
 	}
 	return modified, err
@@ -854,12 +861,6 @@ func (r *ServerReconciler) resetServer(ctx context.Context, bmcClient bmc.BMC, s
 func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (ctrl.Result, bool, error) {
 	log := ctrl.LoggerFrom(ctx)
 
-	if !isParkableState(server.Status.State) {
-		log.V(1).Info("Server is not in a parkable state, deferring park request", "currentState", server.Status.State)
-		r.Recorder.Eventf(server, nil, v1.EventTypeWarning, "ParkDeferred", "DeferPark", "Park request deferred because server is in state %q", server.Status.State)
-		return ctrl.Result{}, false, nil
-	}
-
 	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, false, fmt.Errorf("failed to update server status: %w", err)
 	}
@@ -880,6 +881,7 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 
 	serverBase := server.DeepCopy()
 	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.ParkedAnnotation, "true")
+	metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.PreParkStateAnnotation, string(server.Status.State))
 	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
 		return ctrl.Result{}, false, fmt.Errorf("failed to patch parked annotations: %w", err)
 	}
@@ -890,6 +892,19 @@ func (r *ServerReconciler) parkServer(ctx context.Context, bmcClient bmc.BMC, se
 }
 
 func (r *ServerReconciler) resolvePreParkState(server *metalv1alpha1.Server) metalv1alpha1.ServerState {
+	if state, ok := server.GetAnnotations()[metalv1alpha1.PreParkStateAnnotation]; ok {
+		switch s := metalv1alpha1.ServerState(state); s {
+		case metalv1alpha1.ServerStateInitial,
+			metalv1alpha1.ServerStateDiscovery,
+			metalv1alpha1.ServerStateAvailable,
+			metalv1alpha1.ServerStateReserved,
+			metalv1alpha1.ServerStateReleased,
+			metalv1alpha1.ServerStateError,
+			metalv1alpha1.ServerStateMaintenance:
+			return s
+		}
+		r.Recorder.Eventf(server, nil, v1.EventTypeWarning, "InvalidPreParkState", "Resume", "Ignoring invalid pre-park state %q, falling back to claim ref inference", state)
+	}
 	if server.Spec.ServerClaimRef != nil {
 		return metalv1alpha1.ServerStateReserved
 	}

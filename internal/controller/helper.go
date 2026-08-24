@@ -42,14 +42,6 @@ func isResetAnnotation(operation string) bool {
 	return ok
 }
 
-func isParkableState(state metalv1alpha1.ServerState) bool {
-	switch state {
-	case metalv1alpha1.ServerStateAvailable, metalv1alpha1.ServerStateReserved:
-		return true
-	}
-	return false
-}
-
 // GenerateRandomPassword generates a random password of the given length.
 func GenerateRandomPassword(length int) ([]byte, error) {
 	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"

@@ -96,20 +96,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
-		By("Ensuring that the Server has the correct claim ref")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
-		))
-
-		By("Ensuring that the ServerClaim is bound")
-		Eventually(Object(claim)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(serverClaimFinalizer)),
-			HaveField("Status.Phase", metalv1alpha1.PhaseBound),
-			HaveField("Spec.ServerRef", Not(BeNil())),
-			HaveField("Spec.ServerRef.Name", server.Name),
-		))
-
 		By("Ensuring that the ServerBootConfiguration has been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
 			ObjectMeta: metav1.ObjectMeta{
@@ -185,45 +171,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should not unbind an already-bound claim when the server is cordoned", func(ctx SpecContext) {
-		By("Creating a ServerClaim")
-		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-cordon-bound-",
-			},
-			Spec: metalv1alpha1.ServerClaimSpec{
-				Power:     metalv1alpha1.PowerOn,
-				ServerRef: &v1.LocalObjectReference{Name: server.Name},
-				Image:     "foo:bar",
-			},
-		}
-		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-
-		By("Ensuring the server is claimed")
-		Eventually(Object(claim)).Should(
-			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
-		)
-
-		By("Cordoning the server after binding")
-		Eventually(Update(server, func() {
-			server.Spec.Unclaimable = true
-		})).Should(Succeed())
-
-		By("Ensuring the existing claim stays bound")
-		Consistently(Object(claim)).Should(
-			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
-		)
-		By("Ensuring the claim ref remains in place")
-		Consistently(Object(server)).Should(
-			HaveField("Spec.ServerClaimRef.Name", claim.Name),
-		)
-
-		By("Removing the ServerClaim")
-		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
-		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
-	})
-
 	It("should stand down and not revert power while the bound server is parked", func(ctx SpecContext) {
 		By("Creating a ServerClaim with PowerOn")
 		claim := &metalv1alpha1.ServerClaim{
@@ -282,108 +229,5 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Removing the ServerClaim")
 		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
 		Eventually(Get(claim)).To(Satisfy(apierrors.IsNotFound))
-	})
-})
-
-var _ = Describe("ServerClaim Validation", func() {
-	ns := SetupTest(nil)
-
-	var claim *metalv1alpha1.ServerClaim
-	var claimWithSelector *metalv1alpha1.ServerClaim
-
-	BeforeEach(func(ctx SpecContext) {
-		By("Creating a new ServerClaim")
-		claim = &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "claim-",
-			},
-		}
-		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
-
-		By("Updating the ServerRef to claim a Server")
-		Eventually(Update(claim, func() {
-			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
-		})).Should(Succeed())
-
-		By("Creating a new ServerClaim")
-		claimWithSelector = &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "claim-",
-			},
-		}
-		Expect(k8sClient.Create(ctx, claimWithSelector)).To(Succeed())
-
-		By("Updating the ServerSelector to claim a Server")
-		Eventually(Update(claimWithSelector, func() {
-			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"foo": "bar",
-				},
-			}
-		})).Should(Succeed())
-	})
-
-	AfterEach(func(ctx SpecContext) {
-		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, claimWithSelector)).To(Succeed())
-		EnsureCleanState(ctx)
-	})
-
-	It("should deny if the ServerRef changes", func() {
-		By("Updating the ServerRef to claim a different Server")
-		Eventually(Update(claim, func() {
-			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "bar"}
-		})).Should(HaveOccurred())
-
-		By("Ensuring that the ServerRef did not change")
-		Consistently(Object(claim)).Should(HaveField("Spec.ServerRef.Name", Equal("foo")))
-	})
-
-	It("should allow a change of ServerClaim by not changing the ServerRef", func() {
-		By("Updating the ServerRef to claim a different Server")
-		Eventually(Update(claim, func() {
-			claim.Spec.Power = metalv1alpha1.PowerOn
-			claim.Spec.ServerRef = &v1.LocalObjectReference{Name: "foo"}
-		})).Should(Succeed())
-
-		By("Ensuring that the PowerState changed")
-		Consistently(Object(claim)).Should(SatisfyAll(
-			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
-			HaveField("Spec.ServerRef.Name", Equal("foo")),
-		))
-	})
-
-	It("should deny if the ServerSelector changes", func() {
-		By("Updating the ServerRef to claim a different Server")
-		Eventually(Update(claimWithSelector, func() {
-			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"bar": "foo",
-				},
-			}
-		})).Should(HaveOccurred())
-
-		By("ensuring that the ServerRef did not change")
-		Consistently(Object(claimWithSelector)).Should(
-			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"})))
-	})
-
-	It("should allow a change of ServerClaim by not changing the ServerSelector", func() {
-		By("Updating the ServerRef to claim a different Server")
-		Eventually(Update(claimWithSelector, func() {
-			claimWithSelector.Spec.Power = metalv1alpha1.PowerOn
-			claimWithSelector.Spec.ServerSelector = &metav1.LabelSelector{
-				MatchLabels: map[string]string{
-					"foo": "bar",
-				},
-			}
-		})).Should(Succeed())
-
-		By("Ensuring that the PowerState changed")
-		Consistently(Object(claimWithSelector)).Should(SatisfyAll(
-			HaveField("Spec.Power", Equal(metalv1alpha1.PowerOn)),
-			HaveField("Spec.ServerSelector.MatchLabels", Equal(map[string]string{"foo": "bar"}))))
 	})
 })

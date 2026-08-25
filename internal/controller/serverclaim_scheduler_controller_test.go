@@ -455,6 +455,45 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 		)
 	})
 
+	It("should not unbind an already-bound claim when the server is cordoned", func(ctx SpecContext) {
+		By("Creating a ServerClaim")
+		claim := &metalv1alpha1.ServerClaim{
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace:    ns.Name,
+				GenerateName: "test-cordon-bound-",
+			},
+			Spec: metalv1alpha1.ServerClaimSpec{
+				Power:     metalv1alpha1.PowerOn,
+				ServerRef: &v1.LocalObjectReference{Name: server.Name},
+				Image:     "foo:bar",
+			},
+		}
+		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
+
+		By("Ensuring the server is claimed")
+		Eventually(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
+		)
+
+		By("Cordoning the server after binding")
+		Eventually(Update(server, func() {
+			server.Spec.Unclaimable = true
+		})).Should(Succeed())
+
+		By("Ensuring the existing claim stays bound")
+		Consistently(Object(claim)).Should(
+			HaveField("Status.Phase", Equal(metalv1alpha1.PhaseBound)),
+		)
+		By("Ensuring the claim ref remains in place")
+		Consistently(Object(server)).Should(
+			HaveField("Spec.ServerClaimRef.Name", claim.Name),
+		)
+
+		By("Removing the ServerClaim")
+		Expect(k8sClient.Delete(ctx, claim)).To(Succeed())
+		Eventually(Get(claim)).Should(Satisfy(apierrors.IsNotFound))
+	})
+
 	It("should not claim a cordoned server by explicit ServerRef", func(ctx SpecContext) {
 		By("Cordoning the server")
 		Eventually(Update(server, func() {

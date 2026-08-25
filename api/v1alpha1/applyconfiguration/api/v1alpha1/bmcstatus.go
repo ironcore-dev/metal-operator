@@ -37,10 +37,6 @@ type BMCStatusApplyConfiguration struct {
 	PowerState *apiv1alpha1.BMCPowerState `json:"powerState,omitempty"`
 	// LastResetTime is the timestamp of the last reset operation performed on the BMC.
 	LastResetTime *v1.Time `json:"lastResetTime,omitempty"`
-	// MetricsReportSubscriptionLink is the link to the metrics report subscription of the bmc.
-	MetricsReportSubscriptionLink *string `json:"metricsReportSubscriptionLink,omitempty"`
-	// EventsSubscriptionLink is the link to the events subscription of the bmc.
-	EventsSubscriptionLink *string `json:"eventsSubscriptionLink,omitempty"`
 	// Conditions represents the latest available observations of the BMC's current state.
 	Conditions []metav1.ConditionApplyConfiguration `json:"conditions,omitempty"`
 }
@@ -128,22 +124,6 @@ func (b *BMCStatusApplyConfiguration) WithPowerState(value apiv1alpha1.BMCPowerS
 // If called multiple times, the LastResetTime field is set to the value of the last call.
 func (b *BMCStatusApplyConfiguration) WithLastResetTime(value v1.Time) *BMCStatusApplyConfiguration {
 	b.LastResetTime = &value
-	return b
-}
-
-// WithMetricsReportSubscriptionLink sets the MetricsReportSubscriptionLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the MetricsReportSubscriptionLink field is set to the value of the last call.
-func (b *BMCStatusApplyConfiguration) WithMetricsReportSubscriptionLink(value string) *BMCStatusApplyConfiguration {
-	b.MetricsReportSubscriptionLink = &value
-	return b
-}
-
-// WithEventsSubscriptionLink sets the EventsSubscriptionLink field in the declarative configuration to the given value
-// and returns the receiver, so that objects can be built by chaining "With" function invocations.
-// If called multiple times, the EventsSubscriptionLink field is set to the value of the last call.
-func (b *BMCStatusApplyConfiguration) WithEventsSubscriptionLink(value string) *BMCStatusApplyConfiguration {
-	b.EventsSubscriptionLink = &value
 	return b
 }
 

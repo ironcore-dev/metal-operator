@@ -95,6 +95,11 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 		defer bmcClient.Logout()
 	}
 
+	// TODO: remove this part in a future version, as we will no longer set owner references on servers
+	if modified, err := r.removeOwnerReferencesFromServers(ctx, bmcObj); err != nil || modified {
+		return ctrl.Result{}, err
+	}
+
 	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
 		return ctrl.Result{}, err
 	}
@@ -106,6 +111,9 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BMC")
+	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil || modified {
+		return ctrl.Result{}, err
+	}
 	if shouldIgnoreReconciliation(bmcObj) {
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
@@ -199,6 +207,31 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 
 	log.V(1).Info("Reconciled BMC")
 	return ctrl.Result{}, nil
+}
+
+func (r *BMCReconciler) removeOwnerReferencesFromServers(ctx context.Context, obj *metalv1alpha1.BMC) (bool, error) {
+	serverList := &metalv1alpha1.ServerList{}
+	if err := r.List(ctx, serverList, client.MatchingFields{bmcRefField: obj.Name}); err != nil {
+		return false, fmt.Errorf("failed to list servers for BMC %s: %w", obj.Name, err)
+	}
+
+	modified := false
+	for i := range serverList.Items {
+		server := &serverList.Items[i]
+		base := server.DeepCopy()
+		server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
+			return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
+		})
+		if len(server.OwnerReferences) == len(base.OwnerReferences) {
+			continue
+		}
+		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+			return false, fmt.Errorf("failed to remove owner reference from server %s: %w", server.Name, err)
+		}
+		modified = true
+	}
+
+	return modified, nil
 }
 
 func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {

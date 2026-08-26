@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -280,7 +281,11 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
-			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
+			// TODO: remove in a future version
+			server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
+				return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
+			})
+			return nil
 		})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))
@@ -664,11 +669,19 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	return reqs
 }
 
+func (r *BMCReconciler) enqueueBMCByServer(_ context.Context, obj client.Object) []ctrl.Request {
+	server := obj.(*metalv1alpha1.Server)
+	if server.Spec.BMCRef == nil {
+		return nil
+	}
+	return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: server.Spec.BMCRef.Name}}}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
-		Owns(&metalv1alpha1.Server{}).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByServer)).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)

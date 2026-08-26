@@ -280,14 +280,7 @@ var _ = Describe("Server Controller", func() {
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "BMC",
-				Name:               bmc.Name,
-				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.Power", BeEmpty()),
@@ -432,14 +425,7 @@ var _ = Describe("Server Controller", func() {
 		By("Ensuring that the Server is set to discovery and powered on")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "BMC",
-				Name:               bmc.Name,
-				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
 				Namespace: ns.Name,

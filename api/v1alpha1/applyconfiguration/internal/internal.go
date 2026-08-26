@@ -121,9 +121,6 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
           elementRelationship: atomic
-    - name: eventsSubscriptionLink
-      type:
-        scalar: string
     - name: firmwareVersion
       type:
         scalar: string
@@ -137,9 +134,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
     - name: manufacturer
-      type:
-        scalar: string
-    - name: metricsReportSubscriptionLink
       type:
         scalar: string
     - name: model

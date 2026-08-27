@@ -744,6 +744,8 @@ func dellOnOffString(b bool) string {
 	return "Off"
 }
 
+// dellBuildRepositoryUpdateRequestBody maps RepositoryUpdateParameters to the
+// JSON body expected by Dell's InstallFromRepository OEM action.
 func dellBuildRepositoryUpdateRequestBody(parameters *RepositoryUpdateParameters) *dellRepositoryUpdateRequestBody {
 	return &dellRepositoryUpdateRequestBody{
 		ShareType:              parameters.ShareType,

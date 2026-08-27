@@ -803,9 +803,6 @@ func (s *MockServer) handleDellInstallFromRepository(w http.ResponseWriter, r *h
 	s.dellJobGen++
 	gen := s.dellJobGen
 	s.overrides[dellJobFilePath] = jobBase
-	if !applyUpdate && s.dellRepoState == dellRepoUpdateUnchecked {
-		s.dellRepoState = dellRepoUpdatePending
-	}
 	s.mu.Unlock()
 
 	go s.doDellJobSteps(gen, steps, applyUpdate)
@@ -816,17 +813,23 @@ func (s *MockServer) handleDellInstallFromRepository(w http.ResponseWriter, r *h
 	_, _ = w.Write([]byte(`{"status":"Accepted"}`))
 }
 
-// doDellJobSteps advances the mock iDRAC job through its steps. If applyUpdate
-// is true and the job reaches JobState "Completed", the simulated pending
-// package is cleared (state moves to applied) so that GetRepoBasedUpdateList
-// reports no more pending packages, mirroring the package having actually
-// been installed.
+// doDellJobSteps advances the mock iDRAC job through its steps. The terminal
+// callback transitions dellRepoState based on whether the job succeeded:
+//   - apply jobs: move to dellRepoUpdateApplied on "Completed" (package installed)
+//   - check-only jobs: move to dellRepoUpdatePending on "Completed" (packages found),
+//     leave unchecked on failure so GetRepoBasedUpdateList does not falsely report pending.
 func (s *MockServer) doDellJobSteps(gen int64, steps []map[string]any, applyUpdate bool) {
 	var onTerminal func(finalStep map[string]any)
 	if applyUpdate {
 		onTerminal = func(finalStep map[string]any) {
 			if state, _ := finalStep["JobState"].(string); state == "Completed" {
 				s.dellRepoState = dellRepoUpdateApplied
+			}
+		}
+	} else {
+		onTerminal = func(finalStep map[string]any) {
+			if state, _ := finalStep["JobState"].(string); state == "Completed" {
+				s.dellRepoState = dellRepoUpdatePending
 			}
 		}
 	}

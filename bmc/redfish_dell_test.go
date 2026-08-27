@@ -103,15 +103,26 @@ var _ = Describe("Dell OEM", func() {
 			Expect(body.UserName).To(Equal("admin"))
 			Expect(body.Password).To(Equal("secret"))
 			Expect(body.Workgroup).To(Equal("WORKGROUP"))
-			Expect(body.IgnoreCertWarning).To(Equal("True"))
+			Expect(body.IgnoreCertWarning).To(Equal("On"))
 			Expect(body.ApplyUpdate).To(Equal("True"))
 			Expect(body.RebootNeeded).To(BeTrue())
 		})
 
 		It("should render false booleans as \"False\"", func() {
 			body := dellBuildRepositoryUpdateRequestBody(&RepositoryUpdateParameters{})
-			Expect(body.IgnoreCertWarning).To(Equal("False"))
+			Expect(body.IgnoreCertWarning).To(Equal("Off"))
 			Expect(body.ApplyUpdate).To(Equal("False"))
+			Expect(body.ApplySameVersions).To(Equal("False"))
+			Expect(body.ApplyDowngradeVersions).To(Equal("False"))
+		})
+
+		It("should encode ApplySameVersions and ApplyDowngradeVersions", func() {
+			body := dellBuildRepositoryUpdateRequestBody(&RepositoryUpdateParameters{
+				ApplySameVersions:      true,
+				ApplyDowngradeVersions: true,
+			})
+			Expect(body.ApplySameVersions).To(Equal("True"))
+			Expect(body.ApplyDowngradeVersions).To(Equal("True"))
 		})
 	})
 
@@ -245,6 +256,34 @@ var _ = Describe("Dell OEM", func() {
 			dell.RedfishBaseBMC = newTestRedfishBMC(server)
 			_, isFatal, err := dell.InstallFirmwareFromRepository(context.Background(), "/redfish/v1/Systems/1", &RepositoryUpdateParameters{})
 			Expect(err).To(HaveOccurred())
+			Expect(isFatal).To(BeTrue())
+		})
+
+		It("should return a fatal error when the connection is dropped mid-response", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(serviceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/Systems/1/Oem/Dell/DellSoftwareInstallationService/Actions/DellSoftwareInstallationService.InstallFromRepository",
+				func(w http.ResponseWriter, r *http.Request) {
+					// Hijack and close the connection immediately to simulate a dropped response.
+					hj, ok := w.(http.Hijacker)
+					if !ok {
+						http.Error(w, "hijack not supported", http.StatusInternalServerError)
+						return
+					}
+					conn, _, _ := hj.Hijack()
+					_ = conn.Close()
+				})
+
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			dell.RedfishBaseBMC = newTestRedfishBMC(server)
+			_, isFatal, err := dell.InstallFirmwareFromRepository(context.Background(), "/redfish/v1/Systems/1", &RepositoryUpdateParameters{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("failed to issue repository firmware install"))
 			Expect(isFatal).To(BeTrue())
 		})
 	})

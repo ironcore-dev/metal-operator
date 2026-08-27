@@ -712,16 +712,18 @@ const dellSoftwareInstallationServicePath = "/Oem/Dell/DellSoftwareInstallationS
 // one for this OEM action). Verify against real hardware/mock data before
 // relying on this in production.
 type dellRepositoryUpdateRequestBody struct {
-	ShareType         string `json:"ShareType"`
-	IPAddress         string `json:"IPAddress,omitempty"`
-	ShareName         string `json:"ShareName,omitempty"`
-	CatalogFile       string `json:"CatalogFile,omitempty"`
-	UserName          string `json:"UserName,omitempty"`
-	Password          string `json:"Password,omitempty"`
-	Workgroup         string `json:"Workgroup,omitempty"`
-	IgnoreCertWarning string `json:"IgnoreCertWarning,omitempty"`
-	ApplyUpdate       string `json:"ApplyUpdate"`
-	RebootNeeded      bool   `json:"RebootNeeded"`
+	ShareType              string `json:"ShareType"`
+	IPAddress              string `json:"IPAddress,omitempty"`
+	ShareName              string `json:"ShareName,omitempty"`
+	CatalogFile            string `json:"CatalogFile,omitempty"`
+	UserName               string `json:"UserName,omitempty"`
+	Password               string `json:"Password,omitempty"`
+	Workgroup              string `json:"Workgroup,omitempty"`
+	IgnoreCertWarning      string `json:"IgnoreCertWarning,omitempty"`
+	ApplyUpdate            string `json:"ApplyUpdate"`
+	RebootNeeded           bool   `json:"RebootNeeded"`
+	ApplySameVersions      string `json:"ApplySameVersions,omitempty"`
+	ApplyDowngradeVersions string `json:"ApplyDowngradeVersions,omitempty"`
 }
 
 // dellBoolString renders a bool the way Dell's OEM actions expect certain
@@ -733,18 +735,29 @@ func dellBoolString(b bool) string {
 	return "False"
 }
 
+// dellOnOffString renders a bool as Dell's "On"/"Off" encoding, used by fields
+// such as IgnoreCertWarning in InstallFromRepository.
+func dellOnOffString(b bool) string {
+	if b {
+		return "On"
+	}
+	return "Off"
+}
+
 func dellBuildRepositoryUpdateRequestBody(parameters *RepositoryUpdateParameters) *dellRepositoryUpdateRequestBody {
 	return &dellRepositoryUpdateRequestBody{
-		ShareType:         parameters.ShareType,
-		IPAddress:         parameters.IPAddress,
-		ShareName:         parameters.ShareName,
-		CatalogFile:       parameters.CatalogFile,
-		UserName:          parameters.UserName,
-		Password:          parameters.Password,
-		Workgroup:         parameters.Workgroup,
-		IgnoreCertWarning: dellBoolString(parameters.IgnoreCertWarning),
-		ApplyUpdate:       dellBoolString(parameters.ApplyUpdate),
-		RebootNeeded:      parameters.RebootNeeded,
+		ShareType:              parameters.ShareType,
+		IPAddress:              parameters.IPAddress,
+		ShareName:              parameters.ShareName,
+		CatalogFile:            parameters.CatalogFile,
+		UserName:               parameters.UserName,
+		Password:               parameters.Password,
+		Workgroup:              parameters.Workgroup,
+		IgnoreCertWarning:      dellOnOffString(parameters.IgnoreCertWarning),
+		ApplyUpdate:            dellBoolString(parameters.ApplyUpdate),
+		RebootNeeded:           parameters.RebootNeeded,
+		ApplySameVersions:      dellBoolString(parameters.ApplySameVersions),
+		ApplyDowngradeVersions: dellBoolString(parameters.ApplyDowngradeVersions),
 	}
 }
 
@@ -772,17 +785,10 @@ func (r *DellRedfishBMC) InstallFirmwareFromRepository(_ context.Context, system
 
 	resp, err := client.Post(target, dellBuildRepositoryUpdateRequestBody(parameters))
 	if err != nil {
-		// gofish's client converts any non-2xx/204 response into a
-		// *schemas.Error (with a nil *http.Response), rather than returning a
-		// response we could inspect for its status code ourselves. A
-		// *schemas.Error means the BMC received and rejected the request, so
-		// the operation is fatal: a retry could trigger a second install while
-		// the rejected one may still be processing. Any other error (e.g. a
-		// network failure) means the request never reached the BMC and is
-		// therefore safe to retry.
-		var redfishErr *schemas.Error
-		isFatal := errors.As(err, &redfishErr)
-		return "", isFatal, fmt.Errorf("failed to issue repository firmware install: %w", err)
+		// Any error after POST is treated as fatal: the request may have reached
+		// the BMC and started executing (including dropped-response errors), so
+		// retrying risks triggering a second install.
+		return "", true, fmt.Errorf("failed to issue repository firmware install: %w", err)
 	}
 	defer resp.Body.Close() // nolint: errcheck
 

@@ -18,10 +18,8 @@ type ConditionRequirementApplyConfiguration struct {
 	// Type of server condition
 	//
 	// Following kubebuilder validation is referred from https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition
-	//
 	Type *string `json:"type,omitempty"`
 	// RequiredStatus is status of the condition, one of True, False, Unknown.
-	//
 	RequiredStatus *v1.ConditionStatus `json:"requiredStatus,omitempty"`
 }
 

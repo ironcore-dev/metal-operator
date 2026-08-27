@@ -84,50 +84,6 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
-	It("should not garbage-collect Servers of an unreachable BMC carrying legacy owner references", func(ctx SpecContext) {
-		By("Creating a BMC whose endpoint does not exist (discovery fails)")
-		bmcObj := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-unreachable-bmc-",
-			},
-			Spec: metalv1alpha1.BMCSpec{
-				EndpointRef: &v1.LocalObjectReference{Name: "does-not-exist"},
-			},
-		}
-		Expect(k8sClient.Create(ctx, bmcObj)).To(Succeed())
-		Eventually(Object(bmcObj)).Should(HaveField("Finalizers", ContainElement(BMCFinalizer)))
-
-		By("Creating a Server with a legacy BMC owner reference")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-legacy-server-",
-				OwnerReferences: []metav1.OwnerReference{{
-					APIVersion:         metalv1alpha1.GroupVersion.String(),
-					Kind:               "BMC",
-					Name:               bmcObj.Name,
-					UID:                bmcObj.UID,
-					Controller:         new(true),
-					BlockOwnerDeletion: new(true),
-				}},
-			},
-			Spec: metalv1alpha1.ServerSpec{
-				BMCRef: &v1.LocalObjectReference{Name: bmcObj.Name},
-			},
-		}
-		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-
-		By("Deleting the unreachable BMC")
-		Expect(k8sClient.Delete(ctx, bmcObj)).To(Succeed())
-		Eventually(Get(bmcObj)).Should(Satisfy(apierrors.IsNotFound))
-
-		By("Ensuring the Server survived without the legacy owner reference")
-		Eventually(Object(server)).Should(HaveField("OwnerReferences", BeEmpty()))
-		Consistently(Get(server)).Should(Succeed())
-
-		By("Cleaning up the Server")
-		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-	})
-
 	It("should successfully reconcile a BMC resource with inline access information", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{

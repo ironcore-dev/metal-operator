@@ -42,6 +42,7 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
+	"github.com/ironcore-dev/metal-operator/internal/migration"
 	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
@@ -102,6 +103,7 @@ func main() { // nolint: gocyclo
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
 		defaultFailedAutoRetryCount        int
+		skipMigrations                     bool
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -172,6 +174,7 @@ func main() { // nolint: gocyclo
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
 		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
+	flag.BoolVar(&skipMigrations, "skip-migrations", false, "Whether to skip any migration before start or not.")
 
 	opts := zap.Options{
 		Development: true,
@@ -387,6 +390,19 @@ func main() { // nolint: gocyclo
 	serverCollector := metalmetrics.NewServerStateCollector(mgr.GetClient())
 	ctrlmetrics.Registry.MustRegister(serverCollector)
 	setupLog.Info("Registered custom server metrics collector")
+
+	if !skipMigrations {
+		migrator := migration.NewMigrator()
+		if err := migrator.Add(&migration.ServerBMCOwnerReferenceMigration{Client: mgr.GetClient()}); err != nil {
+			setupLog.Error(err, "Failed to add Server BMC owner reference migration")
+			os.Exit(1)
+		}
+		if err := mgr.Add(migrator); err != nil {
+			setupLog.Error(err, "Failed to add migrator to manager")
+			os.Exit(1)
+		}
+		mgr = migration.WrapManager(migrator, mgr)
+	}
 
 	if err = (&controller.EndpointReconciler{
 		Client:             mgr.GetClient(),

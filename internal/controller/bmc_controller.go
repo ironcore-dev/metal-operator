@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -19,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -36,8 +34,6 @@ import (
 )
 
 const (
-	BMCFinalizer = "metal.ironcore.dev/bmc"
-
 	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
 )
@@ -87,23 +83,8 @@ func (r *BMCReconciler) reconcileExists(ctx context.Context, bmcObj *metalv1alph
 	return r.reconcile(ctx, bmcObj)
 }
 
-func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+func (r *BMCReconciler) delete(ctx context.Context, _ *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Deleting BMC")
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
-	if err == nil {
-		defer bmcClient.Logout()
-	}
-
-	// TODO: remove this part in a future version, as we will no longer set owner references on servers
-	if modified, err := r.removeOwnerReferencesFromServers(ctx, bmcObj); err != nil || modified {
-		return ctrl.Result{}, err
-	}
-
-	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	log.V(1).Info("Deleted BMC")
 	return ctrl.Result{}, nil
 }
@@ -111,9 +92,6 @@ func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (
 func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Reconciling BMC")
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil || modified {
-		return ctrl.Result{}, err
-	}
 	if shouldIgnoreReconciliation(bmcObj) {
 		log.V(1).Info("Skipped BMC reconciliation")
 		return ctrl.Result{}, nil
@@ -209,31 +187,6 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 	return ctrl.Result{}, nil
 }
 
-func (r *BMCReconciler) removeOwnerReferencesFromServers(ctx context.Context, obj *metalv1alpha1.BMC) (bool, error) {
-	serverList := &metalv1alpha1.ServerList{}
-	if err := r.List(ctx, serverList, client.MatchingFields{bmcRefField: obj.Name}); err != nil {
-		return false, fmt.Errorf("failed to list servers for BMC %s: %w", obj.Name, err)
-	}
-
-	modified := false
-	for i := range serverList.Items {
-		server := &serverList.Items[i]
-		base := server.DeepCopy()
-		server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
-			return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
-		})
-		if len(server.OwnerReferences) == len(base.OwnerReferences) {
-			continue
-		}
-		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-			return false, fmt.Errorf("failed to remove owner reference from server %s: %w", server.Name, err)
-		}
-		modified = true
-	}
-
-	return modified, nil
-}
-
 func (r *BMCReconciler) updateBMCStatusDetails(ctx context.Context, bmcClient bmc.BMC, bmcObj *metalv1alpha1.BMC) error {
 	log := ctrl.LoggerFrom(ctx)
 	var (
@@ -314,10 +267,6 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
-			// TODO: remove in a future version
-			server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
-				return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
-			})
 			return nil
 		})
 		if err != nil {

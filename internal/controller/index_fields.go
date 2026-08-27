@@ -37,7 +37,7 @@ func RegisterIndexFields(ctx context.Context, indexer client.FieldIndexer) error
 			return nil
 		}
 		if ref := server.Spec.ServerClaimRef; ref != nil {
-			return []string{ref.Namespace + "/" + ref.Name}
+			return []string{(client.ObjectKey{Namespace: ref.Namespace, Name: ref.Name}).String()}
 		}
 		return nil
 	}); err != nil {

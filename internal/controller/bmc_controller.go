@@ -489,19 +489,15 @@ func (r *BMCReconciler) resetBMC(ctx context.Context, bmcObj *metalv1alpha1.BMC,
 		return fmt.Errorf("failed to set BMC resetting condition: %w", err)
 	}
 	if bmcClient == nil {
-		// No Redfish client available. If the connection error was a 5xx (e.g. 503
-		// from the BMC during gofish connect), schedule an SSH retry.
+		// No Redfish client available — any connectivity failure warrants an SSH retry.
 		if clientErr != nil {
-			if httpErr, ok := errors.AsType[*schemas.Error](clientErr); ok &&
-				httpErr.HTTPReturnedStatusCode >= 500 && httpErr.HTTPReturnedStatusCode < 600 {
-				bmcBase := bmcObj.DeepCopy()
-				metautils.SetAnnotation(bmcObj, metalv1alpha1.OperationAnnotation, metalv1alpha1.ForceSSHResetBMC)
-				if patchErr := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); patchErr != nil {
-					return fmt.Errorf("failed to set SSH reset annotation: %w", patchErr)
-				}
-				log.Info("Scheduled SSH-based BMC reset due to connection 5xx error", "BMC", bmcObj.Name)
-				return r.patchBMCStatePending(ctx, bmcObj)
+			bmcBase := bmcObj.DeepCopy()
+			metautils.SetAnnotation(bmcObj, metalv1alpha1.OperationAnnotation, metalv1alpha1.ForceSSHResetBMC)
+			if patchErr := r.Patch(ctx, bmcObj, client.MergeFrom(bmcBase)); patchErr != nil {
+				return fmt.Errorf("failed to set SSH reset annotation: %w", patchErr)
 			}
+			log.Info("Scheduled SSH-based BMC reset due to connection failure", "BMC", bmcObj.Name)
+			return r.patchBMCStatePending(ctx, bmcObj)
 		}
 		return errors.Join(
 			r.patchBMCStatePending(ctx, bmcObj),

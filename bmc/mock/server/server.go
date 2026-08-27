@@ -178,9 +178,7 @@ func WithResourceOverride(subPath string, fields map[string]any) Option {
 		if err != nil {
 			return
 		}
-		for k, v := range fields {
-			resource[k] = v
-		}
+		maps.Copy(resource, fields)
 		s.saveResource(filePath, resource)
 	}
 }

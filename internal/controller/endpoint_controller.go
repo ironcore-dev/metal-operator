@@ -68,29 +68,6 @@ func (r *EndpointReconciler) delete(ctx context.Context, endpoint *metalv1alpha1
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Deleting Endpoint")
 
-	// Drop legacy Endpoint owner references from the BMC and BMCSecret
-	for _, obj := range []client.Object{
-		&metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{Name: endpoint.Name}},
-		&metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{Name: endpoint.Name}},
-	} {
-		if err := r.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
-			if apierrors.IsNotFound(err) {
-				continue
-			}
-			return ctrl.Result{}, fmt.Errorf("failed to get %T %s: %w", obj, obj.GetName(), err)
-		}
-		if before := len(obj.GetOwnerReferences()); before > 0 {
-			base := obj.DeepCopyObject().(client.Object)
-			removeEndpointOwnerReference(obj)
-			if len(obj.GetOwnerReferences()) != before {
-				if err := r.Patch(ctx, obj, client.MergeFrom(base)); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to remove Endpoint owner reference from %T %s: %w", obj, obj.GetName(), err)
-				}
-				log.V(1).Info("Removed Endpoint owner reference", "Name", obj.GetName())
-			}
-		}
-	}
-
 	if modified, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, endpoint, endpointFinalizer); err != nil || modified {
 		return ctrl.Result{}, err
 	}

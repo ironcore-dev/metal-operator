@@ -397,6 +397,10 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "Failed to add Server BMC owner reference migration")
 			os.Exit(1)
 		}
+		if err := migrator.Add(&migration.EndpointOwnerReferenceMigration{Client: mgr.GetClient()}); err != nil {
+			setupLog.Error(err, "Failed to add Endpoint owner reference migration")
+			os.Exit(1)
+		}
 		if err := mgr.Add(migrator); err != nil {
 			setupLog.Error(err, "Failed to add migrator to manager")
 			os.Exit(1)

@@ -250,20 +250,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			Scheme: k8sManager.GetScheme(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
-		Expect((&BMCUserReconciler{
-			Client:             k8sManager.GetClient(),
-			Scheme:             k8sManager.GetScheme(),
-			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
-			SkipCertValidation: true,
-			BMCOptions: bmc.Options{
-				ResourcePollingInterval: 50 * time.Millisecond,
-				ResourcePollingTimeout:  200 * time.Millisecond,
-				PowerPollingInterval:    50 * time.Millisecond,
-				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
-			},
-		}).SetupWithManager(k8sManager)).To(Succeed())
-
 		Expect((&ServerReadinessRuleReconciler{
 			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())

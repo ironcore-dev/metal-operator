@@ -465,12 +465,18 @@ func main() { // nolint: gocyclo
 	}
 	if err = (&controller.ServerClaimReconciler{
 		Client:                  mgr.GetClient(),
-		APIReader:               mgr.GetAPIReader(),
-		Cache:                   mgr.GetCache(),
 		Scheme:                  mgr.GetScheme(),
 		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "serverclaim")
+		os.Exit(1)
+	}
+	if err = (&controller.ServerClaimSchedulerReconciler{
+		Client:                  mgr.GetClient(),
+		APIReader:               mgr.GetAPIReader(),
+		MaxConcurrentReconciles: serverClaimMaxConcurrentReconciles,
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "serverclaimscheduler")
 		os.Exit(1)
 	}
 	if err = (&controller.BMCUserReconciler{

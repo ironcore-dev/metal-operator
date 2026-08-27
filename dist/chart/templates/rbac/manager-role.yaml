@@ -49,7 +49,6 @@ rules:
   - bmcusers
   - endpoints
   - serverbootconfigurations
-  - serverclaims
   - serverconfigurations
   - serverreadinessrules
   - servers
@@ -89,3 +88,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - serverclaims
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch

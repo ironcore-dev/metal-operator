@@ -2257,7 +2257,6 @@ rules:
   - bmcusers
   - endpoints
   - serverbootconfigurations
-  - serverclaims
   - serverconfigurations
   - serverreadinessrules
   - servers
@@ -2297,6 +2296,16 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - metal.ironcore.dev
+  resources:
+  - serverclaims
+  verbs:
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

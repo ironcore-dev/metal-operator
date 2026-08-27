@@ -235,9 +235,13 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 
 		Expect((&ServerClaimReconciler{
 			Client:                  k8sManager.GetClient(),
-			APIReader:               k8sManager.GetAPIReader(),
-			Cache:                   k8sManager.GetCache(),
 			Scheme:                  k8sManager.GetScheme(),
+			MaxConcurrentReconciles: 5,
+		}).SetupWithManager(k8sManager)).To(Succeed())
+
+		Expect((&ServerClaimSchedulerReconciler{
+			Client:                  k8sManager.GetClient(),
+			APIReader:               k8sManager.GetAPIReader(),
 			MaxConcurrentReconciles: 5,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

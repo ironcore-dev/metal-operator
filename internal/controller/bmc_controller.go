@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -35,8 +34,6 @@ import (
 )
 
 const (
-	BMCFinalizer = "metal.ironcore.dev/bmc"
-
 	bmcUserResetMessage = "BMC reset initiated by user. Waiting for it to come back online."
 	bmcAutoResetMessage = "BMC reset initiated automatically after repeated connection failures. Waiting for it to come back online."
 )
@@ -86,18 +83,8 @@ func (r *BMCReconciler) reconcileExists(ctx context.Context, bmcObj *metalv1alph
 	return r.reconcile(ctx, bmcObj)
 }
 
-func (r *BMCReconciler) delete(ctx context.Context, bmcObj *metalv1alpha1.BMC) (ctrl.Result, error) {
+func (r *BMCReconciler) delete(ctx context.Context, _ *metalv1alpha1.BMC) (ctrl.Result, error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Deleting BMC")
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
-	if err == nil {
-		defer bmcClient.Logout()
-	}
-
-	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, bmcObj, BMCFinalizer); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	log.V(1).Info("Deleted BMC")
 	return ctrl.Result{}, nil
 }
@@ -280,7 +267,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
-			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
+			return nil
 		})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))
@@ -664,11 +651,19 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	return reqs
 }
 
+func (r *BMCReconciler) enqueueBMCByServer(_ context.Context, obj client.Object) []ctrl.Request {
+	server := obj.(*metalv1alpha1.Server)
+	if server.Spec.BMCRef == nil {
+		return nil
+	}
+	return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: server.Spec.BMCRef.Name}}}
+}
+
 // SetupWithManager sets up the controller with the Manager.
 func (r *BMCReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metalv1alpha1.BMC{}).
-		Owns(&metalv1alpha1.Server{}).
+		Watches(&metalv1alpha1.Server{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByServer)).
 		Watches(&metalv1alpha1.Endpoint{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByEndpoint)).
 		Watches(&metalv1alpha1.BMCSecret{}, handler.EnqueueRequestsFromMapFunc(r.enqueueBMCByBMCSecret)).
 		Complete(r)

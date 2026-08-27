@@ -29,12 +29,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCSpecApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BMCStatus"):
 		return &apiv1alpha1.BMCStatusApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCUser"):
-		return &apiv1alpha1.BMCUserApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserSpec"):
-		return &apiv1alpha1.BMCUserSpecApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("BMCUserStatus"):
-		return &apiv1alpha1.BMCUserStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BootOrder"):
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConditionRequirement"):

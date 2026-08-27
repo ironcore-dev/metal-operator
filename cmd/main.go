@@ -479,22 +479,6 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "serverclaimscheduler")
 		os.Exit(1)
 	}
-	if err = (&controller.BMCUserReconciler{
-		Client:             mgr.GetClient(),
-		Scheme:             mgr.GetScheme(),
-		DefaultProtocol:    effectiveProtocol,
-		SkipCertValidation: effectiveSkipCert,
-		BMCOptions: bmc.Options{
-			BasicAuth:               true,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "Failed to create controller", "controller", "bmcuser")
-		os.Exit(1)
-	}
 	if err := (&controller.ServerReadinessRuleReconciler{
 		Client: mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {

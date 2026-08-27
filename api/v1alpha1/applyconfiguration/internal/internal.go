@@ -152,60 +152,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCState
       default: Pending
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUser
-  map:
-    fields:
-    - name: apiVersion
-      type:
-        scalar: string
-    - name: kind
-      type:
-        scalar: string
-    - name: metadata
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
-    - name: spec
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSpec
-    - name: status
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserStatus
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserSpec
-  map:
-    fields:
-    - name: bmcRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: bmcSecretRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: description
-      type:
-        scalar: string
-    - name: roleID
-      type:
-        scalar: string
-    - name: rotationPeriod
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
-    - name: userName
-      type:
-        scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCUserStatus
-  map:
-    fields:
-    - name: effectiveBMCSecretRef
-      type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
-    - name: id
-      type:
-        scalar: string
-    - name: lastRotation
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
-    - name: passwordExpiration
-      type:
-        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
   map:
     fields:
@@ -813,8 +759,6 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         scalar: string
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.ConditionStatus
-  scalar: string
-- name: io.k8s.apimachinery.pkg.apis.meta.v1.Duration
   scalar: string
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.FieldsV1
   map:

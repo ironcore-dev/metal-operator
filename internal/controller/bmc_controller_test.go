@@ -64,14 +64,7 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "BMC",
-				Name:               bmc.Name,
-				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
 			HaveField("Spec.BMCRef.Name", endpoint.Name),
@@ -86,7 +79,7 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
@@ -146,14 +139,7 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "BMC",
-				Name:               bmc.Name,
-				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -163,7 +149,7 @@ var _ = Describe("BMC Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
@@ -223,14 +209,7 @@ var _ = Describe("BMC Controller", func() {
 			},
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "BMC",
-				Name:               bmc.Name,
-				UID:                bmc.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
+			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("ObjectMeta.Labels", bmcLabels),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
@@ -252,7 +231,7 @@ var _ = Describe("BMC Controller", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
@@ -325,7 +304,7 @@ var _ = Describe("BMC Controller", func() {
 		}
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, dnsRecord)).To(Succeed())
 	})
 
@@ -560,7 +539,7 @@ var _ = Describe("BMC Reset", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})
@@ -679,7 +658,7 @@ var _ = Describe("BMC Conditions", func() {
 		// cleanup
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, server)).To(Or(Succeed(), MatchError(apierrors.IsNotFound, "server already garbage collected")))
+		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
 		Eventually(Get(bmc)).Should(Satisfy(apierrors.IsNotFound))
 		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
 	})

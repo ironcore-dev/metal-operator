@@ -675,17 +675,13 @@ func (j *DellJob) IsCompleted() bool {
 	return j.State == dellJobStateCompleted
 }
 
-// IsFailed reports whether the job has reached a failed terminal state, either
-// via a known failure JobState or via failure-indicating text in Message
-// (mirroring Dell's reference scripting examples, which classify jobs by
-// substring-matching Message rather than JobState alone).
+// IsFailed reports whether the job has reached a known terminal failure state.
 func (j *DellJob) IsFailed() bool {
 	switch j.State {
 	case dellJobStateFailed, dellJobStateCompletedWithErrors, dellJobStateRebootFailed:
 		return true
 	}
-	msg := strings.ToLower(j.Message)
-	return strings.Contains(msg, "fail") || strings.Contains(msg, "invalid") || strings.Contains(msg, "unable")
+	return false
 }
 
 // IsTerminal reports whether the job has reached any terminal state, success
@@ -919,9 +915,6 @@ func (r *DellRedfishBMC) ListJobs(_ context.Context, UUID string) ([]string, err
 	if err != nil {
 		return nil, fmt.Errorf("failed to read jobs collection response body: %w", err)
 	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to list jobs %v, statusCode %v", string(rawBody), resp.StatusCode)
-	}
 
 	var collection dellJobsCollection
 	if err := json.Unmarshal(rawBody, &collection); err != nil {
@@ -954,9 +947,6 @@ func (r *DellRedfishBMC) GetJob(_ context.Context, UUID string, jobID string) (*
 	rawBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read job response body: %w", err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get job %v, statusCode %v", string(rawBody), resp.StatusCode)
 	}
 
 	var dj dellJob

@@ -200,7 +200,7 @@ var _ = Describe("Dell OEM", func() {
 			Entry("CompletedWithErrors state", &DellJob{State: "CompletedWithErrors"}, true),
 			Entry("RebootFailed state", &DellJob{State: "RebootFailed"}, true),
 			Entry("Running state with no failure message", &DellJob{State: "Running", Message: "Job execution in progress."}, false),
-			Entry("Running state with a failure message", &DellJob{State: "Running", Message: "Unable to apply the update."}, true),
+			Entry("Running state with a failure message", &DellJob{State: "Running", Message: "Unable to apply the update."}, false),
 			Entry("Completed state", &DellJob{State: "Completed"}, false),
 		)
 

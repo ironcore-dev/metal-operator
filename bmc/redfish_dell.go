@@ -12,6 +12,7 @@ import (
 	"maps"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -817,13 +818,18 @@ func (r *DellRedfishBMC) GetRepositoryUpdateList(_ context.Context, systemURI st
 	if err != nil {
 		// As in InstallFirmwareFromRepository, gofish surfaces non-2xx/204
 		// responses as a *schemas.Error rather than a response we can inspect.
-		// Treat a "no catalog match"/"not found" message as "nothing pending"
-		// rather than a hard failure.
+		// Treat a "no catalog match" message or the specific iDRAC SUP099 error
+		// (no applicable updates found) as "nothing pending" rather than a hard failure.
 		var redfishErr *schemas.Error
 		if errors.As(err, &redfishErr) {
 			msg := strings.ToLower(redfishErr.Message)
-			if strings.Contains(msg, "match catalog") || strings.Contains(msg, "not found") {
+			if strings.Contains(msg, "match catalog") {
 				return false, "", nil
+			}
+			for _, ei := range redfishErr.ExtendedInfos {
+				if ei.MessageID == "IDRAC.2.1.SUP099" {
+					return false, "", nil
+				}
 			}
 		}
 		return false, "", fmt.Errorf("failed to get repository update list: %w", err)
@@ -859,12 +865,31 @@ func dellPackageListHasPendingPackages(packageListXML string) bool {
 
 // dellJob is the JSON body of a single Dell iDRAC job resource.
 type dellJob struct {
-	ID              string `json:"Id"`
-	Name            string `json:"Name"`
-	JobType         string `json:"JobType"`
-	JobState        string `json:"JobState"`
-	Message         string `json:"Message"`
-	PercentComplete int32  `json:"PercentComplete"`
+	ID              string          `json:"Id"`
+	Name            string          `json:"Name"`
+	JobType         string          `json:"JobType"`
+	JobState        string          `json:"JobState"`
+	Message         string          `json:"Message"`
+	PercentComplete json.RawMessage `json:"PercentComplete"`
+}
+
+// dellParsePercentComplete converts a raw JSON value (number or quoted string)
+// to int32, returning 0 for missing or unparsable values.
+func dellParsePercentComplete(raw json.RawMessage) int32 {
+	if len(raw) == 0 {
+		return 0
+	}
+	var n int32
+	if err := json.Unmarshal(raw, &n); err == nil {
+		return n
+	}
+	var s string
+	if err := json.Unmarshal(raw, &s); err == nil {
+		if v, err := strconv.ParseInt(s, 10, 32); err == nil {
+			return int32(v)
+		}
+	}
+	return 0
 }
 
 // dellJobsCollection is the JSON body of the iDRAC Jobs collection.
@@ -945,6 +970,6 @@ func (r *DellRedfishBMC) GetJob(_ context.Context, UUID string, jobID string) (*
 		JobType:         dj.JobType,
 		State:           dj.JobState,
 		Message:         dj.Message,
-		PercentComplete: dj.PercentComplete,
+		PercentComplete: dellParsePercentComplete(dj.PercentComplete),
 	}, nil
 }

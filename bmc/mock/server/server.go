@@ -828,7 +828,8 @@ func (s *MockServer) doDellJobSteps(gen int64, steps []map[string]any, applyUpda
 		}
 	} else {
 		onTerminal = func(finalStep map[string]any) {
-			if state, _ := finalStep["JobState"].(string); state == "Completed" {
+			if state, _ := finalStep["JobState"].(string); state == "Completed" &&
+				s.dellRepoState == dellRepoUpdateUnchecked {
 				s.dellRepoState = dellRepoUpdatePending
 			}
 		}

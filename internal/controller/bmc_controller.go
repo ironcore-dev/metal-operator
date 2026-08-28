@@ -267,7 +267,7 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 			server.Spec.SystemUUID = strings.ToLower(s.UUID)
 			server.Spec.SystemURI = s.URI
 			server.Spec.BMCRef = &corev1.LocalObjectReference{Name: bmcObj.Name}
-			return nil
+			return controllerutil.SetControllerReference(bmcObj, server, r.Scheme)
 		})
 		if err != nil {
 			errs = append(errs, fmt.Errorf("failed to create or patch server %s: %w", server.Name, err))

@@ -563,106 +563,48 @@ func (r *DellRedfishBMC) dellCheckPending(fw *schemas.SoftwareInventory) bool {
 }
 
 // --- Repository-based firmware update (FirmwareUpdaterDell) ---
-//
-// The interface, parameter/result types, implementation, and compile-time
-// assertion for this feature are intentionally kept together in this single
-// section (rather than splitting the interface to the top of the file), since
-// FirmwareUpdaterDell is Dell-only and self-contained.
 
-// FirmwareUpdaterDell drives Dell's OEM repository-based firmware update
-// action (DellSoftwareInstallationService.InstallFromRepository), tracking
-// Dell's proprietary iDRAC job resources (not standard Redfish Tasks) to
-// completion.
-//
-// This capability is intentionally NOT part of the BMC union interface: no
-// other vendor exposes an equivalent OEM action today, and requiring every
-// other vendor's RedfishBaseBMC to carry "not supported" stubs would go
-// against this package's "accept interfaces, return structs" idiom. Consumers
-// that need this capability should use a type assertion against the concrete
-// BMC client to discover support at runtime, e.g.:
-//
-//	updater, ok := bmcClient.(bmc.FirmwareUpdaterDell)
-//	if !ok {
-//	    return fmt.Errorf("repository-based firmware update not supported by this vendor: %w", bmc.ErrNotSupported)
-//	}
+// FirmwareUpdaterDell is a Dell-only interface for OEM repository-based
+// firmware updates. It is intentionally not part of the BMC union interface —
+// no other vendor exposes an equivalent OEM action today. Callers discover
+// support via a type assertion: updater, ok := bmcClient.(bmc.FirmwareUpdaterDell).
 type FirmwareUpdaterDell interface {
-	// InstallFirmwareFromRepository triggers a repository-based firmware
-	// installation for the given system, and returns the ID of the job tracking
-	// the operation. Any error returned once the request has been issued is
-	// fatal, since a new request cannot safely be issued while one may already
-	// be in flight.
 	InstallFirmwareFromRepository(ctx context.Context, systemURI string, parameters *RepositoryUpdateParameters) (jobID string, isFatal bool, err error)
-
-	// GetRepositoryUpdateList performs a dry-run check against the configured
-	// repository/catalog and reports whether any packages are pending installation.
 	GetRepositoryUpdateList(ctx context.Context, systemURI string) (hasPendingPackages bool, packageListXML string, err error)
-
-	// ListJobs lists the IDs of the iDRAC jobs currently known to the BMC
-	// identified by UUID.
 	ListJobs(ctx context.Context, UUID string) ([]string, error)
-
-	// GetJob retrieves the current state of a single iDRAC job by ID.
 	GetJob(ctx context.Context, UUID string, jobID string) (*DellJob, error)
 }
 
 // RepositoryUpdateParameters are the parameters for Dell's InstallFromRepository OEM action.
 type RepositoryUpdateParameters struct {
-	// ShareType is the type of network share hosting the repository (e.g. NFS, CIFS, HTTP, HTTPS).
-	ShareType string
-	// IPAddress is the share's IP address or hostname.
-	IPAddress string
-	// ShareName is the network share name. Not required for HTTP/HTTPS catalogs.
-	ShareName string
-	// CatalogFile is the catalog file name within the share (e.g. "Catalog.xml").
-	CatalogFile string
-	// UserName is the username used to authenticate against the share, if required.
-	UserName string
-	// Password is the password used to authenticate against the share, if required.
-	Password string
-	// Workgroup is the CIFS workgroup, if applicable.
-	Workgroup string
-	// IgnoreCertWarning, if true, ignores certificate warnings for HTTPS shares.
-	IgnoreCertWarning bool
-	// ApplyUpdate, if true, applies the update; if false, performs a dry-run check only.
-	ApplyUpdate bool
-	// RebootNeeded, if true, allows the BMC to reboot the system to apply updates that require it.
-	RebootNeeded bool
-	// ApplySameVersions, if true, re-applies packages already at the same version.
-	ApplySameVersions bool
-	// ApplyDowngradeVersions, if true, allows applying packages older than the currently installed version.
+	ShareType              string
+	IPAddress              string
+	ShareName              string
+	CatalogFile            string
+	UserName               string
+	Password               string
+	Workgroup              string
+	IgnoreCertWarning      bool
+	ApplyUpdate            bool
+	RebootNeeded           bool
+	ApplySameVersions      bool
 	ApplyDowngradeVersions bool
 }
 
-// DellJob represents a Dell iDRAC job resource tracking a repository-based
-// firmware operation.
+// DellJob represents a Dell iDRAC job resource.
 type DellJob struct {
-	// ID is the job identifier (e.g. "JID_...").
-	ID string
-	// Name is the job's display name.
-	Name string
-	// JobType is the Dell-reported job type (e.g. "RepositoryUpdate", "FirmwareUpdate").
+	ID      string
+	Name    string
 	JobType string
-	// State is the Dell-reported raw "JobState" string. It is intentionally a
-	// plain string, not a gofish schemas.TaskState or schemas.JobState:
-	// Dell's OEM iDRAC Job resource predates (and does not conform to) both the
-	// standard Task resource and the newer DMTF Job.v1_3_0 schema gofish also
-	// models. Dell reports failure states like "Failed", "CompletedWithErrors",
-	// and "RebootFailed" that have no equivalent in schemas.JobState (which
-	// uses "Exception"/"Cancelled" instead), and "Scheduled" rather than
-	// schemas.JobState's "Pending". Reusing either typed enum would imply a
-	// conformance Dell doesn't have, without buying real type safety since
-	// Dell-only values would need their own constants anyway.
-	State string
-	// Message is the Dell-reported status message.
-	Message string
-	// PercentComplete is the Dell-reported completion percentage.
+	// State is the raw Dell "JobState" string — not a typed gofish enum, since
+	// Dell's OEM states ("Failed", "CompletedWithErrors", "RebootFailed",
+	// "Scheduled") have no equivalent in schemas.JobState or schemas.TaskState.
+	State           string
+	Message         string
 	PercentComplete int32
 }
 
-// Known Dell iDRAC JobState values. Dell does not publish a formal enum for
-// this field; these are the values commonly observed on iDRAC OEM Jobs and
-// used by Dell's reference scripting examples. Verify against real hardware
-// before relying on this exhaustively.
+// Known Dell iDRAC JobState values (no formal enum published by Dell).
 const (
 	dellJobStateCompleted           = "Completed"
 	dellJobStateCompletedWithErrors = "CompletedWithErrors"
@@ -684,30 +626,21 @@ func (j *DellJob) IsFailed() bool {
 	return false
 }
 
-// IsTerminal reports whether the job has reached any terminal state, success
-// or failure.
+// IsTerminal reports whether the job has reached any terminal state.
 func (j *DellJob) IsTerminal() bool {
 	return j.IsCompleted() || j.IsFailed()
 }
 
-// Compile-time guarantee that DellRedfishBMC additionally satisfies
-// FirmwareUpdaterDell. This capability is intentionally not part of the BMC
-// union (see the FirmwareUpdaterDell doc comment above), so it is asserted
-// here instead of alongside the BMC guarantees in bmc.go.
+// FirmwareUpdaterDell is not part of the BMC union; assert separately from bmc.go.
 var _ FirmwareUpdaterDell = (*DellRedfishBMC)(nil)
 
-// dellSoftwareInstallationServicePath is the OEM path segment appended to a
-// system's URI to reach Dell's software installation service actions.
 const dellSoftwareInstallationServicePath = "/Oem/Dell/DellSoftwareInstallationService"
 
-// dellRepositoryUpdateRequestBody is the JSON body for Dell's
-// DellSoftwareInstallationService.InstallFromRepository action.
+// dellRepositoryUpdateRequestBody is the JSON body for Dell's InstallFromRepository OEM action.
 //
-// NOTE: field names and value encodings are based on Dell's publicly
-// documented iDRAC Redfish scripting examples and have not been verified
-// against a real iDRAC or a captured OpenAPI schema (Dell does not publish
-// one for this OEM action). Verify against real hardware/mock data before
-// relying on this in production.
+// NOTE: field names and encodings are based on Dell's publicly documented iDRAC Redfish
+// scripting examples and have not been verified against a real iDRAC — Dell does not
+// publish an OpenAPI schema for this OEM action.
 type dellRepositoryUpdateRequestBody struct {
 	ShareType              string `json:"ShareType"`
 	IPAddress              string `json:"IPAddress,omitempty"`
@@ -723,8 +656,6 @@ type dellRepositoryUpdateRequestBody struct {
 	ApplyDowngradeVersions string `json:"ApplyDowngradeVersions,omitempty"`
 }
 
-// dellBoolString renders a bool the way Dell's OEM actions expect certain
-// fields to be encoded (capitalized string, not a JSON boolean).
 func dellBoolString(b bool) string {
 	if b {
 		return "True"
@@ -732,8 +663,6 @@ func dellBoolString(b bool) string {
 	return "False"
 }
 
-// dellOnOffString renders a bool as Dell's "On"/"Off" encoding, used by fields
-// such as IgnoreCertWarning in InstallFromRepository.
 func dellOnOffString(b bool) string {
 	if b {
 		return "On"
@@ -741,8 +670,6 @@ func dellOnOffString(b bool) string {
 	return "Off"
 }
 
-// dellBuildRepositoryUpdateRequestBody maps RepositoryUpdateParameters to the
-// JSON body expected by Dell's InstallFromRepository OEM action.
 func dellBuildRepositoryUpdateRequestBody(parameters *RepositoryUpdateParameters) *dellRepositoryUpdateRequestBody {
 	return &dellRepositoryUpdateRequestBody{
 		ShareType:              parameters.ShareType,
@@ -760,15 +687,11 @@ func dellBuildRepositoryUpdateRequestBody(parameters *RepositoryUpdateParameters
 	}
 }
 
-// dellRepositoryActionTarget builds the URI for a Dell software installation
-// service action on the given system.
 func dellRepositoryActionTarget(systemURI, action string) string {
 	return path.Join(systemURI, dellSoftwareInstallationServicePath, "Actions", "DellSoftwareInstallationService."+action)
 }
 
-// dellExtractJobID extracts the iDRAC job ID from the Location header of a
-// Dell OEM action response (mirrors dellExtractTaskMonitorURI's approach for
-// the standard UpdateService.SimpleUpdate flow).
+// dellExtractJobID extracts the iDRAC job ID from the Location header (mirrors dellExtractTaskMonitorURI).
 func dellExtractJobID(response *http.Response) (string, error) {
 	if location, ok := response.Header["Location"]; ok && len(location) > 0 {
 		return path.Base(location[0]), nil
@@ -776,8 +699,6 @@ func dellExtractJobID(response *http.Response) (string, error) {
 	return "", fmt.Errorf("unable to extract job ID from Dell iDRAC response: no Location header")
 }
 
-// InstallFirmwareFromRepository triggers Dell's repository-based firmware
-// installation for the given system.
 func (r *DellRedfishBMC) InstallFirmwareFromRepository(_ context.Context, systemURI string, parameters *RepositoryUpdateParameters) (string, bool, error) {
 	client := r.client.GetService().GetClient()
 	target := dellRepositoryActionTarget(systemURI, "InstallFromRepository")
@@ -798,24 +719,17 @@ func (r *DellRedfishBMC) InstallFirmwareFromRepository(_ context.Context, system
 	return jobID, false, nil
 }
 
-// dellGetRepoBasedUpdateListResponse is the JSON body returned by Dell's
-// DellSoftwareInstallationService.GetRepoBasedUpdateList action.
 type dellGetRepoBasedUpdateListResponse struct {
 	PackageList string `json:"PackageList"`
 }
 
-// GetRepositoryUpdateList performs a dry-run check against the configured
-// repository/catalog for the given system.
 func (r *DellRedfishBMC) GetRepositoryUpdateList(_ context.Context, systemURI string) (bool, string, error) {
 	client := r.client.GetService().GetClient()
 	target := dellRepositoryActionTarget(systemURI, "GetRepoBasedUpdateList")
 
 	resp, err := client.Post(target, map[string]any{})
 	if err != nil {
-		// As in InstallFirmwareFromRepository, gofish surfaces non-2xx/204
-		// responses as a *schemas.Error rather than a response we can inspect.
-		// Treat a "no catalog match" message or the specific iDRAC SUP099 error
-		// (no applicable updates found) as "nothing pending" rather than a hard failure.
+		// Treat a "no catalog match" or SUP099 (no applicable updates) as nothing pending.
 		var redfishErr *schemas.Error
 		if errors.As(err, &redfishErr) {
 			msg := strings.ToLower(redfishErr.Message)
@@ -845,12 +759,8 @@ func (r *DellRedfishBMC) GetRepositoryUpdateList(_ context.Context, systemURI st
 	return dellPackageListHasPendingPackages(parsed.PackageList), parsed.PackageList, nil
 }
 
-// dellPackageListHasPendingPackages performs a pragmatic check for whether
-// Dell's PackageList XML contains any pending device/package entries. The
-// exact PackageList XML schema is not fully documented in Dell's public
-// reference script (it only shows regex substring matching); this treats any
-// <PACKAGE ...> or <INSTANCE ...> element as evidence of a pending package.
-// Revisit once a real sample has been captured.
+// dellPackageListHasPendingPackages checks for pending packages in Dell's PackageList XML.
+// The schema isn't formally documented — any <PACKAGE> or <INSTANCE> element is treated as pending.
 func dellPackageListHasPendingPackages(packageListXML string) bool {
 	if strings.TrimSpace(packageListXML) == "" {
 		return false
@@ -859,7 +769,6 @@ func dellPackageListHasPendingPackages(packageListXML string) bool {
 	return strings.Contains(upper, "<PACKAGE") || strings.Contains(upper, "<INSTANCE")
 }
 
-// dellJob is the JSON body of a single Dell iDRAC job resource.
 type dellJob struct {
 	ID              string          `json:"Id"`
 	Name            string          `json:"Name"`
@@ -869,8 +778,7 @@ type dellJob struct {
 	PercentComplete json.RawMessage `json:"PercentComplete"`
 }
 
-// dellParsePercentComplete converts a raw JSON value (number or quoted string)
-// to int32, returning 0 for missing or unparsable values.
+// dellParsePercentComplete accepts either a number or a quoted string (both seen in iDRAC responses).
 func dellParsePercentComplete(raw json.RawMessage) int32 {
 	if len(raw) == 0 {
 		return 0
@@ -888,15 +796,12 @@ func dellParsePercentComplete(raw json.RawMessage) int32 {
 	return 0
 }
 
-// dellJobsCollection is the JSON body of the iDRAC Jobs collection.
 type dellJobsCollection struct {
 	Members []struct {
 		ODataID string `json:"@odata.id"`
 	} `json:"Members"`
 }
 
-// ListJobs lists the IDs of the iDRAC jobs currently known to the manager
-// identified by UUID (or the first manager, if UUID is empty).
 func (r *DellRedfishBMC) ListJobs(_ context.Context, UUID string) ([]string, error) {
 	manager, err := r.GetManager(UUID)
 	if err != nil {
@@ -928,8 +833,6 @@ func (r *DellRedfishBMC) ListJobs(_ context.Context, UUID string) ([]string, err
 	return jobIDs, nil
 }
 
-// GetJob retrieves the current state of a single iDRAC job by ID, from the
-// manager identified by UUID (or the first manager, if UUID is empty).
 func (r *DellRedfishBMC) GetJob(_ context.Context, UUID string, jobID string) (*DellJob, error) {
 	manager, err := r.GetManager(UUID)
 	if err != nil {

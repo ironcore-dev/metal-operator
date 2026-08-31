@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -33,18 +34,25 @@ func (m *ServerBMCOwnerReferenceMigration) Migrate(ctx context.Context) error {
 	migrated := 0
 	for i := range serverList.Items {
 		server := &serverList.Items[i]
-		base := server.DeepCopy()
-		server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
-			return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
-		})
-		if len(server.OwnerReferences) == len(base.OwnerReferences) {
-			continue
-		}
-		if err := m.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := m.Get(ctx, client.ObjectKeyFromObject(server), server); err != nil {
+				return err
+			}
+			base := server.DeepCopy()
+			server.OwnerReferences = slices.DeleteFunc(server.OwnerReferences, func(ref metav1.OwnerReference) bool {
+				return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "BMC"
+			})
+			if len(server.OwnerReferences) == len(base.OwnerReferences) {
+				return nil
+			}
+			if err := m.Patch(ctx, server, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+				return err
+			}
+			migrated++
+			return nil
+		}); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove BMC owner reference from server %s: %w", server.Name, err))
-			continue
 		}
-		migrated++
 	}
 
 	log.Info("Removed legacy BMC owner references from Servers", "Migrated", migrated, "Total", len(serverList.Items))

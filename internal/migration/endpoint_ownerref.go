@@ -10,6 +10,7 @@ import (
 	"slices"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -44,18 +45,25 @@ func (m *EndpointOwnerReferenceMigration) Migrate(ctx context.Context) error {
 	var errs []error
 	migrated := 0
 	for _, obj := range objs {
-		base := obj.DeepCopyObject().(client.Object)
-		obj.SetOwnerReferences(slices.DeleteFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
-			return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "Endpoint"
-		}))
-		if len(obj.GetOwnerReferences()) == len(base.GetOwnerReferences()) {
-			continue
-		}
-		if err := m.Patch(ctx, obj, client.MergeFrom(base)); err != nil {
+		if err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := m.Get(ctx, client.ObjectKeyFromObject(obj), obj); err != nil {
+				return err
+			}
+			base := obj.DeepCopyObject().(client.Object)
+			obj.SetOwnerReferences(slices.DeleteFunc(obj.GetOwnerReferences(), func(ref metav1.OwnerReference) bool {
+				return ref.APIVersion == metalv1alpha1.GroupVersion.String() && ref.Kind == "Endpoint"
+			}))
+			if len(obj.GetOwnerReferences()) == len(base.GetOwnerReferences()) {
+				return nil
+			}
+			if err := m.Patch(ctx, obj, client.MergeFromWithOptions(base, client.MergeFromWithOptimisticLock{})); err != nil {
+				return err
+			}
+			migrated++
+			return nil
+		}); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove Endpoint owner reference from %T %s: %w", obj, obj.GetName(), err))
-			continue
 		}
-		migrated++
 	}
 
 	log.Info("Removed legacy Endpoint owner references from BMCs and BMCSecrets", "Migrated", migrated, "Total", len(objs))

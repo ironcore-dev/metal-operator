@@ -51,10 +51,29 @@ const (
 	upgradeStepsFailFilePath = "data/TaskService/Tasks/upgrade/steps-fail.json"
 	upgradeTaskURI           = "/redfish/v1/TaskService/Tasks/upgrade"
 
+	// Fixed file paths for Dell OEM repository-based firmware update job simulation.
+	dellJobFilePath          = "data/Managers/BMC/Oem/Dell/Jobs/repository/index.json"
+	dellJobStepsFilePath     = "data/Managers/BMC/Oem/Dell/Jobs/repository/steps.json"
+	dellJobStepsFailFilePath = "data/Managers/BMC/Oem/Dell/Jobs/repository/steps-fail.json"
+	dellJobURI               = "/redfish/v1/Managers/BMC/Oem/Dell/Jobs/repository"
+
 	// Firmware version JSON field names updated on upgrade task completion.
 	// The target resource path is resolved dynamically via FirmwareInventory RelatedItem links.
 	biosVersionField = "BiosVersion"
 	bmcVersionField  = "FirmwareVersion"
+)
+
+// dellRepoUpdateState models GetRepoBasedUpdateList's pending-package
+// simulation as a one-way progression through this server run:
+// unchecked → pending (on the first check-only InstallFromRepository call) →
+// applied (once an apply call's job completes successfully). See
+// handleDellGetRepoBasedUpdateList and handleDellInstallFromRepository.
+type dellRepoUpdateState int
+
+const (
+	dellRepoUpdateUnchecked dellRepoUpdateState = iota
+	dellRepoUpdatePending
+	dellRepoUpdateApplied
 )
 
 // noRebootSettings and noRebootBMCSettings are populated at init time by
@@ -144,6 +163,39 @@ func WithAuth() Option {
 	return func(s *MockServer) { s.authEnabled = true }
 }
 
+// WithResourceOverride merges fields into the embedded JSON resource at
+// subPath, given relative to the "data/" root (e.g.
+// "Systems/437XR1138R2/index.json" for a System, or
+// "Systems/437XR1138R2/Bios/index.json" for its Bios subresource),
+// overwriting any keys present in fields while leaving the rest of the
+// resource untouched. Nested fields (e.g. "Oem") are replaced wholesale
+// rather than deep-merged; supply the full nested value if a sub-field
+// needs changing. If subPath does not exist, this is a no-op.
+func WithResourceOverride(subPath string, fields map[string]any) Option {
+	return func(s *MockServer) {
+		filePath := path.Join("data", subPath)
+		resource, err := s.loadResource(filePath)
+		if err != nil {
+			return
+		}
+		maps.Copy(resource, fields)
+		s.saveResource(filePath, resource)
+	}
+}
+
+// WithSystemOverride merges fields into the System resource identified by
+// systemID (the folder name under data/Systems/, e.g. "437XR1138R2"),
+// overwriting any keys present in fields (e.g. "Manufacturer", "Model",
+// "SKU"). Use this to seed System resource state a test depends on - e.g.
+// BMC vendor detection (bmc.NewRedfishBMCClient / bmc.DefaultVendors) reads
+// Manufacturer to dispatch to a vendor-specific client, so overriding it to
+// "Dell Inc." obtains a Dell-capable BMC client. To override a subresource
+// such as Bios (data/Systems/<systemID>/Bios/index.json), use
+// WithResourceOverride directly.
+func WithSystemOverride(systemID string, fields map[string]any) Option {
+	return WithResourceOverride(fmt.Sprintf("Systems/%s/index.json", systemID), fields)
+}
+
 type MockServer struct {
 	log               logr.Logger
 	addr              string
@@ -151,6 +203,8 @@ type MockServer struct {
 	mu                sync.RWMutex
 	overrides         map[string]any
 	upgradeGen        int64                 // incremented on each SimpleUpdate to cancel stale goroutines
+	dellJobGen        int64                 // incremented on each Dell repository install to cancel stale goroutines
+	dellRepoState     dellRepoUpdateState   // GetRepoBasedUpdateList pending-package simulation state (see handleDellGetRepoBasedUpdateList)
 	upgradedResources map[string]string     // odata.id URI → file path for resources updated by the last upgrade
 	accounts          map[string]string     // username → password (authentication store)
 	authEnabled       bool                  // when true, all non-service-root requests require Basic Auth
@@ -266,6 +320,14 @@ func NewMockServer(log logr.Logger, addr string, opts ...Option) *MockServer {
 					strings.Contains(path, "UpdateService/Actions/UpdateService.SimpleUpdate")
 			},
 			handle: s.handleSimpleUpdate,
+		},
+		{
+			matches: hasSuffix("/DellSoftwareInstallationService.InstallFromRepository"),
+			handle:  s.handleDellInstallFromRepository,
+		},
+		{
+			matches: hasSuffix("/DellSoftwareInstallationService.GetRepoBasedUpdateList"),
+			handle:  s.handleDellGetRepoBasedUpdateList,
 		},
 		{
 			matches: hasSuffix("/Actions/ManagerAccount.ChangePassword"),
@@ -637,40 +699,165 @@ func (s *MockServer) handleSimpleUpdate(w http.ResponseWriter, r *http.Request, 
 // firmware version fields in the targeted resources are updated so that
 // GetBiosVersion / GetBMCVersion return the new version. Target resources are
 // resolved dynamically by following the FirmwareInventory items' RelatedItem
-// links — no system UUID is hardcoded here. A stale goroutine (superseded by a
-// newer SimpleUpdate call) exits without side-effects once it detects a
-// generation mismatch.
+// links — no system UUID is hardcoded here.
 func (s *MockServer) doUpgradeSteps(gen int64, steps []map[string]any, imageURI string, targets []string) {
+	s.advanceResourceSteps(&s.upgradeGen, gen, upgradeTaskFilePath, steps, func(finalStep map[string]any) {
+		// Only update version fields when the task reaches Completed.
+		if state, _ := finalStep["TaskState"].(string); state == "Completed" {
+			s.applyFirmwareVersionsLocked(targets, imageURI)
+		}
+	})
+}
+
+// advanceResourceSteps advances an overridden JSON resource through a sequence
+// of step patches (steps[0] is assumed already applied by the caller), one
+// patch per tick, simulating an async Redfish operation (Task, Job, etc.)
+// progressing toward a terminal state. Before each patch it checks *genPtr
+// against gen so that a stale goroutine — superseded by a newer request for
+// the same resource — exits without side-effects. If onTerminal is non-nil, it
+// is invoked (with s.mu held) with the last step's fields once all steps have
+// been applied, to let the caller react to the final state (e.g. writing
+// side-effect fields elsewhere).
+func (s *MockServer) advanceResourceSteps(genPtr *int64, gen int64, filePath string, steps []map[string]any, onTerminal func(finalStep map[string]any)) {
 	time.Sleep(20 * time.Millisecond)
 	for i := 1; i < len(steps); i++ {
 		time.Sleep(5 * time.Millisecond)
 		s.mu.Lock()
-		if s.upgradeGen != gen {
+		if *genPtr != gen {
 			s.mu.Unlock()
 			return
 		}
-		taskBase, err := s.loadResourceLocked(upgradeTaskFilePath)
+		resource, err := s.loadResourceLocked(filePath)
 		if err == nil {
-			mergeJSON(taskBase, steps[i])
-			s.overrides[upgradeTaskFilePath] = taskBase
+			mergeJSON(resource, steps[i])
+			s.overrides[filePath] = resource
 		}
 		s.mu.Unlock()
 	}
 
-	// Only update version fields when the task reaches Completed.
-	lastState, _ := steps[len(steps)-1]["TaskState"].(string)
-	if lastState != "Completed" {
+	if onTerminal == nil {
 		return
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if *genPtr != gen {
+		return
+	}
+	onTerminal(steps[len(steps)-1])
+}
 
-	if s.upgradeGen != gen {
+// handleDellInstallFromRepository simulates Dell's
+// DellSoftwareInstallationService.InstallFromRepository OEM action: it seeds
+// the mock iDRAC job resource with the first step and progresses it
+// asynchronously via doDellJobSteps, mirroring handleSimpleUpdate's approach
+// for the standard Task-based upgrade flow. A CatalogFile value containing
+// "fail" selects the failing step progression, mirroring the ImageURI
+// "fail" convention used by handleSimpleUpdate.
+//
+// ApplyUpdate drives the GetRepoBasedUpdateList pending-package simulation
+// (see handleDellGetRepoBasedUpdateList): the first check-only call
+// (ApplyUpdate "False"/absent) made during this server run marks a package as
+// pending, since on real hardware the check itself performs the catalog scan;
+// later check-only calls are no-ops so that re-checking doesn't keep
+// re-arming the pending flag. An apply call (ApplyUpdate "True") clears the
+// pending flag once its job completes successfully, since the package has now
+// actually been installed. Call ResetDellRepositoryUpdate to simulate a fresh
+// server run (e.g. a BMC restart) and allow the pending transition to fire again.
+func (s *MockServer) handleDellInstallFromRepository(w http.ResponseWriter, r *http.Request, body []byte) {
+	var req struct {
+		CatalogFile string `json:"CatalogFile"`
+		ApplyUpdate string `json:"ApplyUpdate"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "malformed InstallFromRepository JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	applyUpdate := strings.EqualFold(req.ApplyUpdate, "true")
+
+	stepsPath := dellJobStepsFilePath
+	if strings.Contains(req.CatalogFile, "fail") {
+		stepsPath = dellJobStepsFailFilePath
+	}
+
+	stepsData, err := dataFS.ReadFile(stepsPath)
+	if err != nil {
+		http.Error(w, "steps not found", http.StatusInternalServerError)
+		return
+	}
+	var steps []map[string]any
+	if err := json.Unmarshal(stepsData, &steps); err != nil || len(steps) == 0 {
+		http.Error(w, "corrupt steps JSON", http.StatusInternalServerError)
 		return
 	}
 
-	s.applyFirmwareVersionsLocked(targets, imageURI)
+	// Load the job template and seed it with the first step.
+	jobBase, err := s.loadResource(dellJobFilePath)
+	if err != nil {
+		http.Error(w, "job not found", http.StatusInternalServerError)
+		return
+	}
+	mergeJSON(jobBase, steps[0])
+
+	s.mu.Lock()
+	s.dellJobGen++
+	gen := s.dellJobGen
+	s.overrides[dellJobFilePath] = jobBase
+	s.mu.Unlock()
+
+	go s.doDellJobSteps(gen, steps, applyUpdate)
+
+	w.Header().Set("Location", dellJobURI)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_, _ = w.Write([]byte(`{"status":"Accepted"}`))
+}
+
+// doDellJobSteps advances the mock iDRAC job through its steps. The terminal
+// callback transitions dellRepoState based on whether the job succeeded:
+//   - apply jobs: move to dellRepoUpdateApplied on "Completed" (package installed)
+//   - check-only jobs: move to dellRepoUpdatePending on "Completed" (packages found),
+//     leave unchecked on failure so GetRepoBasedUpdateList does not falsely report pending.
+func (s *MockServer) doDellJobSteps(gen int64, steps []map[string]any, applyUpdate bool) {
+	var onTerminal func(finalStep map[string]any)
+	if applyUpdate {
+		onTerminal = func(finalStep map[string]any) {
+			if state, _ := finalStep["JobState"].(string); state == "Completed" {
+				s.dellRepoState = dellRepoUpdateApplied
+			}
+		}
+	} else {
+		onTerminal = func(finalStep map[string]any) {
+			if state, _ := finalStep["JobState"].(string); state == "Completed" &&
+				s.dellRepoState == dellRepoUpdateUnchecked {
+				s.dellRepoState = dellRepoUpdatePending
+			}
+		}
+	}
+	s.advanceResourceSteps(&s.dellJobGen, gen, dellJobFilePath, steps, onTerminal)
+}
+
+// handleDellGetRepoBasedUpdateList simulates Dell's
+// DellSoftwareInstallationService.GetRepoBasedUpdateList OEM action. The real
+// action takes no meaningful request body (callers POST an empty JSON
+// object). It reports no pending packages until the first check-only
+// InstallFromRepository call of this server run, then one pending package
+// until an apply call's job completes successfully (see
+// handleDellInstallFromRepository), after which it reports no pending
+// packages again — until the mock server state is reset via
+// ResetDellRepositoryUpdate (simulating a restart).
+func (s *MockServer) handleDellGetRepoBasedUpdateList(w http.ResponseWriter, r *http.Request, body []byte) {
+	s.mu.RLock()
+	pending := s.dellRepoState == dellRepoUpdatePending
+	s.mu.RUnlock()
+
+	packageList := ""
+	if pending {
+		packageList = "<PACKAGELIST><PACKAGE NAME=\"BIOS_FIRMWARE\" VERSION=\"2.1.0\"/></PACKAGELIST>"
+	}
+	s.writeJSON(w, http.StatusOK, map[string]any{
+		"PackageList": packageList,
+	})
 }
 
 // applyFirmwareVersionsLocked follows each FirmwareInventory target's
@@ -1056,6 +1243,22 @@ func (s *MockServer) ResetUpgradeTask(resourceURIs ...string) {
 	if len(s.upgradedResources) == 0 {
 		s.resetResourceFromEmbeddedLocked(upgradeTaskFilePath)
 	}
+}
+
+// ResetDellRepositoryUpdate resets Dell repository-update job state on the
+// mock server: the job JSON, any in-flight doDellJobSteps goroutine, and the
+// GetRepoBasedUpdateList pending-package state (back to unchecked, the
+// initial state before any InstallFromRepository call), simulating a fresh
+// server run (e.g. a BMC restart).
+//
+// Call this in AfterEach to ensure a clean slate between Dell
+// repository-update-related tests.
+func (s *MockServer) ResetDellRepositoryUpdate() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.dellJobGen++ // invalidate any running doDellJobSteps goroutine
+	s.dellRepoState = dellRepoUpdateUnchecked
+	s.resetResourceFromEmbeddedLocked(dellJobFilePath)
 }
 
 // resetResourceFromEmbeddedLocked replaces the override for filePath with the

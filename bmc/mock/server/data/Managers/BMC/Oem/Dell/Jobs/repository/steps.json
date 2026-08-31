@@ -1,0 +1,8 @@
+[
+    {"JobState": "New",       "Message": "Task successfully scheduled.",           "PercentComplete": 0},
+    {"JobState": "Scheduled", "Message": "Task successfully scheduled.",           "PercentComplete": 0},
+    {"JobState": "Running",   "Message": "Job execution in progress.",             "PercentComplete": 10},
+    {"JobState": "Running",   "Message": "Job execution in progress.",             "PercentComplete": 50},
+    {"JobState": "Running",   "Message": "Job execution in progress.",             "PercentComplete": 100},
+    {"JobState": "Completed", "Message": "Job completed successfully.",            "PercentComplete": 100}
+]

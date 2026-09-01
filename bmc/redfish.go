@@ -44,9 +44,9 @@ const (
 
 // Options contain the options for the BMC redfish client.
 type Options struct {
-	Endpoint  string
-	Username  string
-	Password  string
+	Endpoint string
+	Username string
+	Password string
 
 	InsecureTLS bool
 

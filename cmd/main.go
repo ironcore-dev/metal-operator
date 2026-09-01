@@ -185,7 +185,7 @@ func main() { // nolint: gocyclo
 		"Maximum idle TTL for cached Redfish session tokens (used with --bmc-auth-mode=session-cache). "+
 			"The effective TTL is min(this value, BMC-advertised SessionTimeout) — the BMC is queried "+
 			"on each cache miss and its SessionTimeout caps the value automatically. "+
-			"0 disables the cache.")
+			"Must be positive.")
 
 	opts := zap.Options{
 		Development: true,
@@ -418,8 +418,8 @@ func main() { // nolint: gocyclo
 	var sessionCache *bmc.SessionCache
 	switch bmcAuthMode {
 	case "session-cache":
-		if bmcSessionCacheTTL == 0 {
-			setupLog.Error(nil, "--bmc-session-cache-ttl must be > 0 when --bmc-auth-mode=session-cache")
+		if bmcSessionCacheTTL <= 0 {
+			setupLog.Error(nil, "--bmc-session-cache-ttl must be positive when --bmc-auth-mode=session-cache")
 			os.Exit(1)
 		}
 		sessionCache = bmc.NewSessionCache(bmcSessionCacheTTL)

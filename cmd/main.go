@@ -479,7 +479,7 @@ func main() { // nolint: gocyclo
 		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		SSHResetTimeout:        sshResetTimeout,
-		BMCOptions: bmcBaseOptions,
+		BMCOptions:             bmcBaseOptions,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "bmc")
 		os.Exit(1)

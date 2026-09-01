@@ -5,6 +5,7 @@ package bmc
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"maps"
 	"net/http"
@@ -22,9 +23,10 @@ type SessionCacheKey struct {
 }
 
 type sessionCacheEntry struct {
-	mu        sync.Mutex
-	session   *gofish.Session
-	expiresAt time.Time
+	mu          sync.Mutex
+	session     *gofish.Session
+	expiresAt   time.Time
+	insecureTLS bool
 }
 
 // SessionCache holds live Redfish session tokens keyed by endpoint+username.
@@ -35,7 +37,11 @@ type SessionCache struct {
 }
 
 // NewSessionCache returns a SessionCache with the given idle TTL.
+// ttl must be positive.
 func NewSessionCache(ttl time.Duration) *SessionCache {
+	if ttl <= 0 {
+		panic("bmc: NewSessionCache requires a positive TTL")
+	}
 	return &SessionCache{
 		entries: make(map[SessionCacheKey]*sessionCacheEntry),
 		ttl:     ttl,
@@ -45,11 +51,6 @@ func NewSessionCache(ttl time.Duration) *SessionCache {
 // GetOrCreate returns a valid Redfish session for the given options, reusing a
 // cached token if one exists and has not expired.
 func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.Session, error) {
-	if c == nil || c.ttl == 0 {
-		session, _, err := c.createSession(ctx, opts)
-		return session, err
-	}
-
 	key := SessionCacheKey{Endpoint: opts.Endpoint, Username: opts.Username}
 
 	c.mu.Lock()
@@ -77,6 +78,7 @@ func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.S
 	}
 	entry.session = session
 	entry.expiresAt = time.Now().Add(ttl)
+	entry.insecureTLS = opts.InsecureTLS
 	return session, nil
 }
 
@@ -113,15 +115,24 @@ func (c *SessionCache) Close() {
 	for key, entry := range entries {
 		entry.mu.Lock()
 		sess := entry.session
+		insecureTLS := entry.insecureTLS
 		entry.session = nil
 		entry.mu.Unlock()
 
 		if sess == nil || sess.ID == "" {
 			continue
 		}
-		httpClient := &http.Client{}
-		req, err := http.NewRequest(http.MethodDelete, key.Endpoint+sess.ID, nil)
+		//nolint:gosec
+		httpClient := &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureTLS},
+			},
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		req, err := http.NewRequestWithContext(ctx, http.MethodDelete, key.Endpoint+sess.ID, nil)
 		if err != nil {
+			cancel()
 			continue
 		}
 		req.Header.Set("X-Auth-Token", sess.Token)
@@ -129,6 +140,7 @@ func (c *SessionCache) Close() {
 		if err == nil {
 			_ = resp.Body.Close()
 		}
+		cancel()
 	}
 }
 

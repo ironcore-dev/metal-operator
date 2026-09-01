@@ -107,6 +107,8 @@ func main() { // nolint: gocyclo
 		serverClaimMaxConcurrentReconciles int
 		dnsRecordTemplatePath              string
 		defaultFailedAutoRetryCount        int
+		bmcAuthMode                        string
+		bmcSessionCacheTTL                 time.Duration
 	)
 
 	flag.IntVar(&serverMaxConcurrentReconciles, "server-max-concurrent-reconciles", 5,
@@ -183,6 +185,15 @@ func main() { // nolint: gocyclo
 		"Path to the DNS record template file used for creating DNS records for Servers.")
 	flag.IntVar(&defaultFailedAutoRetryCount, "default-failed-auto-retry-count", 0,
 		"The default number of auto retries for a CRD when it fails. 0 for no retries.")
+	flag.StringVar(&bmcAuthMode, "bmc-auth-mode", "basic",
+		"Authentication mode for Redfish BMC connections. "+
+			"'basic': HTTP Basic Auth on every request (default). "+
+			"'session-cache': reuse Redfish session tokens across reconciles (requires --bmc-session-cache-ttl).")
+	flag.DurationVar(&bmcSessionCacheTTL, "bmc-session-cache-ttl", 25*time.Minute,
+		"Maximum idle TTL for cached Redfish session tokens (used with --bmc-auth-mode=session-cache). "+
+			"The effective TTL is min(this value, BMC-advertised SessionTimeout) — the BMC is queried "+
+			"on each cache miss and its SessionTimeout caps the value automatically. "+
+			"0 disables the cache.")
 
 	opts := zap.Options{
 		Development: true,
@@ -410,12 +421,40 @@ func main() { // nolint: gocyclo
 	ctrlmetrics.Registry.MustRegister(serverCollector)
 	setupLog.Info("Registered custom server metrics collector")
 
+	var sessionCache *bmc.SessionCache
+	switch bmcAuthMode {
+	case "session-cache":
+		if bmcSessionCacheTTL == 0 {
+			setupLog.Error(nil, "--bmc-session-cache-ttl must be > 0 when --bmc-auth-mode=session-cache")
+			os.Exit(1)
+		}
+		sessionCache = bmc.NewSessionCache(bmcSessionCacheTTL)
+		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
+			<-ctx.Done()
+			sessionCache.Close()
+			return nil
+		})); err != nil {
+			setupLog.Error(err, "Failed to register session cache shutdown")
+			os.Exit(1)
+		}
+		setupLog.Info("Redfish session cache enabled", "ttl", bmcSessionCacheTTL)
+	case "basic", "":
+		// default: basic auth, no session cache
+	default:
+		setupLog.Error(nil, "Invalid --bmc-auth-mode value. Must be 'basic' or 'session-cache'", "value", bmcAuthMode)
+		os.Exit(1)
+	}
+
+	bmcBaseOptions := bmc.Options{
+		SessionCache: sessionCache,
+	}
 	if err = (&controller.EndpointReconciler{
 		Client:             mgr.GetClient(),
 		Scheme:             mgr.GetScheme(),
 		MACPrefixes:        macPRefixes,
 		DefaultProtocol:    effectiveProtocol,
 		SkipCertValidation: effectiveSkipCert,
+		BMCOptions:         bmcBaseOptions,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "endpoint")
 		os.Exit(1)
@@ -440,9 +479,7 @@ func main() { // nolint: gocyclo
 		DNSRecordTemplate:      dnsRecordTemplate,
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		SSHResetTimeout:        sshResetTimeout,
-		BMCOptions: bmc.Options{
-			BasicAuth: true,
-		},
+		BMCOptions: bmcBaseOptions,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "bmc")
 		os.Exit(1)
@@ -468,7 +505,7 @@ func main() { // nolint: gocyclo
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,
@@ -512,7 +549,7 @@ func main() { // nolint: gocyclo
 		ResyncInterval:     maintenanceResyncInterval,
 		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,
@@ -533,7 +570,7 @@ func main() { // nolint: gocyclo
 		ResyncInterval:     maintenanceResyncInterval,
 		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,
@@ -553,7 +590,7 @@ func main() { // nolint: gocyclo
 		SkipCertValidation: effectiveSkipCert,
 		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,
@@ -573,7 +610,7 @@ func main() { // nolint: gocyclo
 		ResyncInterval:     maintenanceResyncInterval,
 		Conditions:         conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,
@@ -622,7 +659,7 @@ func main() { // nolint: gocyclo
 		DefaultProtocol:    effectiveProtocol,
 		SkipCertValidation: effectiveSkipCert,
 		BMCOptions: bmc.Options{
-			BasicAuth:               true,
+			SessionCache:            sessionCache,
 			PowerPollingInterval:    powerPollingInterval,
 			PowerPollingTimeout:     powerPollingTimeout,
 			ResourcePollingInterval: resourcePollingInterval,

@@ -23,6 +23,14 @@ var _ = Describe("SessionCache", func() {
 			Expect(cache).NotTo(BeNil())
 			Expect(cache.ttl).To(Equal(10 * time.Minute))
 		})
+
+		It("panics for a zero TTL", func() {
+			Expect(func() { NewSessionCache(0) }).To(Panic())
+		})
+
+		It("panics for a negative TTL", func() {
+			Expect(func() { NewSessionCache(-1 * time.Second) }).To(Panic())
+		})
 	})
 
 	Describe("Invalidate", func() {

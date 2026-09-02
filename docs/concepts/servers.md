@@ -30,7 +30,8 @@ not on the `Server`.
 
 The `Server` CRD is central to managing bare metal servers. It allows for:
 
-- **Power Management**: Powering servers on and off.
+- **Power Management**: Powering servers on and off. Workload power is requested via the [`ServerClaim`](serverclaims.md),
+  while lifecycle states drive power directly — on during [Discovery](#lifecycle-and-states), off when released or [parked](#parking).
 - **BIOS Configuration**: Changing BIOS settings and performing BIOS updates.
 - **Lifecycle Management**: Handling the server's lifecycle through various states.
 - **Hardware Discovery**: Gathering hardware information via BMC and in-band agents.

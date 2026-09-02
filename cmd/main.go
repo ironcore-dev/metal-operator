@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+	migrationutils "github.com/ironcore-dev/controller-utils/migration"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
@@ -392,7 +393,7 @@ func main() { // nolint: gocyclo
 	setupLog.Info("Registered custom server metrics collector")
 
 	if !skipMigrations {
-		migrator := migration.NewMigrator()
+		migrator := migrationutils.NewMigrator()
 		if err := migrator.Add(&migration.ServerBMCOwnerReferenceMigration{Client: mgr.GetClient()}); err != nil {
 			setupLog.Error(err, "Failed to add Server BMC owner reference migration")
 			os.Exit(1)
@@ -405,7 +406,7 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "Failed to add migrator to manager")
 			os.Exit(1)
 		}
-		mgr = migration.WrapManager(migrator, mgr)
+		mgr = migrationutils.WrapManager(migrator, mgr)
 	}
 
 	if err = (&controller.EndpointReconciler{

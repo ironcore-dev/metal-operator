@@ -15,8 +15,6 @@ import (
 
 // AllServerStates defines all possible server states for enum metrics
 var AllServerStates = []metalv1alpha1.ServerState{
-	metalv1alpha1.ServerStateInitial,
-	metalv1alpha1.ServerStateDiscovery,
 	metalv1alpha1.ServerStateAvailable,
 	metalv1alpha1.ServerStateReserved,
 	metalv1alpha1.ServerStateError,

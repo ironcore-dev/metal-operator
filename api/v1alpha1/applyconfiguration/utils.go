@@ -43,10 +43,6 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.ImmutableObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("InlineEndpoint"):
 		return &apiv1alpha1.InlineEndpointApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("LLDPNeighbor"):
-		return &apiv1alpha1.LLDPNeighborApplyConfiguration{}
-	case v1alpha1.SchemeGroupVersion.WithKind("NetworkInterface"):
-		return &apiv1alpha1.NetworkInterfaceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &apiv1alpha1.ObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Processor"):

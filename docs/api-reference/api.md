@@ -468,7 +468,6 @@ Power defines the possible power states for a device.
 
 _Appears in:_
 - [ServerClaimSpec](#serverclaimspec)
-- [ServerSpec](#serverspec)
 
 | Field | Description |
 | --- | --- |
@@ -810,7 +809,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  |  |
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
-| `power` _[Power](#power)_ | Power specifies the desired power state of the server.<br />Deprecated: This field is an internal actuator variable exposed as<br />user-facing API. It is written almost exclusively by controllers<br />(the ServerReconciler while traversing the state machine, and the<br />ServerClaim reconciler as surrogate input), and<br />every write patches the Server object, racing with its actual owner.<br />The desired power state is expressed more precisely through<br />ServerClaim and the server state machine itself;<br />the genuinely observed value is status.powerState. Do not set this<br />field on new Server resources; it will be removed in a future release. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
 | `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />- Recycle (default), immediately transitioning the server to `Available` after use.<br />- Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
 | `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |

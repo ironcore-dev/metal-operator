@@ -538,9 +538,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: indicatorLED
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IndicatorLED
-    - name: power
-      type:
-        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Power
     - name: reclaimPolicy
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerReclaimPolicy

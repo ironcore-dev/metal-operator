@@ -144,7 +144,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
 			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Spec.Power", BeEmpty()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 		))
 	})
@@ -211,9 +210,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		By("Ensuring the server is powered off while parked")
 		Eventually(Object(server)).Should(HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState))
 
-		By("Asserting spec.power stays cleared while parked")
-		Consistently(Object(server)).Should(HaveField("Spec.Power", BeEmpty()))
-
 		By("Resuming the server via an unpark request")
 		Eventually(Update(server, func() {
 			metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
@@ -223,7 +219,6 @@ var _ = Describe("ServerClaim Controller", func() {
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Status.State", metalv1alpha1.ServerStateReserved),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOnPowerState),
-			HaveField("Spec.Power", BeEmpty()),
 		))
 
 		By("Removing the ServerClaim")

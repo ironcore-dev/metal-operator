@@ -16,20 +16,32 @@ import (
 // seedSession is a sentinel gofish.Session used in tests that need a non-nil cached session.
 var seedSession = &gofish.Session{ID: "/redfish/v1/SessionService/Sessions/abc", Token: "test-token-123"}
 
+// mustNewSessionCache wraps NewSessionCache for tests where a valid TTL is always passed.
+func mustNewSessionCache(ttl time.Duration) *SessionCache {
+	c, err := NewSessionCache(ttl)
+	if err != nil {
+		panic(err)
+	}
+	return c
+}
+
 var _ = Describe("SessionCache", func() {
 	Describe("NewSessionCache", func() {
 		It("returns a non-nil cache with the given TTL", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache, err := NewSessionCache(10 * time.Minute)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(cache).NotTo(BeNil())
 			Expect(cache.ttl).To(Equal(10 * time.Minute))
 		})
 
-		It("panics for a zero TTL", func() {
-			Expect(func() { NewSessionCache(0) }).To(Panic())
+		It("returns an error for a zero TTL", func() {
+			_, err := NewSessionCache(0)
+			Expect(err).To(HaveOccurred())
 		})
 
-		It("panics for a negative TTL", func() {
-			Expect(func() { NewSessionCache(-1 * time.Second) }).To(Panic())
+		It("returns an error for a negative TTL", func() {
+			_, err := NewSessionCache(-1 * time.Second)
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
@@ -40,7 +52,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("clears a cached entry", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -60,7 +72,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("is a no-op for unknown keys", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			Expect(func() {
 				cache.Invalidate(SessionCacheKey{Endpoint: "https://unknown", Username: "x"})
 			}).NotTo(Panic())
@@ -74,7 +86,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("empties the entries map", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -93,7 +105,7 @@ var _ = Describe("SessionCache", func() {
 
 	Describe("cache-hit logic (internal state)", func() {
 		It("a seeded entry within TTL is treated as a cache hit", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -114,7 +126,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("an expired entry is treated as a cache miss", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -167,7 +179,7 @@ var _ = Describe("SessionCache", func() {
 
 	Describe("concurrent access", func() {
 		It("serialises concurrent reads for the same key without data races", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -196,7 +208,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("concurrent Invalidate and read do not race", func() {
-			cache := NewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache(10 * time.Minute)
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()

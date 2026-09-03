@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"maps"
 	"net/http"
 	"sync"
@@ -37,15 +38,15 @@ type SessionCache struct {
 }
 
 // NewSessionCache returns a SessionCache with the given idle TTL.
-// ttl must be positive.
-func NewSessionCache(ttl time.Duration) *SessionCache {
+// Returns an error if ttl is not positive.
+func NewSessionCache(ttl time.Duration) (*SessionCache, error) {
 	if ttl <= 0 {
-		panic("bmc: NewSessionCache requires a positive TTL")
+		return nil, fmt.Errorf("bmc: session cache TTL must be positive, got %v", ttl)
 	}
 	return &SessionCache{
 		entries: make(map[SessionCacheKey]*sessionCacheEntry),
 		ttl:     ttl,
-	}
+	}, nil
 }
 
 // GetOrCreate returns a valid Redfish session for the given options, reusing a
@@ -172,8 +173,9 @@ func (c *SessionCache) createSession(ctx context.Context, opts Options) (*gofish
 	return session, bmcTTL, nil
 }
 
-// IsSessionExpiredError reports whether err is an HTTP 401 from the BMC,
-// indicating the cached session token was invalidated server-side.
+// IsSessionExpiredError reports whether err indicates the BMC rejected the
+// cached session token. Matches HTTP 401 (Unauthorized) and 403 (Forbidden),
+// which are the most common responses for an expired or revoked token.
 func IsSessionExpiredError(err error) bool {
 	if err == nil {
 		return false
@@ -182,5 +184,6 @@ func IsSessionExpiredError(err error) bool {
 	if !errors.As(err, &redfishErr) {
 		return false
 	}
-	return redfishErr.HTTPReturnedStatusCode == http.StatusUnauthorized
+	return redfishErr.HTTPReturnedStatusCode == http.StatusUnauthorized ||
+		redfishErr.HTTPReturnedStatusCode == http.StatusForbidden
 }

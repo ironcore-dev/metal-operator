@@ -265,7 +265,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				ResourcePollingTimeout:  200 * time.Millisecond,
 				PowerPollingInterval:    50 * time.Millisecond,
 				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
 			},
 			TimeoutExpiry: 6 * time.Second,
 		}).SetupWithManager(k8sManager)).To(Succeed())
@@ -283,7 +282,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				ResourcePollingTimeout:  200 * time.Millisecond,
 				PowerPollingInterval:    50 * time.Millisecond,
 				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -306,7 +304,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				ResourcePollingTimeout:  200 * time.Millisecond,
 				PowerPollingInterval:    50 * time.Millisecond,
 				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -323,7 +320,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				ResourcePollingTimeout:  200 * time.Millisecond,
 				PowerPollingInterval:    50 * time.Millisecond,
 				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
@@ -355,7 +351,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				ResourcePollingTimeout:  200 * time.Millisecond,
 				PowerPollingInterval:    50 * time.Millisecond,
 				PowerPollingTimeout:     200 * time.Millisecond,
-				BasicAuth:               true,
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 

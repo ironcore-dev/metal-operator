@@ -185,6 +185,8 @@ func main() { // nolint: gocyclo
 		"Maximum idle TTL for cached Redfish session tokens (used with --bmc-auth-mode=session-cache). "+
 			"The effective TTL is min(this value, BMC-advertised SessionTimeout) — the BMC is queried "+
 			"on each cache miss and its SessionTimeout caps the value automatically. "+
+			"Sessions are deleted on clean shutdown; an unclean exit (OOM kill, eviction) may leave "+
+			"orphaned sessions on the BMC until the BMC-side timeout expires. "+
 			"Must be positive.")
 
 	opts := zap.Options{
@@ -422,7 +424,11 @@ func main() { // nolint: gocyclo
 			setupLog.Error(nil, "--bmc-session-cache-ttl must be positive when --bmc-auth-mode=session-cache")
 			os.Exit(1)
 		}
-		sessionCache = bmc.NewSessionCache(bmcSessionCacheTTL)
+		sessionCache, err = bmc.NewSessionCache(bmcSessionCacheTTL)
+		if err != nil {
+			setupLog.Error(err, "Failed to create session cache")
+			os.Exit(1)
+		}
 		if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
 			<-ctx.Done()
 			sessionCache.Close()
@@ -440,7 +446,11 @@ func main() { // nolint: gocyclo
 	}
 
 	bmcBaseOptions := bmc.Options{
-		SessionCache: sessionCache,
+		SessionCache:            sessionCache,
+		PowerPollingInterval:    powerPollingInterval,
+		PowerPollingTimeout:     powerPollingTimeout,
+		ResourcePollingInterval: resourcePollingInterval,
+		ResourcePollingTimeout:  resourcePollingTimeout,
 	}
 
 	if err = (&controller.EndpointReconciler{
@@ -498,14 +508,8 @@ func main() { // nolint: gocyclo
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		DiscoveryIgnitionPath:   discoveryIgnitionPath,
-		BMCOptions: bmc.Options{
-			SessionCache:            sessionCache,
-			PowerPollingInterval:    powerPollingInterval,
-			PowerPollingTimeout:     powerPollingTimeout,
-			ResourcePollingInterval: resourcePollingInterval,
-			ResourcePollingTimeout:  resourcePollingTimeout,
-		},
-		DiscoveryTimeout: discoveryTimeout,
+		BMCOptions:              bmcBaseOptions,
+		DiscoveryTimeout:        discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "server")
 		os.Exit(1)

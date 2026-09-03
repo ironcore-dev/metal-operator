@@ -192,9 +192,9 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 	})
 
 	It("should not claim a server in a non-available state", func(ctx SpecContext) {
-		By("Patching the Server to Initial state")
+		By("Patching the Server to Error state")
 		Eventually(UpdateStatus(server, func() {
-			server.Status.State = metalv1alpha1.ServerStateInitial
+			server.Status.State = metalv1alpha1.ServerStateError
 		})).Should(Succeed())
 
 		By("Creating a ServerClaim")
@@ -214,7 +214,7 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 		By("Ensuring that the Server has no claim ref")
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
+			HaveField("Status.State", metalv1alpha1.ServerStateError),
 		))
 
 		By("Ensuring that the ServerClaim stays unbound")

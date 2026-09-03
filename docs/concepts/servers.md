@@ -31,37 +31,31 @@ not on the `Server`.
 The `Server` CRD is central to managing bare metal servers. It allows for:
 
 - **Power Management**: Powering servers on and off. Workload power is requested via the [`ServerClaim`](serverclaims.md),
-  while lifecycle states drive power directly — on during [Discovery](#lifecycle-and-states), off when released or [parked](#parking).
+  while lifecycle states drive power directly — on when reserved, off when available, released, or [parked](#parking).
 - **BIOS Configuration**: Changing BIOS settings and performing BIOS updates.
 - **Lifecycle Management**: Handling the server's lifecycle through various states.
-- **Hardware Discovery**: Gathering hardware information via BMC and in-band agents.
+- **Hardware Information**: Gathering hardware information via BMC.
 
 ## Lifecycle and States
 
 A server undergoes the following phases:
 
-1. **Initial**: The server object is created; hardware details are not yet known.
+1. **Available**: The server object is created and transitions directly to the `Available` state.
+    - The `ServerReconciler` interacts with the BMC to retrieve hardware details (manufacturer, model, processors, storage) and adds them to the `ServerStatus`.
+    - An idle server is powered off and ready for use.
 
-2. **Discovery**:
-    - The `ServerReconciler` interacts with the BMC to retrieve hardware details.
-    - An initial boot is performed using a predefined ignition configuration.
-    - An agent called [`metalprobe`](https://github.com/ironcore-dev/metal-operator/tree/main/cmd/metalprobe) runs on the server to collect additional data (e.g., network interfaces, disks).
-    - The collected data is reported back to the `metal-operator` and added to the `ServerStatus`.`
-
-3. **Available**: The server has completed discovery and is ready for use.
-
-4. **Reserved**:
+2. **Reserved**:
     - A [`ServerClaim`](serverclaims.md) resource is created to claim the server.
     - The server transitions to the `Reserved` state.
     - The server is allocated for a specific use or user.
 
-5. **Released**:
+3. **Released**:
     - Only entered when `spec.reclaimPolicy` is `Retain` and the [`ServerClaim`](serverclaims.md) has been deleted.
     - The server is powered off and its `BootConfigurationRef` is cleared, but `spec.serverClaimRef` is kept.
     - The server stays in `Released` until an operator manually clears `spec.serverClaimRef`, at which point it transitions back to `Available`.
     - See [Reclaim Policy](#reclaim-policy) below.
 
-6. **Parked**:
+4. **Parked**:
     - An overlay state a server enters when it is **parked** out of the `ServerClaim` lifecycle so an
       external component can run an out-of-band **day-2 operation** (a firmware or BIOS/BMC update,
       hardware rework, diagnostics, or low-level storage reconfiguration) that must not be fought by
@@ -75,7 +69,7 @@ A server undergoes the following phases:
       any other state is deferred until it reaches a parkable state.
     - See [Parking](#parking) below.
 
-7. **Error**:
+5. **Error**:
     - The server has encountered an error.
     - Requires intervention to resolve issues before it can return to `Available`.
 
@@ -83,9 +77,7 @@ The state diagram below represents the various server states and their transitio
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Initial
-    Initial --> Discovery : Server object created
-    Discovery --> Available : Discovery complete
+    [*] --> Available : Server object created
     Available --> Reserved : ServerClaim created
     Reserved --> Available : ServerClaim removed (reclaimPolicy is Recycle)
     Reserved --> Released : ServerClaim removed (reclaimPolicy is Retain)
@@ -96,9 +88,8 @@ stateDiagram-v2
     Parked --> Reserved : Unpark requested (ServerClaimRef present)
     Available --> Error : Error detected
     Reserved --> Error : Error detected
-    Discovery --> Error : Error detected
     Released --> Error : Error detected
-    Error --> Initial : Error resolved
+    Error --> Available : Error resolved
 ```
 
 ## Reclaim Policy
@@ -136,7 +127,7 @@ kubectl patch server my-server --type=merge -p '{"spec":{"serverClaimRef":null}}
 
 `spec.unclaimable` is a first-class, typed **cordon** signal on a `Server`. When set to `true`, it prevents **new** [`ServerClaim`](serverclaims.md)s from binding to the server. Already-bound claims are unaffected: the existing `spec.serverClaimRef` stays in place while the server is cordoned.
 
-Cordon is orthogonal to the `Initial → Discovery → Available → Reserved` state machine: it affects claimability, not phase progression. A server may be cordoned in any state; a cordoned server in `Available` simply will not be picked up by new claims until it is uncordoned.
+Cordon is orthogonal to the `Available → Reserved` state machine: it affects claimability, not phase progression. A server may be cordoned in any state; a cordoned server in `Available` simply will not be picked up by new claims until it is uncordoned.
 
 - A claim with an explicit `serverRef` to a cordoned server stays `Pending` (its phase remains `Unbound`).
 - A claim using a `serverSelector` skips cordoned candidates. If no uncordoned candidate matches, the claim stays `Pending`.
@@ -181,6 +172,101 @@ kubectl patch server my-server --type=merge -p '{"spec":{"unclaimable":false}}'
 ```
 
 Any subject with `update` permission on the `Server` resource can toggle `spec.unclaimable`, typically operators/admins for manual maintenance and automated maintenance controllers.
+
+## Third-party discovery and initialization gating
+
+A `Server` becomes `Available` directly on creation. Since there is no built-in "not yet discovered" lifecycle stage, an external component (inventory sync, CMDB importer, discovery controller) that creates `Server` objects must express pending initialization work explicitly instead: with **taints** (a `NoBind` taint prevents any `ServerClaim` from binding) and **conditions** on the server status.
+
+Metal-operator defines neither the taint keys nor the condition types. Both belong to the third party. The following keys (`Undiscovered`, `Uninitialized`, `Discovered`, `Initialized`) are examples chosen by the third-party controller.
+
+A server that first needs a discovery boot and afterward a one-time BMC/BIOS baseline configuration is created with both taints:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: Server
+metadata:
+  name: node-0
+  labels:
+    metal.ironcore.dev/managed-by: my-discovery-controller
+spec:
+  systemUUID: "4c4c4544-0056-4d10-8058-b1c04f5a0333"
+  bmc:
+    protocol:
+      name: Redfish
+      port: 443
+    address: 192.168.1.10
+    bmcSecretRef:
+      name: node-0-bmc-credentials
+  taints:
+    - key: metal.ironcore.dev/Undiscovered
+      effect: NoBind
+    - key: metal.ironcore.dev/Uninitialized
+      effect: NoBind
+```
+
+The server is `Available` per the state machine, but no `ServerClaim` can bind while the taints are present. The third party then works through its gates:
+
+1. **Discovery boot.** The third party drives the first boot into the introspection image, either directly through the BMC access it owns or through metal-operator, by creating a `ServerClaim` that tolerates its own gating taint:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerClaim
+metadata:
+  name: node-0-discovery
+spec:
+  serverRef:
+    name: node-0
+  power: "On"
+  image: discovery-agent:latest
+  ignitionSecretRef:
+    name: node-0-discovery-ignition
+  tolerations:
+    - key: metal.ironcore.dev/Undiscovered
+      operator: Exists
+      effect: NoBind
+```
+
+   The tainted server binds to this claim and powers on with the discovery image. Regular claims still cannot bind. When the in-band agent has reported back, the third party stores the extracted hardware details in its own backend, sets the condition `Discovered: True` on the `Server` status, and deletes the discovery claim.
+
+2. **Initialization.** The third party performs one-time setup through the BMC access it owns (firmware/BIOS baseline, accounts, network) and afterwards sets the condition `Initialized: True` on the `Server` status.
+
+3. **Taint removal.** One `ServerReadinessRule` per gate removes the matching taint once the corresponding condition appears:
+
+```yaml
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerReadinessRule
+metadata:
+  name: undiscovered-gate
+spec:
+  serverSelector:
+    matchLabels:
+      metal.ironcore.dev/managed-by: my-discovery-controller
+  conditions:
+    - type: Discovered
+      requiredStatus: "True"
+  enforcementMode: BootstrapOnly
+  taint:
+    key: metal.ironcore.dev/Undiscovered
+    effect: NoBind
+---
+apiVersion: metal.ironcore.dev/v1alpha1
+kind: ServerReadinessRule
+metadata:
+  name: uninitialized-gate
+spec:
+  serverSelector:
+    matchLabels:
+      metal.ironcore.dev/managed-by: my-discovery-controller
+  conditions:
+    - type: Initialized
+      requiredStatus: "True"
+  enforcementMode: BootstrapOnly
+  taint:
+    key: metal.ironcore.dev/Uninitialized
+    effect: NoBind
+```
+
+Once both taints are gone, the server is claimable by regular workloads. `BootstrapOnly` fits one-time gates like the ones above, since each gate is evaluated only until the taint is removed once. `Continuous` re-enforces the taint if the condition disappears again. Multiple gates compose freely: one taint per initialization stage and one rule per taint, all evaluated independently.
 
 ## Parking
 
@@ -259,7 +345,7 @@ and the parked marker stay the same regardless of how the request arrives.
 ### Admission control
 
 Parking is admitted only from the `Available` and `Reserved` states, the in-use states. A `park`
-request on a server in any other state (`Initial`, `Discovery`, `Released`, `Error`)
+request on a server in any other state (`Released`, `Error`)
 is **deferred**: the request annotation is left in place and retried on the next resync, so a server
 that is still discovering (or otherwise not yet parkable) is parked automatically once it reaches a
 parkable state, without the requestor having to re-issue the request.

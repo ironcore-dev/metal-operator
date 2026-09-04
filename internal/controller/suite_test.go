@@ -37,7 +37,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/bmc/mock/server"
 	"github.com/ironcore-dev/metal-operator/internal/api/macdb"
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -52,11 +51,9 @@ var (
 	cfg       *rest.Config
 	k8sClient client.Client
 	testEnv   *envtest.Environment
-	// MockServerPort and RegistryPort are offset per parallel ginkgo
-	// process so suites running concurrently do not collide on ports.
+	// MockServerPort is offset per parallel ginkgo process so suites
+	// running concurrently do not collide on ports.
 	MockServerPort int32
-	RegistryPort   int
-	registryURL    string
 	mockServers    []*server.MockServer
 )
 
@@ -68,9 +65,7 @@ func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	// Flags are parsed at this point, so GinkgoParallelProcess is reliable.
-	RegistryPort = 30000 + GinkgoParallelProcess()
 	MockServerPort = int32(8000 + (GinkgoParallelProcess()-1)*10)
-	registryURL = fmt.Sprintf("http://localhost:%d", RegistryPort)
 
 	RunSpecs(t, "Controller Suite")
 }
@@ -212,14 +207,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			DefaultProtocol:         metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation:      true,
 			ManagerNamespace:        ns.Name,
-			ProbeImage:              "foo:latest",
-			ProbeOSImage:            "fooOS:latest",
-			RegistryURL:             registryURL,
-			RegistryClientTimeout:   5 * time.Second,
-			RegistryDataMaxAge:      2 * time.Minute,
-			RegistryResyncInterval:  50 * time.Millisecond,
 			ResyncInterval:          50 * time.Millisecond,
-			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
 			Conditions:              accessor,
 			BMCOptions: bmc.Options{
@@ -229,8 +217,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 				PowerPollingTimeout:     200 * time.Millisecond,
 				BasicAuth:               true,
 			},
-			DiscoveryTimeout:      30 * time.Second, // Set a short discovery timeout for testing
-			DiscoveryIgnitionPath: filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimReconciler{
@@ -257,16 +243,6 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 		Expect((&ServerReadinessRuleServerReconciler{
 			Client: k8sManager.GetClient(),
 		}).SetupWithManager(k8sManager)).To(Succeed())
-
-		By("Starting the registry server")
-		Expect(k8sManager.Add(manager.RunnableFunc(func(ctx context.Context) error {
-			registryServer := registry.NewServer(GinkgoLogr, fmt.Sprintf(":%d", RegistryPort), k8sManager.GetClient())
-			if err := registryServer.Start(ctx); err != nil {
-				return fmt.Errorf("failed to start registry server: %w", err)
-			}
-			<-ctx.Done()
-			return nil
-		}))).Should(Succeed())
 
 		if len(redfishMockServers) > 0 {
 			mockServers = make([]*server.MockServer, 0, len(redfishMockServers))

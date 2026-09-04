@@ -32,8 +32,6 @@ type ServerStatusApplyConfiguration struct {
 	IndicatorLED *apiv1alpha1.IndicatorLED `json:"indicatorLED,omitempty"`
 	// State represents the current state of the server.
 	State *apiv1alpha1.ServerState `json:"state,omitempty"`
-	// NetworkInterfaces is a list of network interfaces associated with the server.
-	NetworkInterfaces []NetworkInterfaceApplyConfiguration `json:"networkInterfaces,omitempty"`
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
 	// Processors is a list of Processors associated with the server.
@@ -111,19 +109,6 @@ func (b *ServerStatusApplyConfiguration) WithIndicatorLED(value apiv1alpha1.Indi
 // If called multiple times, the State field is set to the value of the last call.
 func (b *ServerStatusApplyConfiguration) WithState(value apiv1alpha1.ServerState) *ServerStatusApplyConfiguration {
 	b.State = &value
-	return b
-}
-
-// WithNetworkInterfaces adds the given value to the NetworkInterfaces field in the declarative configuration
-// and returns the receiver, so that objects can be build by chaining "With" function invocations.
-// If called multiple times, values provided by each call will be appended to the NetworkInterfaces field.
-func (b *ServerStatusApplyConfiguration) WithNetworkInterfaces(values ...*NetworkInterfaceApplyConfiguration) *ServerStatusApplyConfiguration {
-	for i := range values {
-		if values[i] == nil {
-			panic("nil value passed to WithNetworkInterfaces")
-		}
-		b.NetworkInterfaces = append(b.NetworkInterfaces, *values[i])
-	}
 	return b
 }
 

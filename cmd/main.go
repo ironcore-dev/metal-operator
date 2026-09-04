@@ -4,10 +4,8 @@
 package main
 
 import (
-	"context"
 	"crypto/tls"
 	"flag"
-	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -15,7 +13,6 @@ import (
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 	migrationutils "github.com/ironcore-dev/controller-utils/migration"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"github.com/ironcore-dev/metal-operator/internal/cmd/dns"
 	webhookv1alpha1 "github.com/ironcore-dev/metal-operator/internal/webhook/v1alpha1"
@@ -44,7 +41,6 @@ import (
 	"github.com/ironcore-dev/metal-operator/internal/controller"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/internal/migration"
-	"github.com/ironcore-dev/metal-operator/internal/registry"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -77,25 +73,14 @@ func main() { // nolint: gocyclo
 		protocol                           string
 		skipCertValidation                 bool
 		managerNamespace                   string
-		probeImage                         string
-		probeOSImage                       string
-		registryPort                       int
-		registryProtocol                   string
-		registryURL                        string
-		registryClientTimeout              time.Duration
-		registryDataMaxAge                 time.Duration
-		registryResyncInterval             time.Duration
 		webhookPort                        int
-		enforceFirstBoot                   bool
 		enforcePowerOff                    bool
-		discoveryIgnitionPath              string
 		serverResyncInterval               time.Duration
 		maintenanceResyncInterval          time.Duration
 		powerPollingInterval               time.Duration
 		powerPollingTimeout                time.Duration
 		resourcePollingInterval            time.Duration
 		resourcePollingTimeout             time.Duration
-		discoveryTimeout                   time.Duration
 		bmcFailureResetDelay               time.Duration
 		bmcResetResyncInterval             time.Duration
 		bmcResetWaitingInterval            time.Duration
@@ -111,19 +96,12 @@ func main() { // nolint: gocyclo
 		"The maximum number of concurrent Server reconciles.")
 	flag.IntVar(&serverClaimMaxConcurrentReconciles, "server-claim-max-concurrent-reconciles", 5,
 		"The maximum number of concurrent ServerClaim reconciles.")
-	flag.DurationVar(&discoveryTimeout, "discovery-timeout", 30*time.Minute, "Timeout for discovery boot")
 	flag.DurationVar(&resourcePollingInterval, "resource-polling-interval", 5*time.Second,
 		"Interval between polling resources")
 	flag.DurationVar(&resourcePollingTimeout, "resource-polling-timeout", 2*time.Minute, "Timeout for polling resources")
 	flag.DurationVar(&powerPollingInterval, "power-polling-interval", 5*time.Second,
 		"Interval between polling power state")
 	flag.DurationVar(&powerPollingTimeout, "power-polling-timeout", 2*time.Minute, "Timeout for polling power state")
-	flag.DurationVar(&registryResyncInterval, "registry-resync-interval", 10*time.Second,
-		"Defines the interval at which the registry is polled for new server information.")
-	flag.DurationVar(&registryClientTimeout, "registry-client-timeout", 5*time.Second,
-		"Timeout for HTTP requests to the registry.")
-	flag.DurationVar(&registryDataMaxAge, "registry-data-max-age", 2*time.Minute,
-		"Maximum age of registry data to accept for discovery completion.")
 	flag.DurationVar(&serverResyncInterval, "server-resync-interval", 2*time.Minute,
 		"Defines the interval at which the server is polled.")
 	flag.DurationVar(&bmcFailureResetDelay, "bmc-failure-reset-delay", 0,
@@ -136,13 +114,6 @@ func main() { // nolint: gocyclo
 		"Timeout for SSH reset operations.")
 	flag.DurationVar(&maintenanceResyncInterval, "maintenance-resync-interval", 2*time.Minute,
 		"Defines the interval at which the CRD performing maintenance is polled during server maintenance task.")
-	flag.StringVar(&discoveryIgnitionPath, "discovery-ignition-path", "/etc/metal-operator/ignition-template.yaml",
-		"Path to the ignition template file.")
-	flag.StringVar(&registryURL, "registry-url", "", "The URL of the registry.")
-	flag.StringVar(&registryProtocol, "registry-protocol", "http", "The protocol to use for the registry.")
-	flag.IntVar(&registryPort, "registry-port", 10000, "The port to use for the registry.")
-	flag.StringVar(&probeImage, "probe-image", "", "Image for the first boot probing of a Server.")
-	flag.StringVar(&probeOSImage, "probe-os-image", "", "OS image for the first boot probing of a Server.")
 	flag.StringVar(&managerNamespace, "manager-namespace", "default", "Namespace the manager is running in.")
 	flag.BoolVar(&insecure, "insecure", true, "Deprecated: Use --protocol and --skip-cert-validation instead")
 	flag.StringVar(&protocol, "protocol", "",
@@ -152,8 +123,6 @@ func main() { // nolint: gocyclo
 	flag.StringVar(&macPrefixesFile, "mac-prefixes-file", "", "Location of the MAC prefixes file.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enforceFirstBoot, "enforce-first-boot", false,
-		"Enforce the first boot probing of a Server even if it is powered on in the Initial state.")
 	flag.BoolVar(&enforcePowerOff, "enforce-power-off", false,
 		"Enforce the power off of a Server when graceful shutdown fails.")
 	flag.IntVar(&webhookPort, "webhook-port", 9443, "The port to use for webhook server.")
@@ -220,16 +189,6 @@ func main() { // nolint: gocyclo
 		setupLog.Info("WARNING: TLS certificate verification is disabled. This is not recommended for production")
 	}
 
-	if probeOSImage == "" {
-		setupLog.Error(nil, "probe OS image must be set")
-		os.Exit(1)
-	}
-
-	if probeImage == "" {
-		setupLog.Error(nil, "probe image must be set")
-		os.Exit(1)
-	}
-
 	dnsRecordTemplate := ""
 
 	if dnsRecordTemplatePath != "" {
@@ -253,17 +212,6 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "failed to unmarshal the MAC prefixes file")
 			os.Exit(1)
 		}
-	}
-
-	// set the correct registry URL by getting the address from the environment
-	var registryAddr string
-	if registryURL == "" {
-		registryAddr = os.Getenv("REGISTRY_ADDRESS")
-		if registryAddr == "" {
-			setupLog.Error(nil, "failed to set the registry URL as no address is provided")
-			os.Exit(1)
-		}
-		registryURL = fmt.Sprintf("%s://%s:%d", registryProtocol, registryAddr, registryPort)
 	}
 
 	if defaultFailedAutoRetryCount < 0 || defaultFailedAutoRetryCount > math.MaxInt32 {
@@ -453,18 +401,10 @@ func main() { // nolint: gocyclo
 		DefaultProtocol:         effectiveProtocol,
 		SkipCertValidation:      effectiveSkipCert,
 		ManagerNamespace:        managerNamespace,
-		ProbeImage:              probeImage,
-		ProbeOSImage:            probeOSImage,
-		RegistryURL:             registryURL,
-		RegistryClientTimeout:   registryClientTimeout,
-		RegistryDataMaxAge:      registryDataMaxAge,
-		RegistryResyncInterval:  registryResyncInterval,
 		ResyncInterval:          serverResyncInterval,
-		EnforceFirstBoot:        enforceFirstBoot,
 		EnforcePowerOff:         enforcePowerOff,
 		MaxConcurrentReconciles: serverMaxConcurrentReconciles,
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
-		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions: bmc.Options{
 			BasicAuth:               true,
 			PowerPollingInterval:    powerPollingInterval,
@@ -472,7 +412,6 @@ func main() { // nolint: gocyclo
 			ResourcePollingInterval: resourcePollingInterval,
 			ResourcePollingTimeout:  resourcePollingTimeout,
 		},
-		DiscoveryTimeout: discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "server")
 		os.Exit(1)
@@ -556,20 +495,6 @@ func main() { // nolint: gocyclo
 	ctx := ctrl.SetupSignalHandler()
 	if err := controller.RegisterIndexFields(ctx, mgr.GetFieldIndexer()); err != nil {
 		setupLog.Error(err, "unable to register field indexers")
-		os.Exit(1)
-	}
-
-	// Run registry server as a runnable to ensure it stops when the manager stops
-	if err := mgr.Add(manager.RunnableFunc(func(ctx context.Context) error {
-		setupLog.Info("starting registry server", "RegistryURL", registryURL)
-		registryServer := registry.NewServer(setupLog, fmt.Sprintf(":%d", registryPort), mgr.GetClient())
-		if err := registryServer.Start(ctx); err != nil {
-			return fmt.Errorf("unable to start registry server: %w", err)
-		}
-		<-ctx.Done()
-		return nil
-	})); err != nil {
-		setupLog.Error(err, "unable to add registry runnable to manager")
 		os.Exit(1)
 	}
 

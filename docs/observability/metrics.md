@@ -46,17 +46,14 @@ spec:
 **Description:** Server state as enum metric — emits all possible states for each server with value 1 for the current state and 0 for all others. This pattern prevents series churn when servers change state.
 **Labels:**
 - `server`: Server resource name
-- `state`: ServerState value (Initial, Discovery, Available, Reserved, Error, Maintenance)
+- `state`: ServerState value (Available, Reserved, Error)
 
 **Example values:**
 ```text
 # Server srv-001 is currently in Available state
-metal_server_state{server="srv-001", state="Initial"} 0
-metal_server_state{server="srv-001", state="Discovery"} 0
 metal_server_state{server="srv-001", state="Available"} 1
 metal_server_state{server="srv-001", state="Reserved"} 0
 metal_server_state{server="srv-001", state="Error"} 0
-metal_server_state{server="srv-001", state="Maintenance"} 0
 ```
 
 **Use cases:**

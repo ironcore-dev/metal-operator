@@ -144,24 +144,6 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
 				}
 				log.V(1).Info("Applied BMC object for Endpoint")
-			case metalv1alpha1.ProtocolRedfishWithRegistryPatch:
-				log.V(1).Info("Creating client for a kube test BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmc.NewRedfishLocalBMCClient(ctx, bmcOptions)
-				if err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
-				}
-				defer bmcClient.Logout()
-
-				var bmcSecret *metalv1alpha1.BMCSecret
-				if bmcSecret, err = r.applyBMCSecret(ctx, endpoint, m); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to apply BMCSecret: %w", err)
-				}
-				log.V(1).Info("Applied kube test BMC secret for Endpoint")
-
-				if err := r.applyBMC(ctx, bmcClient, endpoint, bmcSecret, m); err != nil {
-					return ctrl.Result{}, fmt.Errorf("failed to apply BMC object: %w", err)
-				}
-				log.V(1).Info("Applied BMC object for Endpoint")
 			default:
 				return ctrl.Result{}, fmt.Errorf("unknown protocol: %s", m.Protocol)
 			}

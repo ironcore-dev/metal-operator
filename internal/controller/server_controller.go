@@ -6,14 +6,8 @@ package controller
 import (
 	"cmp"
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
-	"encoding/json"
-	"encoding/pem"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
 	"slices"
 	"strings"
 	"time"
@@ -23,13 +17,9 @@ import (
 	"github.com/ironcore-dev/controller-utils/metautils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	"github.com/ironcore-dev/metal-operator/bmc"
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
-	"github.com/ironcore-dev/metal-operator/internal/ignition"
 	metalmetrics "github.com/ironcore-dev/metal-operator/internal/metrics"
 	"github.com/ironcore-dev/metal-operator/pkg/bmcutils"
 	"github.com/stmcginnis/gofish/schemas"
-	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/ssh"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/meta"
@@ -37,10 +27,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	corev1apply "k8s.io/client-go/applyconfigurations/core/v1"
-	metav1apply "k8s.io/client-go/applyconfigurations/meta/v1"
 	"k8s.io/client-go/tools/events"
-	"k8s.io/utils/ptr"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -50,26 +37,8 @@ import (
 )
 
 const (
-	// DefaultIgnitionSecretKeyName is the default key name for the ignition secret
-	DefaultIgnitionSecretKeyName = "ignition"
-	// DefaultIgnitionFormatKey is the key for the ignition format annotation
-	DefaultIgnitionFormatKey = "format"
-	// DefaultIgnitionFormatValue is the value for the ignition format annotation
-	DefaultIgnitionFormatValue = "fcos"
-	// SSHKeyPairSecretPrivateKeyName is the key name for the private key in the SSH key pair secret
-	SSHKeyPairSecretPrivateKeyName = "pem"
-	// SSHKeyPairSecretPublicKeyName is the key name for the public key in the SSH key pair secret
-	SSHKeyPairSecretPublicKeyName = "pub"
-	// SSHKeyPairSecretPasswordKeyName is the key name for the password in the SSH key pair secret
-	SSHKeyPairSecretPasswordKeyName = "password"
 	// ServerFinalizer is the finalizer for the server
 	ServerFinalizer = "metal.ironcore.dev/server"
-	// InternalAnnotationTypeKeyName is the key name for the internal annotation type
-	InternalAnnotationTypeKeyName = "metal.ironcore.dev/type"
-	// IsDefaultServerBootConfigOSImageKeyName is the key name for the is default OS image annotation
-	IsDefaultServerBootConfigOSImageKeyName = "metal.ironcore.dev/is-default-os-image"
-	// InternalAnnotationTypeValue is the value for the internal annotation type
-	InternalAnnotationTypeValue = "Internal"
 )
 
 const (
@@ -90,20 +59,11 @@ type ServerReconciler struct {
 	DefaultProtocol         metalv1alpha1.ProtocolScheme
 	SkipCertValidation      bool
 	ManagerNamespace        string
-	ProbeImage              string
-	ProbeOSImage            string
-	RegistryURL             string
-	RegistryClientTimeout   time.Duration
-	RegistryDataMaxAge      time.Duration
-	RegistryResyncInterval  time.Duration
-	EnforceFirstBoot        bool
 	EnforcePowerOff         bool
 	ResyncInterval          time.Duration
 	BMCOptions              bmc.Options
-	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
-	DiscoveryIgnitionPath   string
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch
@@ -185,7 +145,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 
 	// do late state initialization
 	if server.Status.State == "" {
-		state := metalv1alpha1.ServerStateInitial
+		state := metalv1alpha1.ServerStateAvailable
 		if server.Spec.ServerClaimRef != nil {
 			state = metalv1alpha1.ServerStateReserved
 		}
@@ -194,7 +154,7 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		}
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.WithRegistryURL(r.RegistryURL))
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)
@@ -242,35 +202,22 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 
 // Server state-machine:
 //
-// A Server goes through the following stages:
-// Initial -> Discovery -> Available -> Reserved -> Tainted -> Available ...
-//
-// Initial:
-// In the initial state we create a ServerBootConfiguration and an Ignition to start the Probe server on the
-// Server. The Server is patched to the state Discovery.
-//
-// Discovery:
-// In the discovery state we expect the Server to come up with the Probe server running.
-// This Probe server registers with the managers /registry/{uuid} endpoint it's address, so the reconciler can
-// fetch the server details from this endpoint. Once completed the Server is patched to the state Available.
+// A Server starts in the Available state (or Reserved when created with a claim).
 //
 // Available:
 // In the available state, a Server can be claimed by a ServerClaim. Here the claim reconciler takes over to
-// generate the necessary boot configuration. In the available state the Power state and indicator LEDs are being controlled.
+// generate the necessary boot configuration. In the available state the power state and indicator LEDs are being controlled.
 //
 // Reserved:
-// A Server in a reserved state can not be claimed by another claim.
+// A Server in a reserved state can not be claimed by another claim and is powered on with the claim's boot configuration.
 //
-// Tainted:
-// A tainted Server needs to be sanitized (clean up disks etc.). This is done in a similar way as in the
-// initial state where the server reconciler will create a BootConfiguration and an Ignition secret to
-// boot the server with a cleanup agent. This agent has also an endpoint to report its health state.
+// Released:
+// A released Server is powered off and held until its claim reference is removed, then it transitions back to Available.
+//
+// Parked:
+// An overlay state for external day-2 operations; normal state-machine progression, boot, and power healing are suspended.
 func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	switch server.Status.State {
-	case metalv1alpha1.ServerStateInitial:
-		return r.handleInitialState(ctx, bmcClient, server)
-	case metalv1alpha1.ServerStateDiscovery:
-		return r.handleDiscoveryState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateAvailable:
 		return r.handleAvailableState(ctx, bmcClient, server)
 	case metalv1alpha1.ServerStateReserved:
@@ -284,113 +231,20 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcC
 	}
 }
 
-func (r *ServerReconciler) handleInitialState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if requeue, err := r.ensureInitialConditions(ctx, bmcClient, server); err != nil || requeue {
-		return requeue, err
-	}
-	log.V(1).Info("Initial conditions for Server met")
-
-	if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to update server status system info: %w", err)
-	}
-	log.V(1).Info("Updated Server status system info")
-
-	if err := r.applyBootConfigurationAndIgnitionForDiscovery(ctx, server); err != nil {
-		return false, fmt.Errorf("failed to apply server boot configuration: %w", err)
-	}
-	log.V(1).Info("Applied Server boot configuration")
-
-	if err := r.pxeBootServer(ctx, bmcClient, server); err != nil {
-		return false, fmt.Errorf("failed to set PXE boot for server: %w", err)
-	}
-	log.V(1).Info("Set PXE Boot for Server")
-
-	// Ensure registry is clean before Discovery starts (fresh registration)
-	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
-		return false, fmt.Errorf("failed to clean up registry entry before discovery: %w", err)
-	}
-	log.V(1).Info("Ensured registry is clean for discovery")
-
-	if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateDiscovery); err != nil || modified {
-		return false, err
-	}
-	return false, nil
-}
-
-func (r *ServerReconciler) handleDiscoveryState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if ready, err := r.serverBootConfigurationIsReady(ctx, server); err != nil || !ready {
-		log.V(1).Info("Server boot configuration is not ready, retrying")
-		return true, err
-	}
-	log.V(1).Info("Server boot configuration is ready")
-
-	serverBase := server.DeepCopy()
-	if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOn); err != nil {
-		return false, fmt.Errorf("failed to ensure server power state: %w", err)
-	}
-	log.V(1).Info("Server state set to power on")
-
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch Server status: %w", err)
-	}
-
-	if r.checkLastStatusUpdateAfter(r.DiscoveryTimeout, server) {
-		log.V(1).Info("Server did not post info to registry in time, back to initial state")
-		if modified, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateInitial); err != nil || modified {
-			return false, err
-		}
-	}
-
-	serverDetails := &registry.Server{}
-	ready, err := r.extractServerDetailsFromRegistry(ctx, server, serverDetails)
-	if !ready && err == nil {
-		log.V(1).Info("Server agent did not post info to registry")
-		return true, nil
-	}
-	if err != nil {
-		log.V(1).Info("Could not get server details from registry")
-		return false, err
-	}
-
-	// Check if the registry data has timestamp and is fresh enough to proceed with discovery completion
-	if serverDetails.Timestamp == nil {
-		log.V(1).Info("Registry data has no timestamp, waiting for fresh update")
-		return true, nil
-	}
-	if time.Since(serverDetails.Timestamp.Time) >= r.RegistryDataMaxAge {
-		log.V(1).Info("Registry data is stale, waiting for fresh update", "age", time.Since(serverDetails.Timestamp.Time))
-		return true, nil
-	}
-
-	log.V(1).Info("Extracted Server details")
-
-	log.V(1).Info("Setting Server state to available")
-	if _, err := r.patchServerState(ctx, server, metalv1alpha1.ServerStateAvailable); err != nil {
-		return false, err
-	}
-
-	if err := r.invalidateRegistryEntryForServer(ctx, server); err != nil {
-		return false, fmt.Errorf("failed to invalidate registry entry for server: %w", err)
-	}
-	log.V(1).Info("Removed Server from Registry")
-	return false, nil
-}
-
 func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
+	if server.Status.Manufacturer == "" {
+		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
+			return false, fmt.Errorf("failed to update server status system info: %w", err)
+		}
+		log.V(1).Info("Updated Server status system info")
+	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)
 		}
 		log.V(1).Info("Server state set to power off")
 	}
-
-	if err := r.ensureInitialBootConfigurationIsDeleted(ctx, server); err != nil {
-		return false, fmt.Errorf("failed to ensure server initial boot configuration is deleted: %w", err)
-	}
-	log.V(1).Info("Ensured initial boot configuration is deleted")
 
 	if err := r.ensureIndicatorLED(ctx, bmcClient, server); err != nil {
 		return false, fmt.Errorf("failed to ensure server indicator led: %w", err)
@@ -737,15 +591,6 @@ func (r *ServerReconciler) resolvePreParkState(server *metalv1alpha1.Server) met
 	return metalv1alpha1.ServerStateAvailable
 }
 
-func (r *ServerReconciler) ensureServerBootConfigRef(ctx context.Context, server *metalv1alpha1.Server, config *metalv1alpha1.ServerBootConfiguration) error {
-	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
-		Namespace: config.Namespace,
-		Name:      config.Name,
-	}
-	return r.Patch(ctx, server, client.MergeFrom(serverBase))
-}
-
 // updates the Server status which can be changed via Spec
 func (r *ServerReconciler) updateServerStatus(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
@@ -853,161 +698,6 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 	return nil
 }
 
-func (r *ServerReconciler) applyBootConfigurationAndIgnitionForDiscovery(ctx context.Context, server *metalv1alpha1.Server) error {
-	log := ctrl.LoggerFrom(ctx)
-	bootConfig := &metalv1alpha1.ServerBootConfiguration{}
-	bootConfig.Name = server.Name
-	bootConfig.Namespace = r.ManagerNamespace
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, bootConfig, func() error {
-		if bootConfig.Annotations == nil {
-			bootConfig.Annotations = make(map[string]string)
-		}
-		bootConfig.Annotations[InternalAnnotationTypeKeyName] = InternalAnnotationTypeValue
-		bootConfig.Annotations[IsDefaultServerBootConfigOSImageKeyName] = "true"
-		bootConfig.Spec.ServerRef = v1.LocalObjectReference{Name: server.Name}
-		bootConfig.Spec.IgnitionSecretRef = &v1.LocalObjectReference{Name: server.Name}
-		bootConfig.Spec.Image = r.ProbeOSImage
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
-	}
-
-	log.V(1).Info("Created or patched", "ServerBootConfiguration", bootConfig.Name, "Namespace", bootConfig.Namespace, "Operation", opResult)
-
-	if err := r.ensureServerBootConfigRef(ctx, server, bootConfig); err != nil {
-		return err
-	}
-	return r.applyDefaultIgnitionForServer(ctx, server, bootConfig, r.RegistryURL)
-}
-
-func (r *ServerReconciler) applyDefaultIgnitionForServer(ctx context.Context, server *metalv1alpha1.Server, bootConfig *metalv1alpha1.ServerBootConfiguration, registryURL string) error {
-	log := ctrl.LoggerFrom(ctx)
-	sshPrivateKey, sshPublicKey, password, err := generateSSHKeyPairAndPassword()
-	if err != nil {
-		return fmt.Errorf("failed to generate SSH keypair: %w", err)
-	}
-
-	ownerRef := metav1apply.OwnerReference().
-		WithAPIVersion("metal.ironcore.dev/v1alpha1").
-		WithKind("ServerBootConfiguration").
-		WithName(bootConfig.Name).
-		WithUID(bootConfig.UID).
-		WithController(true).
-		WithBlockOwnerDeletion(true)
-
-	sshSecretApply := corev1apply.
-		Secret(fmt.Sprintf("%s-ssh", bootConfig.Name), r.ManagerNamespace).
-		WithType("Opaque").
-		WithData(map[string][]byte{
-			SSHKeyPairSecretPublicKeyName:   sshPublicKey,
-			SSHKeyPairSecretPrivateKeyName:  sshPrivateKey,
-			SSHKeyPairSecretPasswordKeyName: password,
-		}).
-		WithOwnerReferences(ownerRef)
-
-	if err := r.Apply(ctx, sshSecretApply, fieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply default SSH keypair: %w", err)
-	}
-	sshKeyPairNamespacedName := fmt.Sprintf("%s/%s", ptr.Deref(sshSecretApply.Namespace, ""), ptr.Deref(sshSecretApply.Name, ""))
-	log.V(1).Info("Applied SSH keypair secret", "SSHKeyPair", sshKeyPairNamespacedName)
-
-	probeFlags := fmt.Sprintf("--registry-url=%s --server-uuid=%s", registryURL, server.Spec.SystemUUID)
-	ignitionData, err := r.generateDefaultIgnitionDataForServer(probeFlags, sshPublicKey, password)
-	if err != nil {
-		return fmt.Errorf("failed to generate default ignitionSecret data: %w", err)
-	}
-
-	ownerRef = metav1apply.OwnerReference().
-		WithAPIVersion("metal.ironcore.dev/v1alpha1").
-		WithKind("ServerBootConfiguration").
-		WithName(bootConfig.Name).
-		WithUID(bootConfig.UID).
-		WithController(true).
-		WithBlockOwnerDeletion(true)
-
-	ignitionSecretApply := corev1apply.
-		Secret(bootConfig.Name, r.ManagerNamespace).
-		WithType("Opaque").
-		WithData(map[string][]byte{
-			DefaultIgnitionFormatKey:     []byte(DefaultIgnitionFormatValue),
-			DefaultIgnitionSecretKeyName: ignitionData,
-		}).
-		WithOwnerReferences(ownerRef)
-
-	if err := r.Apply(ctx, ignitionSecretApply, fieldOwner, client.ForceOwnership); err != nil {
-		return fmt.Errorf("failed to apply default ignition secret: %w", err)
-	}
-	log.V(1).Info("Applied Ignition Secret")
-
-	return nil
-}
-
-func generateSSHKeyPairAndPassword() ([]byte, []byte, []byte, error) {
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate private key: %w", err)
-	}
-
-	privateKeyBlock, err := ssh.MarshalPrivateKey(privateKey, "")
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	privateKeyPem := pem.EncodeToMemory(privateKeyBlock)
-
-	sshPubKey, err := ssh.NewPublicKey(&privateKey.PublicKey)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to create SSH public key: %w", err)
-	}
-	publicKeyAuthorized := ssh.MarshalAuthorizedKey(sshPubKey)
-
-	password, err := GenerateRandomPassword(20)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to generate password: %w", err)
-	}
-
-	return privateKeyPem, publicKeyAuthorized, password, nil
-}
-
-func (r *ServerReconciler) generateDefaultIgnitionDataForServer(flags string, sshPublicKey []byte, password []byte) ([]byte, error) {
-	passwordHash, err := bcrypt.GenerateFromPassword(password, bcrypt.DefaultCost)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate password hash: %w", err)
-	}
-
-	config := ignition.Config{
-		Image:        r.ProbeImage,
-		Flags:        flags,
-		SSHPublicKey: string(sshPublicKey),
-		PasswordHash: string(passwordHash),
-	}
-
-	// Load ignition template from file
-	ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-		r.DiscoveryIgnitionPath,
-		config,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate ignition data from file %s: %w", r.DiscoveryIgnitionPath, err)
-	}
-
-	return ignitionData, nil
-}
-
-func (r *ServerReconciler) ensureInitialConditions(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	if server.Status.State == metalv1alpha1.ServerStateInitial &&
-		server.Status.PowerState == metalv1alpha1.ServerOnPowerState &&
-		r.EnforceFirstBoot {
-		log.V(1).Info("Server in initial state is powered on, ensuring it is powered off")
-		if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff); err != nil {
-			return false, fmt.Errorf("failed to power off server in initial state: %w", err)
-		}
-		return true, nil
-	}
-	return false, nil
-}
-
 func (r *ServerReconciler) serverBootConfigurationIsReady(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
 	if server.Spec.BootConfigurationRef == nil {
 		return false, nil
@@ -1034,107 +724,6 @@ func (r *ServerReconciler) pxeBootServer(ctx context.Context, bmcClient bmc.BMC,
 		return fmt.Errorf("failed to set PXE boot one for server: %w", err)
 	}
 	return nil
-}
-
-func (r *ServerReconciler) extractServerDetailsFromRegistry(ctx context.Context, server *metalv1alpha1.Server, serverDetails *registry.Server) (bool, error) {
-	log := ctrl.LoggerFrom(ctx)
-	url := fmt.Sprintf("%s/systems/%s", r.RegistryURL, server.Spec.SystemUUID)
-	c := &http.Client{Timeout: r.RegistryClientTimeout}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return false, err
-	}
-
-	resp, err := c.Do(req)
-	if err != nil {
-		return false, err
-	}
-
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error(err, "Failed to close response body")
-		}
-	}(resp.Body)
-
-	if resp.StatusCode == http.StatusNotFound {
-		log.V(1).Info("Did not find server information in registry")
-		return false, nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return false, fmt.Errorf("failed to fetch server details from registry: HTTP %d: %s", resp.StatusCode, string(body))
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(serverDetails); err != nil {
-		return false, fmt.Errorf("failed to decode server details: %w", err)
-	}
-
-	serverBase := server.DeepCopy()
-	// update network interfaces
-	nics := make([]metalv1alpha1.NetworkInterface, 0, len(serverDetails.NetworkInterfaces))
-	for _, s := range serverDetails.NetworkInterfaces {
-		nic := metalv1alpha1.NetworkInterface{
-			Name:          s.Name,
-			MACAddress:    s.MACAddress,
-			CarrierStatus: s.CarrierStatus,
-		}
-
-		// Process all IP addresses from IPAddresses slice, with fallback to singular IPAddress
-		var allIPs []metalv1alpha1.IP
-		ipAddrs := s.IPAddresses
-		// Fallback: if IPAddresses is empty, use the deprecated singular IPAddress field
-		if len(ipAddrs) == 0 && s.IPAddress != "" {
-			ipAddrs = []string{s.IPAddress}
-		}
-		for _, ipAddr := range ipAddrs {
-			if ipAddr != "" {
-				// Parse and validate the IP address
-				ip, err := metalv1alpha1.ParseIP(ipAddr)
-				if err != nil {
-					log.Error(err, "Invalid IP address, skipping", "interface", s.Name, "ip", ipAddr)
-					continue
-				}
-
-				// Add all valid IP addresses (both IPv4 and IPv6) to the slice
-				allIPs = append(allIPs, ip)
-			}
-		}
-
-		nic.IPs = allIPs
-		nics = append(nics, nic)
-	}
-
-	// Merge LLDP neighbors into corresponding network interfaces
-	for _, lldpIface := range serverDetails.LLDP {
-		// Find the matching network interface by name
-		for i := range nics {
-			if nics[i].Name == lldpIface.Name {
-				// Convert LLDP neighbors to the CRD format
-				neighbors := make([]metalv1alpha1.LLDPNeighbor, 0, len(lldpIface.Neighbors))
-				for _, neighbor := range lldpIface.Neighbors {
-					neighbors = append(neighbors, metalv1alpha1.LLDPNeighbor{
-						MACAddress:        neighbor.ChassisID,
-						PortID:            neighbor.PortID,
-						PortDescription:   neighbor.PortDescription,
-						SystemName:        neighbor.SystemName,
-						SystemDescription: neighbor.SystemDescription,
-					})
-				}
-				nics[i].Neighbors = neighbors
-				break
-			}
-		}
-	}
-
-	server.Status.NetworkInterfaces = nics
-	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return false, fmt.Errorf("failed to patch server status: %w", err)
-	}
-
-	return true, nil
 }
 
 func (r *ServerReconciler) patchServerState(ctx context.Context, server *metalv1alpha1.Server, state metalv1alpha1.ServerState) (bool, error) {
@@ -1270,69 +859,6 @@ func (r *ServerReconciler) ensureIndicatorLED(ctx context.Context, bmcClient bmc
 	return bmcClient.SetIndicatorLED(ctx, server.Spec.SystemURI, desired)
 }
 
-func (r *ServerReconciler) ensureInitialBootConfigurationIsDeleted(ctx context.Context, server *metalv1alpha1.Server) error {
-	if server.Spec.BootConfigurationRef == nil {
-		return nil
-	}
-
-	config := &metalv1alpha1.ServerBootConfiguration{}
-	if err := r.Get(ctx, client.ObjectKey{Namespace: server.Spec.BootConfigurationRef.Namespace, Name: server.Spec.BootConfigurationRef.Name}, config); err != nil {
-		return err
-	}
-
-	if val, ok := config.Annotations[InternalAnnotationTypeKeyName]; !ok || val != InternalAnnotationTypeValue {
-		// hit a non-initial boot config
-		return nil
-	}
-
-	if err := r.Delete(ctx, config); err != nil {
-		return err
-	}
-
-	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = nil
-	if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (r *ServerReconciler) invalidateRegistryEntryForServer(ctx context.Context, server *metalv1alpha1.Server) error {
-	log := ctrl.LoggerFrom(ctx)
-	url := fmt.Sprintf("%s/delete/%s", r.RegistryURL, server.Spec.SystemUUID)
-	c := &http.Client{Timeout: r.RegistryClientTimeout}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
-	if err != nil {
-		return err
-	}
-
-	// Send the request
-	resp, err := c.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func(Body io.ReadCloser) {
-		err := Body.Close()
-		if err != nil {
-			log.Error(err, "Failed to close response body")
-		}
-	}(resp.Body)
-
-	// If the entry is not found, we can consider it already invalidated, so we return nil
-	if resp.StatusCode == http.StatusNotFound {
-		return nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return fmt.Errorf("failed to delete registry entry for server: HTTP %d: %s", resp.StatusCode, string(body))
-	}
-
-	return nil
-}
-
 func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) error {
 	log := ctrl.LoggerFrom(ctx)
 	if server.Spec.BMCRef == nil && server.Spec.BMC == nil {
@@ -1367,28 +893,8 @@ func (r *ServerReconciler) applyBootOrder(ctx context.Context, bmcClient bmc.BMC
 	return nil
 }
 
-func (r *ServerReconciler) checkLastStatusUpdateAfter(duration time.Duration, server *metalv1alpha1.Server) bool {
-	if len(server.ManagedFields) == 0 {
-		return false
-	}
-	length := len(server.ManagedFields) - 1
-	if server.ManagedFields[length].Operation == "Update" {
-		if server.ManagedFields[length].Subresource == "status" {
-			if server.ManagedFields[length].Time.Add(duration).Before(time.Now()) {
-				return true
-			}
-		}
-	}
-	return false
-}
-
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	// Validate DiscoveryIgnitionPath is set and accessible
-	if err := r.validateDiscoveryIgnitionPath(); err != nil {
-		return fmt.Errorf("invalid DiscoveryIgnitionPath configuration: %w", err)
-	}
-
 	return ctrl.NewControllerManagedBy(mgr).
 		WithOptions(controller.Options{
 			MaxConcurrentReconciles: r.MaxConcurrentReconciles,
@@ -1403,20 +909,6 @@ func (r *ServerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			r.enqueueServerByClaim(),
 		).
 		Complete(r)
-}
-
-// validateDiscoveryIgnitionPath ensures the DiscoveryIgnitionPath is set and accessible
-func (r *ServerReconciler) validateDiscoveryIgnitionPath() error {
-	if r.DiscoveryIgnitionPath == "" {
-		return fmt.Errorf("DiscoveryIgnitionPath is empty; must be set to a valid ignition template file path")
-	}
-
-	// Attempt to validate file accessibility by performing a test read
-	if err := ignition.ValidateIgnitionTemplatePath(r.DiscoveryIgnitionPath); err != nil {
-		return fmt.Errorf("DiscoveryIgnitionPath %q is not accessible or not a valid template: %w", r.DiscoveryIgnitionPath, err)
-	}
-
-	return nil
 }
 
 func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.EventHandler {

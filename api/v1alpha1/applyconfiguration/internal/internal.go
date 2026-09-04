@@ -225,8 +225,6 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EnforcementMode
   scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
-  scalar: untyped
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
   map:
     fields:
@@ -247,51 +245,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: macAddress
       type:
         scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
-  map:
-    fields:
-    - name: macAddress
-      type:
-        scalar: string
-    - name: portDescription
-      type:
-        scalar: string
-    - name: portID
-      type:
-        scalar: string
-    - name: systemDescription
-      type:
-        scalar: string
-    - name: systemName
-      type:
-        scalar: string
-- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.NetworkInterface
-  map:
-    fields:
-    - name: carrierStatus
-      type:
-        scalar: string
-    - name: ip
-      type:
-        scalar: string
-    - name: ips
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.IP
-          elementRelationship: atomic
-    - name: macAddress
-      type:
-        scalar: string
-    - name: name
-      type:
-        scalar: string
-    - name: neighbors
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LLDPNeighbor
-          elementRelationship: atomic
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
   map:
     fields:
@@ -584,12 +537,6 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: model
       type:
         scalar: string
-    - name: networkInterfaces
-      type:
-        list:
-          elementType:
-            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.NetworkInterface
-          elementRelationship: atomic
     - name: powerState
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerPowerState

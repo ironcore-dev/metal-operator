@@ -58,7 +58,19 @@ if ! git ls-remote --exit-code --heads upstream "${RELEASE_BRANCH}" &>/dev/null;
     exit 1
 fi
 
-UPSTREAM_REPO=$(gh repo view upstream --json nameWithOwner -q '.nameWithOwner')
+UPSTREAM_URL=$(git remote get-url upstream)
+UPSTREAM_REPO=$(gh repo view "${UPSTREAM_URL}" --json nameWithOwner -q '.nameWithOwner')
+if [[ -z "${UPSTREAM_REPO}" ]]; then
+    echo "Error: could not determine upstream repository from '${UPSTREAM_URL}'."
+    exit 1
+fi
+
+ORIGIN_URL=$(git remote get-url origin)
+FORK_OWNER=$(gh repo view "${ORIGIN_URL}" --json owner -q '.owner.login')
+if [[ -z "${FORK_OWNER}" ]]; then
+    echo "Error: could not determine fork owner from '${ORIGIN_URL}'."
+    exit 1
+fi
 
 # Get the merge commit SHA for the PR
 MERGE_COMMIT=$(gh pr view "${PR_NUMBER}" --repo "${UPSTREAM_REPO}" --json mergeCommit --jq '.mergeCommit.oid')
@@ -86,16 +98,17 @@ if ! git cherry-pick -x -m1 "${MERGE_COMMIT}"; then
     echo ""
     echo "Cherry-pick has conflicts. Please resolve them, then run:"
     echo "  git cherry-pick --continue"
-    echo "  git push origin ${CHERRY_PICK_BRANCH}"
-    echo "  gh pr create --repo ${UPSTREAM_REPO} --base ${RELEASE_BRANCH} --title \"🍒 [${RELEASE_BRANCH}] ${PR_TITLE}\" --body \"Cherry-pick of #${PR_NUMBER} into \`${RELEASE_BRANCH}\`.\""
+    echo "  git push -u origin ${CHERRY_PICK_BRANCH}"
+    echo "  gh pr create --repo ${UPSTREAM_REPO} --base ${RELEASE_BRANCH} --head ${FORK_OWNER}:${CHERRY_PICK_BRANCH} --title \"🍒 [${RELEASE_BRANCH}] ${PR_TITLE}\" --body \"Cherry-pick of #${PR_NUMBER} into \`${RELEASE_BRANCH}\`.\""
     exit 1
 fi
 
 # Push to fork and open PR against upstream
-git push origin "${CHERRY_PICK_BRANCH}"
+git push -u origin "${CHERRY_PICK_BRANCH}"
 gh pr create \
     --repo "${UPSTREAM_REPO}" \
     --base "${RELEASE_BRANCH}" \
+    --head "${FORK_OWNER}:${CHERRY_PICK_BRANCH}" \
     --title "🍒 [${RELEASE_BRANCH}] ${PR_TITLE}" \
     --body "Cherry-pick of #${PR_NUMBER} into \`${RELEASE_BRANCH}\`."
 

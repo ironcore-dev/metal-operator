@@ -6,6 +6,8 @@ This document describes how to cherry-pick a merged pull request into a release 
 
 - [gh CLI](https://cli.github.com/) installed and authenticated
 - Clean git working tree
+- `origin` remote pointing to your personal fork (the contributor fork)
+- `upstream` remote pointing to the PR base repository (the canonical repo)
 
 ## Overview
 
@@ -38,7 +40,7 @@ Cherry-pick PR #123 into the `release-v0.1` branch:
 This will:
 
 1. Fetch the merge commit of PR #123 from GitHub
-2. Create a new branch `cherry-pick-123-into-release-v0.1` from `origin/release-v0.1`
+2. Create a new branch `cherry-pick-123-into-release-v0.1` from `upstream/release-v0.1`
 3. Cherry-pick the merge commit
 4. Push the branch and open a PR targeting `release-v0.1`
 
@@ -54,11 +56,11 @@ If the cherry-pick results in merge conflicts, the script will stop and print in
     git cherry-pick --continue
     ```
 
-4. Push and create the PR manually:
+4. Push to your fork and create the PR against upstream manually:
 
     ```shell
     git push origin cherry-pick-<PR>-into-<release-branch>
-    gh pr create --base <release-branch> --title "🍒 [<release-branch>] <title>" --body "Cherry-pick of #<PR> into <release-branch>."
+    gh pr create --repo <org>/<upstream-repo> --base <release-branch> --title "🍒 [<release-branch>] <title>" --body "Cherry-pick of #<PR> into <release-branch>."
     ```
 
 ## Release notes

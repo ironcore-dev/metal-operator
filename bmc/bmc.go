@@ -22,6 +22,7 @@ const (
 	ManufacturerLenovo     Manufacturer = "Lenovo"
 	ManufacturerHPE        Manufacturer = "HPE"
 	ManufacturerSupermicro Manufacturer = "Supermicro"
+	ManufacturerFujitsu    Manufacturer = "Fsas"
 )
 
 // ComponentType represents a firmware component type.
@@ -219,6 +220,7 @@ func DefaultVendors() map[Manufacturer]VendorFactory {
 		ManufacturerHPE:        func(b *RedfishBaseBMC) BMC { return &HPERedfishBMC{RedfishBaseBMC: b} },
 		ManufacturerLenovo:     func(b *RedfishBaseBMC) BMC { return &LenovoRedfishBMC{RedfishBaseBMC: b} },
 		ManufacturerSupermicro: func(b *RedfishBaseBMC) BMC { return &SupermicroRedfishBMC{RedfishBaseBMC: b} },
+		ManufacturerFujitsu:    func(b *RedfishBaseBMC) BMC { return &FujitsuRedfishBMC{RedfishBaseBMC: b} },
 	}
 }
 
@@ -231,6 +233,7 @@ var (
 	_ BMC = (*HPERedfishBMC)(nil)
 	_ BMC = (*LenovoRedfishBMC)(nil)
 	_ BMC = (*SupermicroRedfishBMC)(nil)
+	_ BMC = (*FujitsuRedfishBMC)(nil)
 )
 
 type Entity struct {

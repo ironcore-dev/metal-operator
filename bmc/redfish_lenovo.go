@@ -40,16 +40,20 @@ func (r *LenovoRedfishBMC) GetBMCPendingAttributeValues(_ context.Context, _ str
 	return schemas.SettingsAttributes{}, nil
 }
 
-func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, _ string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
+func (r *LenovoRedfishBMC) SetBMCAttributesImmediately(_ context.Context, _ string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
 		return nil, nil
 	}
-	err := httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
-	return nil, err
+	return httpBasedUpdateBMCAttributes(r.client.GetService().GetClient(), attributes, schemas.ImmediateSettingsApplyTime)
 }
 
 func (r *LenovoRedfishBMC) CheckBMCAttributes(_ context.Context, _ string, _ schemas.SettingsAttributes) (bool, error) {
 	return false, nil
+}
+
+// FetchETags returns the current ETag for each URI. Lenovo XCC exposes ETags on BIOS Pending resources.
+func (r *LenovoRedfishBMC) FetchETags(_ context.Context, uris []string) (map[string]string, error) {
+	return httpFetchETags(r.client.GetService().GetClient(), uris)
 }
 
 // --- Firmware upgrade overrides ---

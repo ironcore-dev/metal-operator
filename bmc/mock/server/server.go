@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -202,6 +203,7 @@ type MockServer struct {
 	handler           http.Handler
 	mu                sync.RWMutex
 	overrides         map[string]any
+	etags             map[string]string     // file path → current ETag value
 	upgradeGen        int64                 // incremented on each SimpleUpdate to cancel stale goroutines
 	dellJobGen        int64                 // incremented on each Dell repository install to cancel stale goroutines
 	dellRepoState     dellRepoUpdateState   // GetRepoBasedUpdateList pending-package simulation state (see handleDellGetRepoBasedUpdateList)
@@ -252,6 +254,7 @@ func NewMockServer(log logr.Logger, addr string, opts ...Option) *MockServer {
 		addr:              addr,
 		log:               log,
 		overrides:         make(map[string]any),
+		etags:             make(map[string]string),
 		upgradedResources: make(map[string]string),
 		accounts:          loadAccountsFromEmbedded(),
 		// onCreate hooks run after a new collection member is stored.
@@ -398,7 +401,12 @@ func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 	if hasOverride {
 		copied = deepCopyAny(cached)
 	}
+	etag := s.etags[filePath]
 	s.mu.RUnlock()
+
+	if etag != "" {
+		w.Header().Set("ETag", etag)
+	}
 
 	if hasOverride {
 		s.writeJSON(w, http.StatusOK, copied)
@@ -544,6 +552,17 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate If-Match before any side effects.
+	if ifMatch := r.Header.Get("If-Match"); ifMatch != "" && ifMatch != "*" {
+		s.mu.RLock()
+		current := s.etags[filePath]
+		s.mu.RUnlock()
+		if current != "" && current != ifMatch {
+			http.Error(w, "Precondition Failed", http.StatusPreconditionFailed)
+			return
+		}
+	}
+
 	if err := s.applyBiosSettings(r.URL.Path, update); err != nil {
 		s.handleError(w, r, err)
 		return
@@ -556,16 +575,24 @@ func (s *MockServer) handlePatch(w http.ResponseWriter, r *http.Request) {
 
 	mergeJSON(base, update)
 
-	// Keep the authentication store in sync when Password is updated via PATCH.
-	if newPwd, ok := update["Password"].(string); ok && newPwd != "" {
-		if username, ok := base["UserName"].(string); ok && username != "" {
-			s.mu.Lock()
-			s.accounts[username] = newPwd
-			s.mu.Unlock()
+	// Extract password update for atomic commit inside checkIfMatchAndSave.
+	var newPwd, pwdUsername string
+	if p, ok := update["Password"].(string); ok && p != "" {
+		if u, ok := base["UserName"].(string); ok && u != "" {
+			newPwd = p
+			pwdUsername = u
 		}
 	}
 
-	s.saveResource(filePath, base)
+	newETag, ok := s.checkIfMatchAndSave(filePath, r.Header.Get("If-Match"), base, pwdUsername, newPwd)
+	if !ok {
+		http.Error(w, "Precondition Failed", http.StatusPreconditionFailed)
+		return
+	}
+	if newETag != "" {
+		w.Header().Set("ETag", newETag)
+	}
+
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -1188,6 +1215,25 @@ func (s *MockServer) GetBMCSettingAttr(managerID string) map[string]any {
 	return attrs
 }
 
+// SetBMCSettingAttr overwrites a single BMC attribute without bumping the ETag.
+// Use in tests to simulate out-of-band drift invisible to the ETag fast-path.
+func (s *MockServer) SetBMCSettingAttr(managerID, key string, value any) {
+	filePath := fmt.Sprintf("data/Managers/%s/index.json", managerID)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	resource, err := s.loadResourceLocked(filePath)
+	if err != nil {
+		return
+	}
+	attrs, ok := resource[attributesKey].(map[string]any)
+	if !ok {
+		attrs = make(map[string]any)
+		resource[attributesKey] = attrs
+	}
+	attrs[key] = value
+	s.overrides[filePath] = resource
+}
+
 // ResetBMCSettings resets the BMC attribute state on the server to defaults,
 // clearing both current and pending attributes. managerID is the folder name under data/Managers/ (e.g. "BMC").
 func (s *MockServer) ResetBMCSettings(managerID string) {
@@ -1414,6 +1460,29 @@ func (s *MockServer) saveResource(filePath string, data map[string]any) {
 	s.overrides[filePath] = data
 }
 
+// checkIfMatchAndSave validates If-Match, writes data, and bumps the ETag atomically.
+// Returns the new ETag and true on success; returns "", false when If-Match is stale.
+// If username and password are non-empty, s.accounts is updated in the same critical section.
+func (s *MockServer) checkIfMatchAndSave(filePath, ifMatch string, data map[string]any, username, password string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if ifMatch != "" && ifMatch != "*" {
+		if current := s.etags[filePath]; current != "" && current != ifMatch {
+			return "", false
+		}
+	}
+	s.overrides[filePath] = data
+	if username != "" && password != "" {
+		s.accounts[username] = password
+	}
+	if etag, ok := s.etags[filePath]; ok && etag != "" {
+		newETag := bumpETag(etag)
+		s.etags[filePath] = newETag
+		return newETag, true
+	}
+	return "", true
+}
+
 func (s *MockServer) isLocked(resource map[string]any) bool {
 	locked, _ := resource["resourceLock"].(string)
 	return locked == "Locked"
@@ -1510,6 +1579,50 @@ func (s *MockServer) ResetAccounts() {
 		}
 	}
 	s.accounts = loadAccountsFromEmbedded()
+}
+
+// SetResourceETag sets the ETag for the resource at urlPath.
+func (s *MockServer) SetResourceETag(urlPath, etag string) {
+	fp := resolvePath(urlPath)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.etags[fp] = etag
+}
+
+// GetResourceETag returns the current ETag for the resource at urlPath, or "".
+func (s *MockServer) GetResourceETag(urlPath string) string {
+	fp := resolvePath(urlPath)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.etags[fp]
+}
+
+// bumpETag increments the numeric suffix of an ETag (e.g. W/"v1" → W/"v2").
+func bumpETag(etag string) string {
+	weak := strings.HasPrefix(etag, "W/")
+	prefix := ""
+	if weak {
+		prefix = "W/"
+	}
+	inner := strings.TrimPrefix(etag, "W/")
+	inner = strings.Trim(inner, "\"")
+	// Hyphen-delimited suffix.
+	if idx := strings.LastIndexByte(inner, '-'); idx >= 0 {
+		if n, err := strconv.ParseInt(inner[idx+1:], 10, 64); err == nil {
+			return fmt.Sprintf("%s\"%s-%d\"", prefix, inner[:idx], n+1)
+		}
+	}
+	// Trailing decimal sequence (no delimiter).
+	i := len(inner)
+	for i > 0 && inner[i-1] >= '0' && inner[i-1] <= '9' {
+		i--
+	}
+	if i < len(inner) {
+		if n, err := strconv.ParseInt(inner[i:], 10, 64); err == nil {
+			return fmt.Sprintf("%s\"%s%d\"", prefix, inner[:i], n+1)
+		}
+	}
+	return fmt.Sprintf("%s\"%s-1\"", prefix, inner)
 }
 
 // Start starts the mock server and stops on ctx cancellation.

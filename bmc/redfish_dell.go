@@ -211,14 +211,43 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAt
 		return nil, nil
 	}
 
+	genericAttrs := map[string]string{}
+	dellAttrNames := map[string]string{}
+	for k, v := range attributes {
+		if parts := strings.Fields(k); len(parts) == 2 &&
+			(parts[0] == http.MethodPost || parts[0] == http.MethodPatch) {
+			genericAttrs[k] = v
+		} else {
+			dellAttrNames[k] = v
+		}
+	}
+
+	result := make(schemas.SettingsAttributes)
+
+	if len(genericAttrs) > 0 {
+		manager, err := r.getManagerForOEM()
+		if err != nil {
+			return nil, err
+		}
+		genericResult, err := httpBasedGetBMCSettingAttribute(manager.GetClient(), genericAttrs)
+		maps.Copy(result, genericResult)
+		if err != nil {
+			return result, err
+		}
+	}
+
+	if len(dellAttrNames) == 0 {
+		return result, nil
+	}
+
 	manager, err := r.getManagerForOEM()
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
 	bmcDellAttributes, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 
 	var mergedBMCAttributes = make(schemas.SettingsAttributes)
@@ -227,7 +256,7 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAt
 			if _, ok := mergedBMCAttributes[k]; !ok {
 				mergedBMCAttributes[k] = v
 			} else {
-				return nil,
+				return result,
 					fmt.Errorf("duplicate attributes in BMC settings are not supported duplicate key %v. in attribute %v",
 						k, bmcDellAttributes)
 			}
@@ -236,15 +265,14 @@ func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAt
 
 	filteredAttr, err := r.getFilteredBMCRegistryAttributes(manager, false, false)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	if len(filteredAttr) == 0 {
-		return nil, fmt.Errorf("'ManagerAttributeRegistry' not found")
+		return result, fmt.Errorf("'ManagerAttributeRegistry' not found")
 	}
 
-	result := make(schemas.SettingsAttributes, len(attributes))
 	var errs []error
-	for name := range attributes {
+	for name := range dellAttrNames {
 		var entry schemas.Attributes
 		var ok bool
 		if entry, ok = filteredAttr[name]; !ok {
@@ -358,18 +386,47 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 		return nil, nil
 	}
 
+	genericAttrs := schemas.SettingsAttributes{}
+	dellAttrs := schemas.SettingsAttributes{}
+	for key, value := range attributes {
+		if parts := strings.Fields(key); len(parts) == 2 &&
+			(parts[0] == http.MethodPost || parts[0] == http.MethodPatch) {
+			genericAttrs[key] = value
+		} else {
+			dellAttrs[key] = value
+		}
+	}
+
+	results := make(map[string]ApplyResult)
+
+	if len(genericAttrs) > 0 {
+		manager, err := r.getManagerForOEM()
+		if err != nil {
+			return results, err
+		}
+		genericResults, err := httpBasedUpdateBMCAttributes(manager.GetClient(), genericAttrs, schemas.ImmediateSettingsApplyTime)
+		maps.Copy(results, genericResults)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if len(dellAttrs) == 0 {
+		return results, nil
+	}
+
 	manager, err := r.getManagerForOEM()
 	if err != nil {
-		return nil, err
+		return results, err
 	}
 
 	bmcAttrValues, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
-		return nil, err
+		return results, err
 	}
 
 	payloads := make(map[string]schemas.SettingsAttributes, len(bmcAttrValues))
-	for key, value := range attributes {
+	for key, value := range dellAttrs {
 		for _, eachAttr := range bmcAttrValues {
 			if _, ok := eachAttr.Attributes[key]; ok {
 				target := eachAttr.Settings.SettingsObject
@@ -377,7 +434,7 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 					target = eachAttr.SourceURI
 				}
 				if target == "" {
-					return nil, fmt.Errorf("attribute '%v' has no target endpoint to patch", key)
+					return results, fmt.Errorf("attribute '%v' has no target endpoint to patch", key)
 				}
 				if data, ok := payloads[target]; ok {
 					data[key] = value
@@ -393,47 +450,79 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 	if len(payloads) > 0 {
 		var errs []error
 		for settingPath, payload := range payloads {
-			etag, err := func() (string, error) {
-				resp, err := manager.GetClient().Get(settingPath)
-				if err != nil {
-					return "", err
-				}
-				defer resp.Body.Close() // nolint: errcheck
-				return resp.Header.Get("ETag"), nil
-			}()
-			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to get Etag for %v: %w", settingPath, err))
-				continue
-			}
-
-			data := map[string]any{"Attributes": payload}
-			data["@Redfish.SettingsApplyTime"] = map[string]string{"ApplyTime": string(schemas.ImmediateSettingsApplyTime)}
-			var header = make(map[string]string)
-			if etag != "" {
-				header["If-Match"] = etag
-			}
-
-			err = func() error {
-				resp, err := manager.GetClient().PatchWithHeaders(settingPath, data, header)
-				if err != nil {
-					return err
-				}
-				defer resp.Body.Close() // nolint: errcheck
-				return nil
-			}()
+			patchETag, err := r.dellPatchPayload(manager.GetClient(), settingPath, payload)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to patch settings at %v: %w", settingPath, err))
 				continue
 			}
+			for key := range payload {
+				results[key] = ApplyResult{URI: settingPath, ETag: patchETag}
+			}
 		}
 		if len(errs) > 0 {
-			return nil, fmt.Errorf("some settings failed to apply %v", errs)
+			return results, fmt.Errorf("some settings failed to apply %v", errs)
 		}
 	}
+
+	return results, nil
+}
+
+// dellPatchPayload applies a single Dell DellAttributes payload via PATCH and returns the post-update ETag.
+func (r *DellRedfishBMC) dellPatchPayload(c schemas.Client, settingPath string, payload schemas.SettingsAttributes) (string, error) {
+	resp, err := c.Get(settingPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to get ETag for %v: %w", settingPath, err)
+	}
+	resp.Body.Close() // nolint: errcheck
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("GET %s returned status %d", settingPath, resp.StatusCode)
+	}
+	etag := resp.Header.Get("ETag")
+
+	data := map[string]any{"Attributes": payload}
+	data["@Redfish.SettingsApplyTime"] = map[string]string{"ApplyTime": string(schemas.ImmediateSettingsApplyTime)}
+	var header = make(map[string]string)
+	if etag != "" {
+		header["If-Match"] = etag
+	}
+
+	patchResp, err := c.PatchWithHeaders(settingPath, data, header)
+	if err != nil {
+		return "", err
+	}
+	defer patchResp.Body.Close() // nolint: errcheck
+	if patchResp.StatusCode < http.StatusOK || patchResp.StatusCode >= http.StatusMultipleChoices {
+		return "", fmt.Errorf("PATCH %s returned status %d", settingPath, patchResp.StatusCode)
+	}
+	if e := patchResp.Header.Get("ETag"); e != "" {
+		return e, nil
+	}
+	getResp, err := c.Get(settingPath)
+	if err != nil {
+		return "", nil
+	}
+	defer getResp.Body.Close() // nolint: errcheck
+	return getResp.Header.Get("ETag"), nil
+}
+
+// FetchETags returns nil; Dell DellAttributes are a monolithic resource with no per-attribute ETag signal.
+func (r *DellRedfishBMC) FetchETags(_ context.Context, _ []string) (map[string]string, error) {
 	return nil, nil
 }
 
 func (r *DellRedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string, attrs schemas.SettingsAttributes) (bool, error) {
+	dellAttrs := schemas.SettingsAttributes{}
+	for k, v := range attrs {
+		if parts := strings.Fields(k); len(parts) == 2 &&
+			(parts[0] == http.MethodPost || parts[0] == http.MethodPatch) {
+			continue
+		}
+		dellAttrs[k] = v
+	}
+	if len(dellAttrs) == 0 {
+		return false, nil
+	}
+
 	manager, err := r.getManagerForOEM()
 	if err != nil {
 		return false, err
@@ -454,7 +543,7 @@ func (r *DellRedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string,
 	if len(filteredAttr) == 0 {
 		return false, nil
 	}
-	return checkAttributes(attrs, filteredAttr)
+	return checkAttributes(dellAttrs, filteredAttr)
 }
 
 func (r *DellRedfishBMC) dellBuildRequestBody(parameters *schemas.UpdateServiceSimpleUpdateParameters) *SimpleUpdateRequestBody {

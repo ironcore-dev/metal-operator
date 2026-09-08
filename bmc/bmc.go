@@ -122,6 +122,9 @@ type BMCSettingsManager interface {
 
 	// CheckBMCAttributes checks if the BMC attributes are valid and returns whether a reset is required.
 	CheckBMCAttributes(ctx context.Context, UUID string, attrs schemas.SettingsAttributes) (reset bool, err error)
+
+	// FetchETags returns the current ETag for each URI, or nil if ETags are unavailable for this vendor.
+	FetchETags(ctx context.Context, uris []string) (map[string]string, error)
 }
 
 // FirmwareUpdater drives BIOS and BMC firmware upgrades.
@@ -401,6 +404,8 @@ type ApplyResult struct {
 	// ETag from the response header or follow-up GET.
 	// May be a real ETag (e.g. "W/\"abc\"") or a body hash (prefixed "hash:sha256:").
 	ETag string
+	// IsPost is true when the value was applied via HTTP POST (ephemeral resource).
+	IsPost bool
 }
 
 // GetBMCAttributeValuesRequest bundles the inputs for GetBMCAttributeValues.

@@ -182,22 +182,34 @@ func httpBasedGetBMCSettingAttribute(c schemas.Client, attributes map[string]str
 		if isSubMap(respData, dataMap) {
 			result[key] = data
 		} else {
-			result[key] = string(respRawBody)
+			// All desired fields null: write-only semantics — return nil.
+			allNull := len(dataMap) > 0
+			for k := range dataMap {
+				if v, ok := respData[k]; !ok || v != nil {
+					allNull = false
+					break
+				}
+			}
+			if allNull {
+				result[key] = nil
+			} else {
+				result[key] = string(respRawBody)
+			}
 		}
 	}
 	return result, errors.Join(errs...)
 }
 
-// httpBasedUpdateBMCAttributes applies BMC attributes via HTTP POST/PATCH.
-// Shared by HPE and Lenovo which use "POST <URI>" or "PATCH <URI>" format attributes.
-func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttributes, applyTime schemas.SettingsApplyTime) error {
+// httpBasedUpdateBMCAttributes applies BMC attributes via HTTP POST/PATCH, returning URI+ETag per key.
+func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttributes, applyTime schemas.SettingsApplyTime) (map[string]ApplyResult, error) {
 	if applyTime != schemas.ImmediateSettingsApplyTime {
-		return fmt.Errorf("does not support scheduled apply time for BMC attributes")
+		return nil, fmt.Errorf("does not support scheduled apply time for BMC attributes")
 	}
 	if c == nil {
-		return fmt.Errorf("failed to get client from gofish service")
+		return nil, fmt.Errorf("failed to get client from gofish service")
 	}
 	okCodes := []int{http.StatusOK, http.StatusAccepted, http.StatusNoContent, http.StatusCreated}
+	results := make(map[string]ApplyResult, len(attrs))
 	var errs []error
 	for attr, value := range attrs {
 		parts := strings.Fields(attr)
@@ -213,14 +225,13 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 			var err error
 			jsonBytes, err = json.Marshal(value)
 			if err != nil {
-				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
+				errs = append(errs, fmt.Errorf("failed to marshal spec data for url %s: %w\nbody: %v", url, err, value))
 				continue
 			}
 		}
 		valueMap := map[string]any{}
-		err := json.Unmarshal(jsonBytes, &valueMap)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", parts[1], err, value))
+		if err := json.Unmarshal(jsonBytes, &valueMap); err != nil {
+			errs = append(errs, fmt.Errorf("failed to unmarshal spec data for url %s: %w\nbody: %v", url, err, value))
 			continue
 		}
 		switch parts[0] {
@@ -230,25 +241,60 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 				errs = append(errs, fmt.Errorf("failed to POST attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
+			resp.Body.Close() // nolint: errcheck
 			if !slices.Contains(okCodes, resp.StatusCode) {
 				errs = append(errs, fmt.Errorf("failed to POST attribute %s: received status code %d", attr, resp.StatusCode))
 				continue
 			}
+			resourceURI := resp.Header.Get("Location")
+			if resourceURI == "" {
+				resourceURI = url
+			}
+			results[attr] = ApplyResult{
+				URI:    resourceURI,
+				ETag:   resp.Header.Get("ETag"),
+				IsPost: true,
+			}
+
 		case http.MethodPatch:
-			resp, err := c.Patch(url, valueMap)
+			var ifMatchHeader map[string]string
+			getResp, getErr := c.Get(url)
+			if getErr != nil {
+				errs = append(errs, fmt.Errorf("failed to GET ETag for PATCH %s: %w", url, getErr))
+				continue
+			}
+			getResp.Body.Close() // nolint: errcheck
+			if getResp.StatusCode < http.StatusOK || getResp.StatusCode >= http.StatusMultipleChoices {
+				errs = append(errs, fmt.Errorf("failed to GET ETag for PATCH %s: status %d", url, getResp.StatusCode))
+				continue
+			}
+			if etag := getResp.Header.Get("ETag"); etag != "" {
+				ifMatchHeader = map[string]string{"If-Match": etag}
+			}
+			resp, err := c.PatchWithHeaders(url, valueMap, ifMatchHeader)
 			if err != nil {
 				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s to URL %s: %w", attr, url, err))
 				continue
 			}
+			resp.Body.Close() // nolint: errcheck
 			if !slices.Contains(okCodes, resp.StatusCode) {
 				errs = append(errs, fmt.Errorf("failed to PATCH attribute %s: received status code %d", attr, resp.StatusCode))
 				continue
 			}
+			appliedETag := resp.Header.Get("ETag")
+			if appliedETag == "" {
+				if getResp, err := c.Get(url); err == nil {
+					getResp.Body.Close() // nolint: errcheck
+					appliedETag = getResp.Header.Get("ETag")
+				}
+			}
+			results[attr] = ApplyResult{URI: url, ETag: appliedETag}
+
 		default:
 			errs = append(errs, fmt.Errorf("unsupported HTTP method %s for attribute %s", parts[0], attr))
 		}
 	}
-	return errors.Join(errs...)
+	return results, errors.Join(errs...)
 }
 
 // isSubMap checks if sub is a subset of main (recursively for nested maps).
@@ -295,6 +341,10 @@ func checkAttributes(
 		}
 		if entryAttribute.ResetRequired {
 			reset = true
+		}
+		// Password attrs: value is opaque and cannot be validated against registry bounds — skip.
+		if entryAttribute.Type == schemas.PasswordAttributeType {
+			continue
 		}
 		switch entryAttribute.Type {
 		case schemas.IntegerAttributeType:
@@ -417,4 +467,33 @@ func checkPendingComponentUpgrade(ctx context.Context, base *RedfishBaseBMC, com
 	}
 
 	return false, nil
+}
+
+// httpFetchETags issues a GET for each URI and returns URI → ETag. Shared by HPE and Lenovo.
+func httpFetchETags(c schemas.Client, uris []string) (map[string]string, error) {
+	if c == nil {
+		return nil, fmt.Errorf("failed to get client for FetchETags")
+	}
+	result := make(map[string]string, len(uris))
+	var errs []error
+	for _, uri := range uris {
+		resp, err := c.Get(uri)
+		if err != nil {
+			// 404: POST-created resource gone — treat as empty, not an error.
+			var redfishErr *schemas.Error
+			if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusNotFound {
+				result[uri] = ""
+				continue
+			}
+			errs = append(errs, fmt.Errorf("FetchETags GET %s: %w", uri, err))
+			continue
+		}
+		resp.Body.Close() // nolint: errcheck
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			errs = append(errs, fmt.Errorf("FetchETags GET %s: unexpected status %d", uri, resp.StatusCode))
+			continue
+		}
+		result[uri] = resp.Header.Get("ETag")
+	}
+	return result, errors.Join(errs...)
 }

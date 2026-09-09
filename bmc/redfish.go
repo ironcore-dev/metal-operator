@@ -187,9 +187,13 @@ func (r *RedfishBaseBMC) Manufacturer() Manufacturer {
 }
 
 // Logout closes the BMC client connection. When session caching is enabled
-// the session is owned by the cache, so Logout is a no-op.
+// the session is owned by the cache, so Logout only closes idle connections.
 func (r *RedfishBaseBMC) Logout() {
-	if r.client == nil || r.options.SessionCache != nil {
+	if r.client == nil {
+		return
+	}
+	if r.options.SessionCache != nil {
+		r.client.HTTPClient.CloseIdleConnections()
 		return
 	}
 	r.client.Logout()

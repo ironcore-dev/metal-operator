@@ -421,7 +421,7 @@ func main() { // nolint: gocyclo
 	switch bmcAuthMode {
 	case "session-cache":
 		if bmcSessionCacheTTL <= 0 {
-			setupLog.Error(nil, "--bmc-session-cache-ttl must be positive when --bmc-auth-mode=session-cache")
+			setupLog.Error(nil, "BMC session cache TTL must be positive", "flag", "--bmc-session-cache-ttl")
 			os.Exit(1)
 		}
 		sessionCache, err = bmc.NewSessionCache(bmcSessionCacheTTL)

@@ -49,6 +49,15 @@ func NewSessionCache(ttl time.Duration) (*SessionCache, error) {
 	}, nil
 }
 
+// effectiveTTL returns the shorter of the configured TTL and the BMC-advertised
+// timeout. A zero or negative bmcTTL means the BMC did not advertise a timeout.
+func effectiveTTL(configured, bmcTTL time.Duration) time.Duration {
+	if bmcTTL > 0 && bmcTTL < configured {
+		return bmcTTL
+	}
+	return configured
+}
+
 // GetOrCreate returns a valid Redfish session for the given options, reusing a
 // cached token if one exists and has not expired.
 func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.Session, error) {
@@ -73,12 +82,8 @@ func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.S
 	if err != nil {
 		return nil, err
 	}
-	ttl := c.ttl
-	if bmcTTL > 0 && bmcTTL < ttl {
-		ttl = bmcTTL
-	}
 	entry.session = session
-	entry.expiresAt = time.Now().Add(ttl)
+	entry.expiresAt = time.Now().Add(effectiveTTL(c.ttl, bmcTTL))
 	entry.insecureTLS = opts.InsecureTLS
 	return session, nil
 }
@@ -128,6 +133,10 @@ func (c *SessionCache) Close() {
 			Timeout: 10 * time.Second,
 			Transport: &http.Transport{
 				TLSClientConfig: &tls.Config{InsecureSkipVerify: insecureTLS},
+			},
+			// Prevent X-Auth-Token from following redirects to another host.
+			CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+				return http.ErrUseLastResponse
 			},
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

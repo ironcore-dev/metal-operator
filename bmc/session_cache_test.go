@@ -4,6 +4,7 @@
 package bmc
 
 import (
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -11,14 +12,15 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/stmcginnis/gofish"
+	"github.com/stmcginnis/gofish/schemas"
 )
 
 // seedSession is a sentinel gofish.Session used in tests that need a non-nil cached session.
 var seedSession = &gofish.Session{ID: "/redfish/v1/SessionService/Sessions/abc", Token: "test-token-123"}
 
-// mustNewSessionCache wraps NewSessionCache for tests where a valid TTL is always passed.
-func mustNewSessionCache(ttl time.Duration) *SessionCache {
-	c, err := NewSessionCache(ttl)
+// mustNewSessionCache creates a SessionCache with a 10-minute TTL for use in tests.
+func mustNewSessionCache() *SessionCache {
+	c, err := NewSessionCache(10 * time.Minute)
 	if err != nil {
 		panic(err)
 	}
@@ -52,7 +54,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("clears a cached entry", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -72,7 +74,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("is a no-op for unknown keys", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			Expect(func() {
 				cache.Invalidate(SessionCacheKey{Endpoint: "https://unknown", Username: "x"})
 			}).NotTo(Panic())
@@ -86,7 +88,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("empties the entries map", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -105,7 +107,7 @@ var _ = Describe("SessionCache", func() {
 
 	Describe("cache-hit logic (internal state)", func() {
 		It("a seeded entry within TTL is treated as a cache hit", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -126,7 +128,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("an expired entry is treated as a cache miss", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -145,41 +147,23 @@ var _ = Describe("SessionCache", func() {
 		})
 	})
 
-	Describe("BMC TTL capping", func() {
+	Describe("effectiveTTL", func() {
 		It("uses the configured TTL when it is shorter than the BMC timeout", func() {
-			configured := 10 * time.Minute
-			bmcTTL := 30 * time.Minute
-			ttl := configured
-			if bmcTTL > 0 && bmcTTL < ttl {
-				ttl = bmcTTL
-			}
-			Expect(ttl).To(Equal(configured))
+			Expect(effectiveTTL(10*time.Minute, 30*time.Minute)).To(Equal(10 * time.Minute))
 		})
 
 		It("caps to the BMC timeout when it is shorter than the configured TTL", func() {
-			configured := 30 * time.Minute
-			bmcTTL := 10 * time.Minute
-			ttl := configured
-			if bmcTTL > 0 && bmcTTL < ttl {
-				ttl = bmcTTL
-			}
-			Expect(ttl).To(Equal(bmcTTL))
+			Expect(effectiveTTL(30*time.Minute, 10*time.Minute)).To(Equal(10 * time.Minute))
 		})
 
 		It("ignores a zero BMC timeout (not advertised)", func() {
-			configured := 10 * time.Minute
-			var bmcTTL time.Duration // zero: BMC did not advertise timeout
-			ttl := configured
-			if bmcTTL > 0 && bmcTTL < ttl {
-				ttl = bmcTTL
-			}
-			Expect(ttl).To(Equal(configured))
+			Expect(effectiveTTL(10*time.Minute, 0)).To(Equal(10 * time.Minute))
 		})
 	})
 
 	Describe("concurrent access", func() {
 		It("serialises concurrent reads for the same key without data races", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -208,7 +192,7 @@ var _ = Describe("SessionCache", func() {
 		})
 
 		It("concurrent Invalidate and read do not race", func() {
-			cache := mustNewSessionCache(10 * time.Minute)
+			cache := mustNewSessionCache()
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
@@ -246,6 +230,27 @@ var _ = Describe("SessionCache", func() {
 
 		It("returns false for a non-Redfish error", func() {
 			Expect(IsSessionExpiredError(http.ErrNoCookie)).To(BeFalse())
+		})
+
+		It("returns true for a Redfish 401 error", func() {
+			err := &schemas.Error{HTTPReturnedStatusCode: http.StatusUnauthorized}
+			Expect(IsSessionExpiredError(err)).To(BeTrue())
+		})
+
+		It("returns true for a Redfish 403 error", func() {
+			err := &schemas.Error{HTTPReturnedStatusCode: http.StatusForbidden}
+			Expect(IsSessionExpiredError(err)).To(BeTrue())
+		})
+
+		It("returns false for a Redfish 500 error", func() {
+			err := &schemas.Error{HTTPReturnedStatusCode: http.StatusInternalServerError}
+			Expect(IsSessionExpiredError(err)).To(BeFalse())
+		})
+
+		It("returns true when wrapped in another error", func() {
+			redfishErr := &schemas.Error{HTTPReturnedStatusCode: http.StatusUnauthorized}
+			wrapped := fmt.Errorf("wrapped: %w", redfishErr)
+			Expect(IsSessionExpiredError(wrapped)).To(BeTrue())
 		})
 	})
 })

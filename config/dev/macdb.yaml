@@ -1,7 +1,7 @@
 macPrefixes:
 - macPrefix: 23
   manufacturer: Foo
-  protocol: RedfishWithRegistryPatch
+  protocol: RedfishLocal
   port: 8000
   type: bmc
   defaultCredentials:

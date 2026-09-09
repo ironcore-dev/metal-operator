@@ -5,6 +5,7 @@ package metaldata_test
 
 import (
 	"net/netip"
+	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,6 +13,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/metaldata"
 )
 
 var _ = Describe("Index", func() {
@@ -29,11 +31,9 @@ var _ = Describe("Index", func() {
 
 	BeforeEach(func() {
 		server = newServer("server-a", "192.0.2.10")
-		server.Annotations = map[string]string{
-			"unrelated": "ignored",
-			metalv1alpha1.MetadataKeyPrefix + "owner": "alice",
-			metalv1alpha1.MetadataKeyPrefix + "rack":  "from-annotation",
-		}
+		server.Annotations["unrelated"] = "ignored"
+		server.Annotations[metalv1alpha1.MetadataKeyPrefix+"owner"] = "alice"
+		server.Annotations[metalv1alpha1.MetadataKeyPrefix+"rack"] = "from-annotation"
 		server.Labels = map[string]string{
 			"unrelated":                              "ignored",
 			metalv1alpha1.MetadataKeyPrefix + "rack": "from-label",
@@ -82,9 +82,7 @@ var _ = Describe("Index", func() {
 	It("lets annotations override static metadata on the same key", func() {
 		deleteServer(server)
 		server = newServer("server-a", "192.0.2.10")
-		server.Annotations = map[string]string{
-			metalv1alpha1.MetadataKeyPrefix + staticKey: "from-annotation",
-		}
+		server.Annotations[metalv1alpha1.MetadataKeyPrefix+staticKey] = "from-annotation"
 		addServer(server)
 
 		entry, _ := idx.Lookup(netip.MustParseAddr("192.0.2.10"))
@@ -160,11 +158,9 @@ var _ = Describe("Index", func() {
 		It("skips them without indexing", func() {
 			deleteServer(server)
 			server = &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{Name: "server-a"},
-				Status: metalv1alpha1.ServerStatus{
-					NetworkInterfaces: []metalv1alpha1.NetworkInterface{
-						{IPs: []metalv1alpha1.IP{{}}},
-					},
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "server-a",
+					Annotations: map[string]string{metaldata.IPsAnnotation: "not-an-ip"},
 				},
 			}
 			addServer(server)
@@ -176,16 +172,11 @@ var _ = Describe("Index", func() {
 })
 
 func newServer(name string, ips ...string) *metalv1alpha1.Server {
-	parsed := make([]metalv1alpha1.IP, 0, len(ips))
-	for _, ip := range ips {
-		parsed = append(parsed, metalv1alpha1.MustParseIP(ip))
-	}
-	return &metalv1alpha1.Server{
+	server := &metalv1alpha1.Server{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
-		Status: metalv1alpha1.ServerStatus{
-			NetworkInterfaces: []metalv1alpha1.NetworkInterface{
-				{Name: "eth0", IPs: parsed},
-			},
-		},
 	}
+	if len(ips) > 0 {
+		server.Annotations = map[string]string{metaldata.IPsAnnotation: strings.Join(ips, ",")}
+	}
+	return server
 }

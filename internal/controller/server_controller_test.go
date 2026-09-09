@@ -8,25 +8,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-	"path/filepath"
-	"time"
-
-	"golang.org/x/crypto/bcrypt"
-	"golang.org/x/crypto/ssh"
-	"gopkg.in/yaml.v3"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/api/registry"
-	"github.com/ironcore-dev/metal-operator/internal/ignition"
-	"github.com/ironcore-dev/metal-operator/internal/probe"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -236,7 +225,7 @@ var _ = Describe("Server Controller", func() {
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
 			HaveField("Status.Processors", ConsistOf(
 				metalv1alpha1.Processor{
@@ -264,144 +253,6 @@ var _ = Describe("Server Controller", func() {
 				},
 			)),
 		))
-
-		By("Ensuring the boot configuration has been created")
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			},
-		}
-		Eventually(Object(bootConfig)).Should(SatisfyAll(
-			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
-			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
-			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Spec.Image", "fooOS:latest"),
-			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-		))
-
-		By("Ensuring that the SSH keypair has been created")
-		sshSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      bootConfig.Name + "-ssh",
-			},
-		}
-		Eventually(Object(sshSecret)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "ServerBootConfiguration",
-				Name:               bootConfig.Name,
-				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeNil()))),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeNil()))),
-		))
-		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
-		Expect(err).NotTo(HaveOccurred())
-		_, _, _, _, err = ssh.ParseAuthorizedKey(sshSecret.Data[SSHKeyPairSecretPublicKeyName])
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring that the default ignition configuration has been created")
-		ignitionSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      bootConfig.Name,
-			},
-		}
-		Eventually(Get(ignitionSecret)).Should(Succeed())
-
-		// Since the bycrypted password hash is not deterministic, we will extract if from the actual secret and
-		// add it to our ignition data which we want to compare the rest with.
-		var parsedData map[string]any
-		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
-
-		passwd, ok := parsedData["passwd"].(map[string]any)
-		Expect(ok).To(BeTrue())
-
-		users, _ := passwd["users"].([]any)
-		Expect(users).To(HaveLen(1))
-
-		user, ok := users[0].(map[string]any)
-		Expect(ok).To(BeTrue())
-		Expect(user).To(HaveKeyWithValue("name", "metal"))
-
-		passwordHash, ok := user["password_hash"].(string)
-		Expect(ok).To(BeTrue(), "password_hash should be a string")
-
-		err = bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])
-		Expect(err).ToNot(HaveOccurred(), "passwordHash should match the expected password")
-
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
-
-		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "ServerBootConfiguration",
-				Name:               bootConfig.Name,
-				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
-		))
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
-
-		By("Ensuring that the Server is set to discovery and powered on")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Finalizers", ContainElement(ServerFinalizer)),
-			HaveField("OwnerReferences", BeEmpty()),
-			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			}),
-			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", ConditionPoweringOn),
-			)),
-		))
-
-		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 100*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
-		go func() {
-			defer GinkgoRecover()
-			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
-		}()
-
-		By("Ensuring that the server is set to available and powered off")
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
-			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
-			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
-		))
-
-		By("Ensuring that the boot configuration has been removed")
-		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
-
-		By("Ensuring that the server is removed from the registry")
-		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, endpoint)).Should(Succeed())
@@ -444,149 +295,22 @@ var _ = Describe("Server Controller", func() {
 		}
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 
-		By("Ensuring the boot configuration has been created")
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			},
-		}
-		Eventually(Object(bootConfig)).Should(SatisfyAll(
-			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
-			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
-			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Spec.Image", "fooOS:latest"),
-			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-		))
-
-		By("Ensuring that the SSH keypair has been created")
-		sshSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      bootConfig.Name + "-ssh",
-			},
-		}
-		Eventually(Object(sshSecret)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "ServerBootConfiguration",
-				Name:               bootConfig.Name,
-				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPublicKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPrivateKeyName, Not(BeEmpty()))),
-			HaveField("Data", HaveKeyWithValue(SSHKeyPairSecretPasswordKeyName, Not(BeEmpty()))),
-		))
-		_, err := ssh.ParsePrivateKey(sshSecret.Data[SSHKeyPairSecretPrivateKeyName])
-		Expect(err).NotTo(HaveOccurred())
-		_, _, _, _, err = ssh.ParseAuthorizedKey(sshSecret.Data[SSHKeyPairSecretPublicKeyName])
-		Expect(err).NotTo(HaveOccurred())
-
-		By("Ensuring that the default ignition configuration has been created")
-		ignitionSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      bootConfig.Name,
-			},
-		}
-		Eventually(Get(ignitionSecret)).Should(Succeed())
-
-		// Since the bycrypted password hash is not deterministic we will extract if from the actual secret and
-		// add it to our ignition data which we want to compare the rest with.
-		var parsedData map[string]any
-		Expect(yaml.Unmarshal(ignitionSecret.Data[DefaultIgnitionSecretKeyName], &parsedData)).ToNot(HaveOccurred())
-
-		passwd, ok := parsedData["passwd"].(map[string]any)
-		Expect(ok).To(BeTrue())
-
-		users, _ := passwd["users"].([]any)
-		Expect(users).To(HaveLen(1))
-
-		user, ok := users[0].(map[string]any)
-		Expect(ok).To(BeTrue())
-		Expect(user).To(HaveKeyWithValue("name", "metal"))
-
-		passwordHash, ok := user["password_hash"].(string)
-		Expect(ok).To(BeTrue(), "password_hash should be a string")
-
-		Expect(bcrypt.CompareHashAndPassword([]byte(passwordHash), sshSecret.Data[SSHKeyPairSecretPasswordKeyName])).Should(Succeed())
-
-		// Generate expected ignition data using the same template file the controller uses
-		ignitionData, err := ignition.GenerateIgnitionDataFromFile(
-			filepath.Join("..", "..", "config", "manager", "ignition-template.yaml"),
-			ignition.Config{
-				Image:        "foo:latest",
-				Flags:        fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				SSHPublicKey: string(sshSecret.Data[SSHKeyPairSecretPublicKeyName]),
-				PasswordHash: passwordHash,
-			},
-		)
-		Expect(err).NotTo(HaveOccurred())
-
-		Eventually(Object(ignitionSecret)).Should(SatisfyAll(
-			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
-				APIVersion:         "metal.ironcore.dev/v1alpha1",
-				Kind:               "ServerBootConfiguration",
-				Name:               bootConfig.Name,
-				UID:                bootConfig.UID,
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			})),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionFormatKey, []byte("fcos"))),
-			HaveField("Data", HaveKeyWithValue(DefaultIgnitionSecretKeyName, MatchYAML(ignitionData))),
-		))
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
-
-		By("Ensuring that the Server resource has been created")
+		By("Ensuring that the Server transitions directly to available and is powered off")
+		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
+		// force calculation of zero capacity string
+		_ = zeroCapacity.String()
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
 			HaveField("Spec.SystemUUID", "38947555-7742-3448-3784-823347823834"),
 			HaveField("Spec.SystemURI", "/redfish/v1/Systems/437XR1138R2"),
-			HaveField("Spec.IndicatorLED", metalv1alpha1.IndicatorLED("")),
 			HaveField("Spec.ServerClaimRef", BeNil()),
-			HaveField("Spec.BootConfigurationRef", &metalv1alpha1.ObjectReference{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			}),
 			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.BIOSVersion", "P79 v1.45 (12/06/2017)"),
 			HaveField("Status.SKU", "8675309"),
 			HaveField("Status.SerialNumber", "437XR1138R2"),
 			HaveField("Status.IndicatorLED", metalv1alpha1.OffIndicatorLED),
-			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-			HaveField("Status.Conditions", ContainElement(
-				HaveField("Type", ConditionPoweringOn),
-			)),
-		))
-
-		By("Starting the probe agent")
-		probeAgent := probe.NewAgent(GinkgoLogr, server.Spec.SystemUUID, registryURL, 50*time.Millisecond, 1*time.Second, 50*time.Millisecond, 250*time.Millisecond)
-		go func() {
-			defer GinkgoRecover()
-			Expect(probeAgent.Start(ctx)).To(Succeed(), "failed to start probe agent")
-		}()
-
-		By("Ensuring that the server is set to available and powered off")
-		// check that the available state is set first, as that is as part of handling
-		// the discovery state. The ServerBootConfig deletion happens in a later
-		// reconciliation as part of handling the available state.
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
-
-		zeroCapacity := resource.NewQuantity(0, resource.DecimalSI)
-		// force calculation of zero capacity string
-		_ = zeroCapacity.String()
-		Eventually(Object(server)).Should(SatisfyAll(
-			HaveField("Spec.BootConfigurationRef", BeNil()),
 			HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
 			HaveField("Status.PowerState", metalv1alpha1.ServerOffPowerState),
-			HaveField("Status.NetworkInterfaces", Not(BeEmpty())),
 			HaveField("Status.Storages", ContainElement(metalv1alpha1.Storage{
 				Name: "Simple Storage Controller",
 				Drives: []metalv1alpha1.StorageDrive{
@@ -618,160 +342,11 @@ var _ = Describe("Server Controller", func() {
 			})),
 			HaveField("Status.Storages", HaveLen(1)),
 		))
-
-		By("Ensuring that the boot configuration has been removed")
-		Consistently(Get(bootConfig)).Should(Satisfy(apierrors.IsNotFound))
-
-		By("Ensuring that the server is removed from the registry")
-		response, err := http.Get(registryURL + "/systems/" + server.Spec.SystemUUID)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response.StatusCode).To(Equal(http.StatusNotFound))
+		Consistently(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateAvailable))
 
 		// cleanup
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
-	})
-
-	It("should reset a Server into initial state on discovery failure", func(ctx SpecContext) {
-		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
-			Data: map[string][]byte{
-				"username": []byte("foo"),
-				"password": []byte("bar"),
-			},
-		}
-		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-
-		By("Creating a Server with inline BMC configuration")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
-			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "38947555-7742-3448-3784-823347823834",
-				BMC: &metalv1alpha1.BMCAccess{
-					Protocol: metalv1alpha1.Protocol{
-						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: MockServerPort,
-					},
-					Address: MockServerIP,
-					BMCSecretRef: v1.LocalObjectReference{
-						Name: bmcSecret.Name,
-					},
-				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateInitial))
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
-
-		By("Ensuring the boot configuration has been created")
-		bootConfig := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			},
-		}
-		Eventually(Object(bootConfig)).Should(SatisfyAll(
-			HaveField("Annotations", HaveKeyWithValue(InternalAnnotationTypeKeyName, InternalAnnotationTypeValue)),
-			HaveField("Annotations", HaveKeyWithValue(IsDefaultServerBootConfigOSImageKeyName, "true")),
-			HaveField("Spec.ServerRef", v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Spec.Image", "fooOS:latest"),
-			HaveField("Spec.IgnitionSecretRef", &v1.LocalObjectReference{Name: server.Name}),
-			HaveField("Status.State", metalv1alpha1.ServerBootConfigurationStatePending),
-		))
-
-		go func(ctx SpecContext) {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					deleteRegistrySystemIfExists(server.Spec.SystemUUID)
-				}
-			}
-		}(ctx)
-
-		By("Patching the boot configuration to a Ready state")
-		Eventually(UpdateStatus(bootConfig, func() {
-			bootConfig.Status.State = metalv1alpha1.ServerBootConfigurationStateReady
-		})).Should(Succeed())
-
-		Eventually(Object(server)).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
-			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-		))
-		Consistently(Object(server)).WithTimeout(6 * time.Second).WithPolling(2 * time.Second).Should(SatisfyAny(
-			HaveField("Status.State", metalv1alpha1.ServerStateInitial),
-			HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
-		))
-
-		// cleanup
-		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
-		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
-	})
-
-	It("should update the BootStateReceived condition when the bootstate endpoint is called", func(ctx SpecContext) {
-		By("Creating a BMCSecret")
-		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
-			Data: map[string][]byte{
-				"username": []byte("foo"),
-				"password": []byte("bar"),
-			},
-		}
-		Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-
-		By("Creating a Server with inline BMC configuration")
-		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
-			Spec: metalv1alpha1.ServerSpec{
-				SystemUUID: "38947555-7742-3448-3784-823347823834",
-				BMC: &metalv1alpha1.BMCAccess{
-					Protocol: metalv1alpha1.Protocol{
-						Name: metalv1alpha1.ProtocolRedfishLocal,
-						Port: MockServerPort,
-					},
-					Address: MockServerIP,
-					BMCSecretRef: v1.LocalObjectReference{
-						Name: bmcSecret.Name,
-					},
-				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
-
-		var bootstateRequest registry.BootstatePayload
-		bootstateRequest.SystemUUID = server.Spec.SystemUUID
-		bootstateRequest.Booted = true
-		marshaled, err := json.Marshal(bootstateRequest)
-		Expect(err).NotTo(HaveOccurred())
-		response, err := http.Post(registryURL+"/bootstate", "application/json", bytes.NewBuffer(marshaled))
-		Expect(err).NotTo(HaveOccurred())
-		Expect(response.Body.Close()).To(Succeed())
-		Expect(response.StatusCode).To(Equal(http.StatusOK))
-
-		bootConfig := metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      server.Spec.BootConfigurationRef.Name,
-				Namespace: server.Spec.BootConfigurationRef.Namespace,
-			},
-		}
-		Eventually(Object(&bootConfig)).Should(HaveField("Status.Conditions", ContainElement(HaveField("Type", registry.BootStateReceivedCondition))))
-		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
-		Eventually(Get(server)).Should(Satisfy(apierrors.IsNotFound))
-		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
-		Eventually(Get(bmcSecret)).Should(Satisfy(apierrors.IsNotFound))
-		Eventually(Get(&bootConfig)).Should(Satisfy(apierrors.IsNotFound))
 	})
 
 	It("should move Server out of reserved state on missing serverClaim and BootConfig", func(ctx SpecContext) {
@@ -896,288 +471,6 @@ var _ = Describe("Server Controller", func() {
 		Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
 		Expect(k8sClient.Delete(ctx, ignitionSecret)).Should(Succeed())
-	})
-
-	Context("File-based Ignition Templates", func() {
-		var bmcSecret *metalv1alpha1.BMCSecret
-		var server *metalv1alpha1.Server
-
-		BeforeEach(func(ctx SpecContext) {
-			By("Creating a BMCSecret")
-			bmcSecret = &metalv1alpha1.BMCSecret{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-server-",
-				},
-				Data: map[string][]byte{
-					"username": []byte("foo"),
-					"password": []byte("bar"),
-				},
-			}
-			Expect(k8sClient.Create(ctx, bmcSecret)).To(Succeed())
-
-			By("Creating a Server with inline BMC configuration")
-			server = &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "server-",
-				},
-				Spec: metalv1alpha1.ServerSpec{
-					SystemUUID: "38947555-7742-3448-3784-823347823834",
-					BMC: &metalv1alpha1.BMCAccess{
-						Protocol: metalv1alpha1.Protocol{
-							Name: metalv1alpha1.ProtocolRedfishLocal,
-							Port: MockServerPort,
-						},
-						Address: MockServerIP,
-						BMCSecretRef: v1.LocalObjectReference{
-							Name: bmcSecret.Name,
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, server)).To(Succeed())
-		})
-
-		AfterEach(func(ctx SpecContext) {
-			By("Cleaning up test resources")
-			if server != nil {
-				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, server))).To(Succeed())
-			}
-			if bmcSecret != nil {
-				Expect(client.IgnoreNotFound(k8sClient.Delete(ctx, bmcSecret))).To(Succeed())
-			}
-		})
-
-		It("should use custom file template when available", func(ctx SpecContext) {
-			By("Creating a custom ignition template file")
-			customTemplate := `variant: fcos
-version: "1.4.0"
-systemd:
-  units:
-    - name: custom-metalprobe.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Custom Metal Probe Service
-        [Service]
-        Restart=on-failure
-        RestartSec=30
-        ExecStartPre=/usr/bin/docker pull {{.Image}}
-        ExecStart=/usr/bin/docker run --network host --privileged --name custom-metalprobe {{.Image}} {{.Flags}}
-        ExecStop=/usr/bin/docker stop custom-metalprobe
-        [Install]
-        WantedBy=multi-user.target
-passwd:
-  users:
-    - name: custom-metal
-      password_hash: {{.PasswordHash}}
-      groups: [ "wheel", "docker" ]
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
-
-			tmpFile, err := os.CreateTemp("", "ignition-template-*.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(os.Remove, tmpFile.Name())
-
-			_, err = tmpFile.WriteString(customTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(tmpFile.Close()).To(Succeed())
-
-			By("Creating a ServerReconciler with file path")
-			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				DiscoveryIgnitionPath: tmpFile.Name(),
-			}
-
-			By("Generating ignition data with custom file")
-			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.4.0\""))
-			Expect(ignitionStr).To(ContainSubstring("custom-metalprobe.service"))
-			Expect(ignitionStr).To(ContainSubstring("Custom Metal Probe Service"))
-			Expect(ignitionStr).To(ContainSubstring("custom-metal"))
-			Expect(ignitionStr).To(ContainSubstring("RestartSec=30"))
-		})
-
-		It("should fallback with error when file is missing", func(ctx SpecContext) {
-			By("Creating a ServerReconciler with non-existent file path")
-			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				DiscoveryIgnitionPath: "/nonexistent/path/ignition.yaml",
-			}
-
-			By("Generating ignition data (should fail)")
-			_, err := reconciler.generateDefaultIgnitionDataForServer(
-				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
-		})
-
-		It("should fail when file template is invalid", func(ctx SpecContext) {
-			By("Creating a file with invalid template")
-			invalidTemplate := `variant: fcos
-systemd:
-  units:
-    - name: broken-service
-      contents: {{.InvalidTemplateField}}`
-
-			tmpFile, err := os.CreateTemp("", "invalid-template-*.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(os.Remove, tmpFile.Name())
-
-			_, err = tmpFile.WriteString(invalidTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(tmpFile.Close()).To(Succeed())
-
-			By("Creating a ServerReconciler with invalid template file")
-			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				DiscoveryIgnitionPath: tmpFile.Name(),
-			}
-
-			By("Generating ignition data (should fail)")
-			_, err = reconciler.generateDefaultIgnitionDataForServer(
-				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("failed to generate ignition data from file"))
-		})
-
-		It("should use default ignition template from file", func(ctx SpecContext) {
-			By("Creating a default ignition template file")
-			defaultTemplate := `variant: fcos
-version: "1.3.0"
-systemd:
-  units:
-    - name: metalprobe.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=Metal Probe Service
-        [Service]
-        ExecStart=/usr/bin/docker run --name metalprobe {{.Image}} {{.Flags}}
-        [Install]
-        WantedBy=multi-user.target
-passwd:
-  users:
-    - name: metal
-      password_hash: {{.PasswordHash}}
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
-
-			tmpFile, err := os.CreateTemp("", "default-ignition-*.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(os.Remove, tmpFile.Name())
-
-			_, err = tmpFile.WriteString(defaultTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(tmpFile.Close()).To(Succeed())
-
-			By("Creating a ServerReconciler with default file path")
-			reconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "foo:latest",
-				DiscoveryIgnitionPath: tmpFile.Name(),
-			}
-
-			By("Generating ignition data (should use default template)")
-			ignitionData, err := reconciler.generateDefaultIgnitionDataForServer(
-				fmt.Sprintf("--registry-url=%s --server-uuid=38947555-7742-3448-3784-823347823834", registryURL),
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			// Should contain default template content
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.3.0\""))
-			Expect(ignitionStr).To(ContainSubstring("metalprobe.service"))
-			Expect(ignitionStr).To(ContainSubstring("name: metal"))
-		})
-
-		It("should create server with custom ignition template file end-to-end", func(ctx SpecContext) {
-			By("Creating a custom ignition template file")
-			customTemplate := `variant: fcos
-version: "1.5.0"
-systemd:
-  units:
-    - name: e2e-custom-probe.service
-      enabled: true
-      contents: |-
-        [Unit]
-        Description=E2E Custom Probe Service
-        [Service]
-        Restart=always
-        ExecStart=/usr/bin/docker run --name e2e-probe {{.Image}} {{.Flags}}
-        [Install]
-        WantedBy=multi-user.target
-passwd:
-  users:
-    - name: e2e-user
-      password_hash: {{.PasswordHash}}
-      ssh_authorized_keys: [ {{.SSHPublicKey}} ]`
-
-			tmpFile, err := os.CreateTemp("", "e2e-ignition-*.yaml")
-			Expect(err).NotTo(HaveOccurred())
-			DeferCleanup(os.Remove, tmpFile.Name())
-
-			_, err = tmpFile.WriteString(customTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(tmpFile.Close()).To(Succeed())
-
-			By("Creating a reconciler with custom ignition template path")
-			customReconciler := &ServerReconciler{
-				Client:                k8sClient,
-				Scheme:                k8sClient.Scheme(),
-				RegistryURL:           registryURL,
-				ManagerNamespace:      ns.Name,
-				ProbeImage:            "custom-probe:v1.0.0",
-				DefaultProtocol:       metalv1alpha1.HTTPProtocolScheme,
-				SkipCertValidation:    true,
-				DiscoveryIgnitionPath: tmpFile.Name(),
-			}
-
-			By("Generating ignition data with custom template")
-			ignitionData, err := customReconciler.generateDefaultIgnitionDataForServer(
-				fmt.Sprintf("--registry-url=%s --server-uuid=e2e-test-12345", registryURL),
-				[]byte("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC test@example.com"),
-				[]byte("testpassword"),
-			)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(ignitionData).NotTo(BeEmpty())
-
-			ignitionStr := string(ignitionData)
-			Expect(ignitionStr).To(ContainSubstring("version: \"1.5.0\""), "Should use custom template version")
-			Expect(ignitionStr).To(ContainSubstring("e2e-custom-probe.service"), "Should use custom service name")
-			Expect(ignitionStr).To(ContainSubstring("E2E Custom Probe Service"), "Should use custom description")
-			Expect(ignitionStr).To(ContainSubstring("e2e-user"), "Should use custom username")
-			Expect(ignitionStr).To(ContainSubstring("custom-probe:v1.0.0"), "Should include custom probe image")
-		})
 	})
 
 	Describe("Parked state", func() {
@@ -1422,17 +715,19 @@ passwd:
 		It("should defer a park request on a non-parkable state and park once parkable", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 
-			By("Ensuring the server reaches Discovery (a non-parkable state)")
-			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateDiscovery))
+			By("Driving the server into the Error state (a non-parkable state)")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateError
+			})).Should(Succeed())
 
-			By("Requesting the server to be parked while still in Discovery")
+			By("Requesting the server to be parked while in Error")
 			Eventually(Update(server, func() {
 				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
 			})).Should(Succeed())
 
 			By("Ensuring the server is not parked and the request is left in place")
 			Consistently(Object(server)).Should(SatisfyAll(
-				HaveField("Status.State", metalv1alpha1.ServerStateDiscovery),
+				HaveField("Status.State", metalv1alpha1.ServerStateError),
 				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)),
 				HaveField("Annotations", Not(HaveKey(metalv1alpha1.ParkedAnnotation))),
 			))
@@ -1576,23 +871,4 @@ func createServerAndSecret(ctx SpecContext) (*metalv1alpha1.Server, *metalv1alph
 	}
 	Expect(k8sClient.Create(ctx, server)).To(Succeed())
 	return server, bmcSecret
-}
-
-func deleteRegistrySystemIfExists(systemUUID string) {
-	response, err := http.Get(registryURL + "/systems/" + systemUUID)
-	if err != nil {
-		return
-	}
-	if response.StatusCode == http.StatusOK {
-		req, err := http.NewRequest(http.MethodDelete, registryURL+"/systems/"+systemUUID, nil)
-		if err != nil {
-			return
-		}
-		httpClient := &http.Client{}
-		resp, err := httpClient.Do(req)
-		if err != nil {
-			return
-		}
-		defer resp.Body.Close() //nolint:errcheck
-	}
 }

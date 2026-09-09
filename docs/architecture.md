@@ -21,7 +21,6 @@ flowchart LR
     BMCReconciler -- Discovers Servers --> Server
 
     ServerReconciler -- Manages state/Power --> Server
-    ServerReconciler -- Uses --> metalprobe
     ServerReconciler -- Waits for --> ServerBootConfiguration
     
     ServerClaimReconciler -- Manages --> ServerClaim
@@ -58,7 +57,7 @@ flowchart LR
 
 - **BMCReconciler**: Manages `BMC` resources by connecting to BMC devices using credentials from `BMCSecret`. It retrieves hardware information, updates the BMC status, and detects managed servers, creating `Server` resources for them.
 
-- **ServerReconciler**: Manages `Server` resources and their lifecycle states. During the **Discovery** phase, it interacts with BMCs and uses the **metalprobe** agent to collect in-band hardware information, updating the server's status. It handles power management and transitions servers through various states (e.g., Initial, Discovery, Available, Reserved).
+- **ServerReconciler**: Manages `Server` resources and their lifecycle states. It interacts with BMCs to collect hardware information, updating the server's status. It handles power management and transitions servers through various states (e.g., Available, Reserved).
 
 - **ServerClaimReconciler**: Handles `ServerClaim` resources, allowing users to reserve servers. Upon creation of a `ServerClaim`, it allocates an available server, transitions it to the **Reserved** state, and creates a `ServerBootConfiguration`. When the claim is deleted, it releases the server, transitioning it to the **Cleanup** state for sanitization.
 
@@ -72,26 +71,22 @@ flowchart LR
     - BMCs are identified using the MAC Prefix Database, leading to the creation of `BMC` and `BMCSecret` resources.
     - The **BMCReconciler** connects to BMCs, gathers hardware details, and creates `Server` resources for each managed server.
 
-2. **Server Discovery Phase**:
-    - The **ServerReconciler** enters the **Discovery** phase, interacting with BMCs and booting servers using a predefined ignition.
-    - The **metalprobe** agent runs on the servers, collecting detailed hardware information (e.g., network interfaces, storage devices) and reporting back to update the `Server` status.
+2. **Server Initialization**:
+    - The **ServerReconciler** collects hardware information via the BMC, updates the `Server` status, and transitions the server directly to the **Available** state, ready to be claimed. It powers the server off when it is idle.
 
-3. **Server Availability**:
-    - Once discovery is complete, servers transition to the **Available** state, ready to be claimed.
-
-4. **Server Reservation and Boot Configuration**:
+3. **Server Reservation and Boot Configuration**:
     - Users create `ServerClaim` resources to reserve servers, specifying desired OS images and ignition configurations.
     - The **ServerClaimReconciler** allocates servers, transitions them to the **Reserved** state, and creates `ServerBootConfiguration` resources.
 
-5. **Boot Environment Preparation**:
+4. **Boot Environment Preparation**:
     - External components (e.g., **boot-operator**) watch for `ServerBootConfiguration` resources and prepare the boot environment accordingly.
     - Once the environment is ready, they update the `ServerBootConfiguration` status to **Ready**.
 
-6. **Server Power-On and Usage**:
+5. **Server Power-On and Usage**:
     - The **ServerReconciler** detects the ready status and powers on the server.
     - The server boots using the specified image and ignition configuration.
 
-7. **Cleanup and Maintenance**:
+6. **Cleanup and Maintenance**:
     - When a `ServerClaim` is deleted, the server transitions to the **Cleanup** state.
     - The **ServerReconciler** performs sanitization tasks (e.g., wiping disks, resetting configurations) before returning the server to the **Available** state.
     - Servers can be **Parked** for out-of-band day-2 operations (updates or repairs) driven by external components.

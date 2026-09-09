@@ -13,7 +13,6 @@ RUN go mod download
 
 # Copy the go source
 COPY cmd/main.go cmd/main.go
-COPY cmd/metalprobe/main.go cmd/metalprobe/main.go
 COPY cmd/metaldata/main.go cmd/metaldata/main.go
 COPY api/ api/
 COPY internal/ internal/
@@ -30,11 +29,6 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
-FROM builder AS probe-builder
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg \
-    CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o metalprobe cmd/metalprobe/main.go
-
 FROM builder AS metaldata-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg \
@@ -46,21 +40,9 @@ FROM gcr.io/distroless/static:nonroot AS manager
 LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
 WORKDIR /
 COPY --from=manager-builder /workspace/manager .
-COPY config/manager/ignition-template.yaml /etc/metal-operator/ignition-template.yaml
 USER 65532:65532
 
 ENTRYPOINT ["/manager"]
-
-FROM debian:testing-slim AS probe
-LABEL source_repository="https://github.com/ironcore-dev/metal-operator"
-WORKDIR /
-COPY --from=probe-builder /workspace/metalprobe .
-COPY hack/metalprobe_launch.sh /launch.sh
-RUN chmod +x /launch.sh
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates bash curl iproute2 iputils-ping net-tools ethtool lldpd && \
-    rm -rf /var/lib/apt/lists/*
-ENTRYPOINT ["/launch.sh"]
 
 FROM builder AS mock-builder
 RUN --mount=type=cache,target=/root/.cache/go-build \

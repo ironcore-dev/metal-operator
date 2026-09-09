@@ -287,12 +287,6 @@ type Registry struct {
 	RegistryEntries RegistryEntry
 }
 
-type NetworkInterface struct {
-	ID                  string
-	MACAddress          string
-	PermanentMACAddress string
-}
-
 type Server struct {
 	UUID         string
 	URI          string

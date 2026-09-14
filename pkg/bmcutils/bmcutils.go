@@ -227,6 +227,20 @@ func CreateBMCClient(
 	}
 	bmcOptions.InsecureTLS = skipCertValidation
 
+	return CreateBMCClientFromOptions(ctx, bmcProtocol, bmcOptions, opts...)
+}
+
+// CreateBMCClientFromOptions creates a BMC client from fully-populated options.
+// Unlike CreateBMCClient, it does not resolve credentials from a secret — the
+// caller must set Endpoint, Username, Password, and InsecureTLS on bmcOptions.
+// When session caching is enabled and the first attempt fails with a session-expired
+// error, it invalidates the cache entry and retries once with a fresh session.
+func CreateBMCClientFromOptions(
+	ctx context.Context,
+	bmcProtocol metalv1alpha1.ProtocolName,
+	bmcOptions bmc.Options,
+	opts ...CreateBMCClientOption,
+) (bmc.BMC, error) {
 	bmcClient, err := doCreateBMCClient(ctx, bmcProtocol, bmcOptions, opts...)
 	if err != nil && bmc.IsSessionExpiredError(err) && bmcOptions.SessionCache != nil {
 		// Cached session was rejected by the BMC (e.g. server-side expiry). Invalidate

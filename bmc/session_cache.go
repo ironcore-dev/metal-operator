@@ -35,6 +35,7 @@ type SessionCache struct {
 	mu      sync.Mutex
 	entries map[SessionCacheKey]*sessionCacheEntry
 	ttl     time.Duration
+	closed  bool
 }
 
 // NewSessionCache returns a SessionCache with the given idle TTL.
@@ -64,6 +65,10 @@ func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.S
 	key := SessionCacheKey{Endpoint: opts.Endpoint, Username: opts.Username}
 
 	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("bmc: session cache is closed")
+	}
 	entry, ok := c.entries[key]
 	if !ok {
 		entry = &sessionCacheEntry{}
@@ -73,6 +78,15 @@ func (c *SessionCache) GetOrCreate(ctx context.Context, opts Options) (*gofish.S
 
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
+
+	// Re-check closed under the entry lock: Close may have run between the outer
+	// lock release and acquiring the entry lock, leaving this entry orphaned.
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil, fmt.Errorf("bmc: session cache is closed")
+	}
+	c.mu.Unlock()
 
 	if entry.session != nil && time.Now().Before(entry.expiresAt) {
 		return entry.session, nil
@@ -95,15 +109,8 @@ func (c *SessionCache) Invalidate(key SessionCacheKey) {
 		return
 	}
 	c.mu.Lock()
-	entry, ok := c.entries[key]
+	delete(c.entries, key)
 	c.mu.Unlock()
-	if !ok {
-		return
-	}
-	entry.mu.Lock()
-	entry.session = nil
-	entry.expiresAt = time.Time{}
-	entry.mu.Unlock()
 }
 
 // Close deletes all live server-side Redfish sessions and clears the cache.
@@ -113,6 +120,7 @@ func (c *SessionCache) Close() {
 		return
 	}
 	c.mu.Lock()
+	c.closed = true
 	entries := make(map[SessionCacheKey]*sessionCacheEntry, len(c.entries))
 	maps.Copy(entries, c.entries)
 	c.entries = make(map[SessionCacheKey]*sessionCacheEntry)

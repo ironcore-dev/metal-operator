@@ -14,7 +14,7 @@ require (
 	github.com/siderolabs/go-smbios v0.3.4
 	github.com/spf13/cobra v1.10.2
 	github.com/stmcginnis/gofish v0.25.0
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.36.3
 	k8s.io/apiextensions-apiserver v0.36.3

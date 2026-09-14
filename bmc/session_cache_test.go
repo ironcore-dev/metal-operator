@@ -58,19 +58,17 @@ var _ = Describe("SessionCache", func() {
 			key := SessionCacheKey{Endpoint: "https://bmc.test", Username: "admin"}
 
 			cache.mu.Lock()
-			entry := &sessionCacheEntry{
+			cache.entries[key] = &sessionCacheEntry{
 				session:   seedSession,
 				expiresAt: time.Now().Add(10 * time.Minute),
 			}
-			cache.entries[key] = entry
 			cache.mu.Unlock()
 
 			cache.Invalidate(key)
 
-			entry.mu.Lock()
-			defer entry.mu.Unlock()
-			Expect(entry.session).To(BeNil())
-			Expect(entry.expiresAt.IsZero()).To(BeTrue())
+			cache.mu.Lock()
+			defer cache.mu.Unlock()
+			Expect(cache.entries).NotTo(HaveKey(key))
 		})
 
 		It("is a no-op for unknown keys", func() {

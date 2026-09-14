@@ -129,7 +129,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcOptions)
+				bmcClient, err := bmcutils.CreateBMCClientFromOptions(ctx, metalv1alpha1.ProtocolName(m.Protocol), bmcOptions)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

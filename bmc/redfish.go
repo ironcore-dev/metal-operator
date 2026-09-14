@@ -139,8 +139,12 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 
 	manufacturer, err := base.getSystemManufacturer()
 	if err != nil {
-		// If we can't determine the manufacturer (e.g. no systems yet during
-		// endpoint discovery), fall back to the base implementation.
+		// Propagate authentication errors so the caller can invalidate the session
+		// cache and retry. For other errors (e.g. no systems yet during endpoint
+		// discovery), fall back to the base implementation.
+		if IsSessionExpiredError(err) {
+			return nil, err
+		}
 		return base, nil
 	}
 	base.manufacturer = manufacturer
@@ -153,9 +157,6 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 		vendors[k] = v
 	}
 	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
-		if factory == nil {
-			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", manufacturer)
-		}
 		client := factory(base)
 		if client == nil {
 			return nil, fmt.Errorf("vendor factory for manufacturer %q returned nil", manufacturer)

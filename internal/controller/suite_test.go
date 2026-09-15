@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
-	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
 
@@ -112,8 +111,17 @@ var _ = BeforeSuite(func() {
 	SetClient(k8sClient)
 })
 
+<<<<<<< HEAD
+var _ = AfterSuite(func() {
+	By("tearing down the test environment")
+	cancel()
+	err := testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
+})
+=======
 func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 	ns := &corev1.Namespace{}
+>>>>>>> tmp-original-15-09-26-00-47
 
 	BeforeEach(func(ctx SpecContext) {
 		var mgrCtx context.Context

@@ -182,7 +182,13 @@ run: manifests generate fmt vet ## Run a controller from your host.
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
+# Override BASE_IMAGE to build from another registry, e.g.
+# make docker-build IMG=<img> BASE_IMAGE=docker.io/library/golang:1.26
 .PHONY: docker-build
+<<<<<<< HEAD
+docker-build: ## Build docker image with the manager.
+	$(CONTAINER_TOOL) build $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) -t ${IMG} .
+=======
 docker-build: docker-build-controller-manager docker-build-metalprobe docker-build-metaldata
 
 .PHONY: docker-build-controller-manager
@@ -196,6 +202,7 @@ docker-build-metalprobe: ## Build metalprobe.
 .PHONY: docker-build-metaldata
 docker-build-metaldata: ## Build metaldata.
 	docker build --target metaldata -t ${METALDATA_IMG} .
+>>>>>>> tmp-original-15-09-26-00-47
 
 .PHONY: docker-push
 docker-push: ## Push docker image with the manager.
@@ -216,7 +223,11 @@ docker-buildx: ## Build and push docker image for the manager for cross-platform
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
 	- $(CONTAINER_TOOL) buildx create --name metal-operator-builder
 	$(CONTAINER_TOOL) buildx use metal-operator-builder
+<<<<<<< HEAD
+	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) $(if $(BASE_IMAGE),--build-arg BASE_IMAGE=$(BASE_IMAGE)) --tag ${IMG} -f Dockerfile.cross .
+=======
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${CONTROLLER_IMG} -f Dockerfile.cross .
+>>>>>>> tmp-original-15-09-26-00-47
 	- $(CONTAINER_TOOL) buildx rm metal-operator-builder
 	rm Dockerfile.cross
 
@@ -318,7 +329,7 @@ YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v5.8.1
-CONTROLLER_TOOLS_VERSION ?= v0.21.0
+CONTROLLER_TOOLS_VERSION ?= v0.22.0
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
@@ -345,6 +356,10 @@ addlicense: $(ADDLICENSE) ## Download addlicense locally if necessary.
 $(ADDLICENSE): $(LOCALBIN)
 	$(call go-install-tool,$(ADDLICENSE),github.com/google/addlicense,$(ADDLICENSE_VERSION))
 
+<<<<<<< HEAD
+GOLANGCI_LINT_VERSION ?= v2.13.1
+=======
+>>>>>>> tmp-original-15-09-26-00-47
 .PHONY: kustomize
 kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
 $(KUSTOMIZE): $(LOCALBIN)
@@ -451,6 +466,35 @@ kind-delete: ## Destroys the "metal" kind cluster.
 	kind delete cluster --name=$(KIND_CLUSTER_NAME)
 	docker stop kind-registry && docker rm kind-registry
 
+<<<<<<< HEAD
+.PHONY: helm-deploy
+helm-deploy: install-helm ## Deploy manager to the K8s cluster via Helm. Specify an image with IMG.
+	IMG="$(IMG)"; $(HELM) upgrade --install $(HELM_RELEASE) $(HELM_CHART_DIR) \
+		--namespace $(HELM_NAMESPACE) \
+		--create-namespace \
+		--set manager.image.repository=$${IMG%:*} \
+		--set manager.image.tag=$${IMG##*:} \
+		--wait \
+		--timeout 5m \
+		$(HELM_EXTRA_ARGS)
+
+.PHONY: helm-uninstall
+helm-uninstall: ## Uninstall the Helm release from the K8s cluster.
+	$(HELM) uninstall $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-status
+helm-status: ## Show Helm release status.
+	$(HELM) status $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-history
+helm-history: ## Show Helm release history.
+	$(HELM) history $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+
+.PHONY: helm-rollback
+helm-rollback: ## Rollback to previous Helm release.
+	$(HELM) rollback $(HELM_RELEASE) --namespace $(HELM_NAMESPACE)
+=======
 .PHONY: tilt-up
 tilt-up: $(ENVTEST) $(KUSTOMIZE) kind-create ## start tilt and build kind cluster if needed
 	EXP_CLUSTER_RESOURCE_SET=true tilt up
+>>>>>>> tmp-original-15-09-26-00-47

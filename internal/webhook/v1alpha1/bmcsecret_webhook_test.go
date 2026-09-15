@@ -13,6 +13,24 @@ import (
 
 var _ = Describe("BMCSecret Webhook", func() {
 	var (
+<<<<<<< HEAD
+		obj       *metalv1alpha1.BMCSecret
+		oldObj    *metalv1alpha1.BMCSecret
+		validator BMCSecretValidator
+	)
+
+	BeforeEach(func() {
+		obj = &metalv1alpha1.BMCSecret{}
+		oldObj = &metalv1alpha1.BMCSecret{}
+		validator = BMCSecretValidator{}
+		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
+		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
+		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
+	})
+
+	AfterEach(func() {
+		// TODO (user): Add any teardown logic common to all tests
+=======
 		BMCSecret *metalv1alpha1.BMCSecret
 		validator BMCSecretCustomValidator
 	)
@@ -34,6 +52,7 @@ var _ = Describe("BMCSecret Webhook", func() {
 		By("Creating a BMCSecret")
 		Expect(k8sClient.Create(ctx, BMCSecret)).To(Succeed())
 		DeferCleanup(k8sClient.Delete, BMCSecret)
+>>>>>>> tmp-original-15-09-26-00-47
 	})
 
 	Context("When creating or updating BMCSecret under Validating Webhook", func() {

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
+{{- if and .Values.certManager.enabled .Values.webhook.enabled }}
+=======
 {{- if .Values.certManager.enable }}
+>>>>>>> tmp-original-15-09-26-00-47
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

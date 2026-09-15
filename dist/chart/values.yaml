@@ -26,6 +26,17 @@ manager:
   ##
   args:
     - --leader-elect
+<<<<<<< HEAD
+
+  ## Health probes.
+  ## The manager serves the liveness (/healthz) and readiness (/readyz) endpoints on this port.
+  ##
+  healthProbe:
+    # Health probe server port
+    port: 8081
+
+=======
+>>>>>>> tmp-original-15-09-26-00-47
   ## Image pull secrets
   ##
   # imagePullSecrets:
@@ -112,9 +123,17 @@ rbac:
 ##
 serviceAccount:
   # Install default ServiceAccount provided
+<<<<<<< HEAD
+  enabled: true
+
+  ## Existing ServiceAccount name (required when enabled=false)
+  ## Set to "default" to use the namespace default ServiceAccount
+  ## Note: When enabled=true, respects nameOverride/fullnameOverride
+=======
   enable: true
   ## Existing ServiceAccount name (only when enable=false)
   ## Note: When enable=true, respects nameOverride/fullnameOverride
+>>>>>>> tmp-original-15-09-26-00-47
   ##
   # name: ""
 ## Custom ServiceAccount annotations
@@ -170,6 +189,19 @@ ignition:
 ## The registry service exposed by the metal-controller-manager to receive metalprobe request call-backs.
 registry:
   enabled: false
+<<<<<<< HEAD
+
+  ## Custom ServiceMonitor labels
+  ##
+  # labels: {}
+
+  ## Custom ServiceMonitor annotations
+  ##
+  # annotations: {}
+
+## Network policies for controlling traffic flow.
+## Enable to restrict ingress to the controller manager.
+=======
   port: 30000
   # {{.Image}} - The Docker image to run for metalprobe
   # {{.Flags}} - The flags to pass to the metalprobe container, this includes --registry-url and --server-uuid
@@ -180,6 +212,7 @@ flags: ""
 sshPublicKey: ""
 passwordHash: ""
 ## Configure the metaldata DaemonSet
+>>>>>>> tmp-original-15-09-26-00-47
 ##
 metaldata:
   image:

@@ -6,8 +6,12 @@ metadata:
     {{- if .Values.crd.keep }}
     "helm.sh/resource-policy": keep
     {{- end }}
+<<<<<<< HEAD
+    controller-gen.kubebuilder.io/version: v0.22.0
+=======
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metal-operator.resourceName" (dict "suffix" "serving-cert" "context" $) }}
     controller-gen.kubebuilder.io/version: v0.21.0
+>>>>>>> tmp-original-15-09-26-00-47
   name: bmcs.metal.ironcore.dev
 spec:
   conversion:

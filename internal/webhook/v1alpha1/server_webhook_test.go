@@ -15,6 +15,21 @@ import (
 )
 
 var _ = Describe("Server Webhook", func() {
+<<<<<<< HEAD
+	var (
+		obj       *metalv1alpha1.Server
+		oldObj    *metalv1alpha1.Server
+		validator ServerValidator
+	)
+
+	BeforeEach(func() {
+		obj = &metalv1alpha1.Server{}
+		oldObj = &metalv1alpha1.Server{}
+		validator = ServerValidator{}
+		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
+		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
+		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")
+=======
 	var server *metalv1alpha1.Server
 
 	BeforeEach(func() {
@@ -36,6 +51,7 @@ var _ = Describe("Server Webhook", func() {
 		Expect(k8sClient.Create(ctx, server)).To(Succeed())
 		SetClient(k8sClient)
 		By("Creating a Server")
+>>>>>>> tmp-original-15-09-26-00-47
 	})
 
 	AfterEach(func(ctx context.Context) {

@@ -15,15 +15,19 @@ var _ = Describe("Endpoint Webhook", func() {
 	var (
 		obj       *metalv1alpha1.Endpoint
 		oldObj    *metalv1alpha1.Endpoint
-		validator EndpointCustomValidator
+		validator EndpointValidator
 	)
 
 	BeforeEach(func() {
 		obj = &metalv1alpha1.Endpoint{}
 		oldObj = &metalv1alpha1.Endpoint{}
+<<<<<<< HEAD
+		validator = EndpointValidator{}
+=======
 		validator = EndpointCustomValidator{
 			Client: k8sClient,
 		}
+>>>>>>> tmp-original-15-09-26-00-47
 		Expect(validator).NotTo(BeNil(), "Expected validator to be initialized")
 		Expect(oldObj).NotTo(BeNil(), "Expected oldObj to be initialized")
 		Expect(obj).NotTo(BeNil(), "Expected obj to be initialized")

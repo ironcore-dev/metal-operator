@@ -25,7 +25,11 @@ var endpointlog = logf.Log.WithName("endpoint-resource")
 // SetupEndpointWebhookWithManager registers the webhook for Endpoint in the manager.
 func SetupEndpointWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr, &metalv1alpha1.Endpoint{}).
+<<<<<<< HEAD
+		WithValidator(&EndpointValidator{}).
+=======
 		WithValidator(&EndpointCustomValidator{Client: mgr.GetClient()}).
+>>>>>>> tmp-original-15-09-26-00-47
 		Complete()
 }
 
@@ -33,17 +37,26 @@ func SetupEndpointWebhookWithManager(mgr ctrl.Manager) error {
 // Modifying the path for an invalid path can cause API server errors; failing to locate the webhook.
 // +kubebuilder:webhook:path=/validate-metal-ironcore-dev-v1alpha1-endpoint,mutating=false,failurePolicy=fail,sideEffects=None,groups=metal.ironcore.dev,resources=endpoints,verbs=create;update,versions=v1alpha1,name=vendpoint-v1alpha1.kb.io,admissionReviewVersions=v1
 
-// EndpointCustomValidator struct is responsible for validating the Endpoint resource
+// EndpointValidator struct is responsible for validating the Endpoint resource
 // when it is created, updated, or deleted.
 //
 // NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
 // as this struct is used only for temporary operations and does not need to be deeply copied.
+<<<<<<< HEAD
+type EndpointValidator struct {
+	// TODO(user): Add more fields as needed for validation
+}
+
+// ValidateCreate implements admission.Validator so a webhook will be registered for the type Endpoint.
+func (v *EndpointValidator) ValidateCreate(_ context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+=======
 type EndpointCustomValidator struct {
 	Client client.Client
 }
 
 // ValidateCreate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
 func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+>>>>>>> tmp-original-15-09-26-00-47
 	endpointlog.Info("Validation for Endpoint upon creation", "name", obj.GetName())
 
 	allErrs := ValidateMACAddressCreate(ctx, v.Client, obj.Spec, field.NewPath("spec"))
@@ -57,8 +70,13 @@ func (v *EndpointCustomValidator) ValidateCreate(ctx context.Context, obj *metal
 	return nil, nil
 }
 
+<<<<<<< HEAD
+// ValidateUpdate implements admission.Validator so a webhook will be registered for the type Endpoint.
+func (v *EndpointValidator) ValidateUpdate(_ context.Context, oldObj, newObj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+=======
 // ValidateUpdate implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
 func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, newObj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+>>>>>>> tmp-original-15-09-26-00-47
 	endpointlog.Info("Validation for Endpoint upon update", "name", newObj.GetName())
 
 	allErrs := ValidateMACAddressUpdate(ctx, v.Client, newObj, field.NewPath("spec"))
@@ -72,8 +90,13 @@ func (v *EndpointCustomValidator) ValidateUpdate(ctx context.Context, oldObj, ne
 	return nil, nil
 }
 
+<<<<<<< HEAD
+// ValidateDelete implements admission.Validator so a webhook will be registered for the type Endpoint.
+func (v *EndpointValidator) ValidateDelete(_ context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+=======
 // ValidateDelete implements webhook.CustomValidator so a webhook will be registered for the type Endpoint.
 func (v *EndpointCustomValidator) ValidateDelete(ctx context.Context, obj *metalv1alpha1.Endpoint) (admission.Warnings, error) {
+>>>>>>> tmp-original-15-09-26-00-47
 	endpointlog.Info("Validation for Endpoint upon deletion", "name", obj.GetName())
 
 	// TODO(user): fill in your validation logic upon object deletion.

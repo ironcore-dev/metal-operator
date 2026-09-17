@@ -52,6 +52,7 @@ export default withMermaid({
             items: [
               { text: 'Kustomize', link: '/installation/kustomize' },
               { text: 'Helm', link: '/installation/helm' },
+              { text: 'Configuration', link: '/installation/configuration' },
             ]
           },
           { text: 'Architecture', link: '/architecture' },
@@ -68,6 +69,7 @@ export default withMermaid({
           { text: 'Servers', link: '/concepts/servers' },
           { text: 'ServerClaims', link: '/concepts/serverclaims' },
           { text: 'ServerBootConfigurations', link: '/concepts/serverbootconfigurations' },
+          { text: 'Watch Filter', link: '/concepts/watch-filter' },
         ]
       },
       {

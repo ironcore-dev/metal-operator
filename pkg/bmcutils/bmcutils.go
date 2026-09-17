@@ -217,6 +217,33 @@ func CreateBMCClient(
 	skipCertValidation bool,
 	opts ...CreateBMCClientOption,
 ) (bmc.BMC, error) {
+	// Resolve the endpoint and credentials up-front so the cache key is
+	// available before and after the first attempt.
+	bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
+	var err error
+	bmcOptions.Username, bmcOptions.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
+	}
+	bmcOptions.InsecureTLS = skipCertValidation
+
+	bmcClient, err := doCreateBMCClient(ctx, bmcProtocol, bmcOptions, opts...)
+	if err != nil && bmc.IsSessionExpiredError(err) && bmcOptions.SessionCache != nil {
+		// Cached session was rejected by the BMC (e.g. server-side expiry). Invalidate
+		// and retry once with a fresh session.
+		key := bmc.SessionCacheKey{Endpoint: bmcOptions.Endpoint, Username: bmcOptions.Username}
+		bmcOptions.SessionCache.Invalidate(key)
+		bmcClient, err = doCreateBMCClient(ctx, bmcProtocol, bmcOptions, opts...)
+	}
+	return bmcClient, err
+}
+
+func doCreateBMCClient(
+	ctx context.Context,
+	bmcProtocol metalv1alpha1.ProtocolName,
+	bmcOptions bmc.Options,
+	opts ...CreateBMCClientOption,
+) (bmc.BMC, error) {
 	var bmcClient bmc.BMC
 	var err error
 
@@ -224,13 +251,6 @@ func CreateBMCClient(
 	for _, o := range opts {
 		o(cfg)
 	}
-
-	bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
-	bmcOptions.Username, bmcOptions.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get credentials from BMC secret: %w", err)
-	}
-	bmcOptions.InsecureTLS = skipCertValidation
 
 	log := ctrl.LoggerFrom(ctx)
 	log.V(1).Info("Creating BMC client", "Protocol", bmcProtocol, "Address", bmcOptions.Endpoint, "Username", bmcOptions.Username, "cfg", cfg)

@@ -590,6 +590,11 @@ func (r *RedfishBaseBMC) SetBMCAttributesImmediately(_ context.Context, _ string
 	return nil, fmt.Errorf("BMC attribute operations not supported for manufacturer %q", r.manufacturer)
 }
 
+// FetchETags returns nil; callers must treat nil as "ETags unavailable, fall back to full value-map GET".
+func (r *RedfishBaseBMC) FetchETags(_ context.Context, _ []string) (map[string]string, error) {
+	return nil, nil
+}
+
 // SetBootOrder sets bios boot order
 func (r *RedfishBaseBMC) SetBootOrder(ctx context.Context, systemURI string, bootOrder []string) error {
 	system, err := r.getSystemFromUri(ctx, systemURI)

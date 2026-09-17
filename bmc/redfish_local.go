@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -66,8 +67,7 @@ func (r *RedfishLocalBMC) GetBiosUpgradeTask(ctx context.Context, _ string, task
 	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, localParseTaskDetails)
 }
 
-// SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH to the BMC Settings endpoint.
-// Navigates from the manager's @Redfish.Settings.SettingsObject link, mirroring the Dell pattern.
+// SetBMCAttributesImmediately sets BMC attributes via HTTP PATCH and returns URI+ETag per key.
 func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUID string, attributes schemas.SettingsAttributes) (map[string]ApplyResult, error) {
 	if len(attributes) == 0 {
 		return nil, nil
@@ -94,7 +94,13 @@ func (r *RedfishLocalBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUU
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("PATCH %s returned status %d", managerData.Settings.SettingsObject, resp.StatusCode)
 	}
-	return nil, nil
+
+	etag := resp.Header.Get("ETag")
+	results := make(map[string]ApplyResult, len(attributes))
+	for key := range attributes {
+		results[key] = ApplyResult{URI: managerData.Settings.SettingsObject, ETag: etag}
+	}
+	return results, nil
 }
 
 // GetBMCAttributeValues retrieves specific BMC attribute values via HTTP from the BMC manager.
@@ -187,6 +193,34 @@ func (r *RedfishLocalBMC) CheckBMCAttributes(ctx context.Context, UUID string, a
 		return false, err
 	}
 	return checkAttributes(attrs, filtered)
+}
+
+// FetchETags returns the ETag for each URI. A 404 stores an empty string to support ephemeral POST resources.
+func (r *RedfishLocalBMC) FetchETags(ctx context.Context, uris []string) (map[string]string, error) {
+	if len(uris) == 0 {
+		return nil, nil
+	}
+	manager, err := r.GetManager("")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get manager for ETag fetch: %w", err)
+	}
+	c := manager.GetClient()
+	result := make(map[string]string, len(uris))
+	for _, uri := range uris {
+		resp, err := c.Get(uri)
+		if err != nil {
+			// 404: POST-created resource gone — treat as empty, not an error.
+			var redfishErr *schemas.Error
+			if errors.As(err, &redfishErr) && redfishErr.HTTPReturnedStatusCode == http.StatusNotFound {
+				result[uri] = ""
+				continue
+			}
+			return result, fmt.Errorf("failed to GET %s for ETag: %w", uri, err)
+		}
+		result[uri] = resp.Header.Get("ETag")
+		_ = resp.Body.Close()
+	}
+	return result, nil
 }
 
 // UpgradeBMCVersion initiates a BMC upgrade.

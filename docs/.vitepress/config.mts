@@ -54,6 +54,13 @@ export default withMermaid({
               { text: 'Helm', link: '/installation/helm' },
             ]
           },
+          { text: 'Upgrades',
+            collapsed: true,
+            link: '/upgrades/',
+            items: [
+              { text: 'v0.7 to v0.8', link: '/upgrades/v0.7-to-v0.8' },
+            ]
+          },
           { text: 'Architecture', link: '/architecture' },
           { text: 'API Reference', link: '/api-reference/api' },
         ]

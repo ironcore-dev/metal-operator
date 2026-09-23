@@ -658,3 +658,27 @@ var _ = Describe("RedfishBaseBMC CreateEventSubscription", func() {
 		Expect(link).To(BeEmpty())
 	})
 })
+
+var _ = Describe("manufacturerFromOEM", func() {
+	oem := func(keys ...string) json.RawMessage {
+		m := make(map[string]json.RawMessage, len(keys))
+		for _, k := range keys {
+			m[k] = json.RawMessage(`{}`)
+		}
+		b, _ := json.Marshal(m)
+		return b
+	}
+
+	DescribeTable("extracts vendor from OEM keys",
+		func(raw json.RawMessage, expected string) {
+			Expect(manufacturerFromOEM(raw)).To(Equal(expected))
+		},
+		Entry("single vendor key", oem("Dell"), "Dell"),
+		Entry("short key uppercased", oem("Hpe"), "HPE"),
+		Entry("key with suffix stripped", oem("Bull_com"), "Bull"),
+		Entry("multiple keys, skips @odata and OpenBmc", oem("@odata.id", "@odata.type", "OpenBmc", "Bull_com"), "Bull"),
+		Entry("only excluded keys", oem("@odata.id", "OpenBmc"), ""),
+		Entry("empty OEM", json.RawMessage(`{}`), ""),
+		Entry("nil OEM", json.RawMessage(nil), ""),
+	)
+})

@@ -51,6 +51,8 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("OwnerReferences", BeEmpty()),
 			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
+			HaveField("Status.Manufacturer", "Contoso"),
+			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
@@ -126,6 +128,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
+			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),
@@ -196,6 +199,7 @@ var _ = Describe("BMC Controller", func() {
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("Status.IP", metalv1alpha1.MustParseIP(MockServerIP)),
 			HaveField("Status.MACAddress", "23:11:8A:33:CF:EA"),
+			HaveField("Status.Manufacturer", "Contoso"),
 			HaveField("Status.Model", "Joo Janta 200"),
 			HaveField("Status.State", metalv1alpha1.BMCStateEnabled),
 			HaveField("Status.PowerState", metalv1alpha1.OnPowerState),

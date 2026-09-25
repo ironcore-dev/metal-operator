@@ -34,7 +34,7 @@ jobs:
       (github.event_name == 'release' && github.event.action == 'published')
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 

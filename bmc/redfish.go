@@ -308,17 +308,64 @@ func (r *RedfishBaseBMC) GetManager(bmcUUID string) (*schemas.Manager, error) {
 		return nil, fmt.Errorf("zero managers found")
 	}
 
+	var manager *schemas.Manager
 	if len(bmcUUID) == 0 {
-		// take the first one available
-		return managers[0], nil
-	}
-
-	for _, m := range managers {
-		if bmcUUID == m.UUID {
-			return m, nil
+		manager = managers[0]
+	} else {
+		for _, m := range managers {
+			if bmcUUID == m.UUID {
+				manager = m
+				break
+			}
+		}
+		if manager == nil {
+			return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
 		}
 	}
-	return nil, fmt.Errorf("matching managers not found for UUID %v", bmcUUID)
+
+	if manager.Manufacturer == "" {
+		manager.Manufacturer = manufacturerFromOEM(manager.OEM)
+	}
+	return manager, nil
+}
+
+// oemKeyExclusions are OEM keys that identify firmware projects rather than vendors.
+var oemKeyExclusions = map[string]bool{
+	"OpenBmc": true,
+}
+
+// manufacturerFromOEM extracts a vendor name from the OEM map keys as a fallback
+// when Manager.Manufacturer is not populated. It splits on [ _.-] and returns the
+// first token of the first non-excluded key.
+func manufacturerFromOEM(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var oem map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &oem); err != nil {
+		return ""
+	}
+	keys := make([]string, 0, len(oem))
+	for key := range oem {
+		if oemKeyExclusions[key] || strings.ContainsRune(key, '@') {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		fields := strings.FieldsFunc(key, func(r rune) bool {
+			return r == ' ' || r == '_' || r == '.' || r == '-'
+		})
+		if len(fields) > 0 {
+			word := fields[0]
+			if len(word) <= 3 {
+				return strings.ToUpper(word)
+			}
+			return word
+		}
+	}
+	return ""
 }
 
 // DiscoverManager queries the BMC for available managers and returns the one

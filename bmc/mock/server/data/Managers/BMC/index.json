@@ -4,10 +4,13 @@
     "Name": "Manager",
     "ManagerType": "BMC",
     "Description": "Contoso BMC",
-    "Manufacturer": "Contoso",
+    "Manufacturer": "",
     "ServiceEntryPointUUID": "92384634-2938-2342-8820-489239905423",
     "UUID": "58893887-8974-2487-2389-841168418919",
     "Model": "Joo Janta 200",
+    "Oem": {
+        "Contoso": {}
+    },
     "DateTime": "2015-03-13T04:14:33+06:00",
     "DateTimeLocalOffset": "+06:00",
     "Status": {

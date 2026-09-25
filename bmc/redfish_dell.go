@@ -133,9 +133,6 @@ func (r *DellRedfishBMC) getManagerForOEM() (*schemas.Manager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get Manager: %w", err)
 	}
-	if manager.Manufacturer == "" {
-		manager.Manufacturer = r.manufacturer
-	}
 	return manager, nil
 }
 

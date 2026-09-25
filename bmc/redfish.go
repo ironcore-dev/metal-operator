@@ -345,10 +345,15 @@ func manufacturerFromOEM(raw json.RawMessage) string {
 	if err := json.Unmarshal(raw, &oem); err != nil {
 		return ""
 	}
+	keys := make([]string, 0, len(oem))
 	for key := range oem {
-		if oemKeyExclusions[key] || strings.HasPrefix(key, "@") {
+		if oemKeyExclusions[key] || strings.ContainsRune(key, '@') {
 			continue
 		}
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
 		fields := strings.FieldsFunc(key, func(r rune) bool {
 			return r == ' ' || r == '_' || r == '.' || r == '-'
 		})

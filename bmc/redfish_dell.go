@@ -696,11 +696,18 @@ const (
 	dellJobStateCompletedWithErrors = "CompletedWithErrors"
 	dellJobStateFailed              = "Failed"
 	dellJobStateRebootFailed        = "RebootFailed"
+	// dellJobStateRebootCompleted is the terminal success state for RebootForce
+	// jobs specifically - unlike other job types, these never reach "Completed".
+	dellJobStateRebootCompleted = "RebootCompleted"
 )
 
 // IsCompleted reports whether the job has reached a successful terminal state.
 func (j *DellJob) IsCompleted() bool {
-	return j.State == dellJobStateCompleted
+	switch j.State {
+	case dellJobStateCompleted, dellJobStateRebootCompleted:
+		return true
+	}
+	return false
 }
 
 // IsFailed reports whether the job has reached a known terminal failure state.
@@ -728,18 +735,19 @@ const dellSoftwareInstallationServicePath = "/Oem/Dell/DellSoftwareInstallationS
 // scripting examples and have not been verified against a real iDRAC — Dell does not
 // publish an OpenAPI schema for this OEM action.
 type dellRepositoryUpdateRequestBody struct {
-	ShareType              string `json:"ShareType"`
-	IPAddress              string `json:"IPAddress,omitempty"`
-	ShareName              string `json:"ShareName,omitempty"`
-	CatalogFile            string `json:"CatalogFile,omitempty"`
-	UserName               string `json:"UserName,omitempty"`
-	Password               string `json:"Password,omitempty"`
-	Workgroup              string `json:"Workgroup,omitempty"`
-	IgnoreCertWarning      string `json:"IgnoreCertWarning,omitempty"`
-	ApplyUpdate            string `json:"ApplyUpdate"`
-	RebootNeeded           bool   `json:"RebootNeeded"`
-	ApplySameVersions      string `json:"ApplySameVersions,omitempty"`
-	ApplyDowngradeVersions string `json:"ApplyDowngradeVersions,omitempty"`
+	ShareType         string `json:"ShareType"`
+	IPAddress         string `json:"IPAddress,omitempty"`
+	ShareName         string `json:"ShareName,omitempty"`
+	CatalogFile       string `json:"CatalogFile,omitempty"`
+	UserName          string `json:"UserName,omitempty"`
+	Password          string `json:"Password,omitempty"`
+	Workgroup         string `json:"Workgroup,omitempty"`
+	IgnoreCertWarning string `json:"IgnoreCertWarning,omitempty"`
+	ApplyUpdate       string `json:"ApplyUpdate"`
+	RebootNeeded      bool   `json:"RebootNeeded"`
+	// ApplySameVersions/ApplyDowngradeVersions are real JSON booleans
+	ApplySameVersions      bool `json:"ApplySameVersions"`
+	ApplyDowngradeVersions bool `json:"ApplyDowngradeVersions"`
 }
 
 func dellBoolString(b bool) string {
@@ -768,8 +776,8 @@ func dellBuildRepositoryUpdateRequestBody(parameters *RepositoryUpdateParameters
 		IgnoreCertWarning:      dellOnOffString(parameters.IgnoreCertWarning),
 		ApplyUpdate:            dellBoolString(parameters.ApplyUpdate),
 		RebootNeeded:           parameters.RebootNeeded,
-		ApplySameVersions:      dellBoolString(parameters.ApplySameVersions),
-		ApplyDowngradeVersions: dellBoolString(parameters.ApplyDowngradeVersions),
+		ApplySameVersions:      parameters.ApplySameVersions,
+		ApplyDowngradeVersions: parameters.ApplyDowngradeVersions,
 	}
 }
 

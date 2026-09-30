@@ -112,17 +112,20 @@ var _ = Describe("Dell OEM", func() {
 			body := dellBuildRepositoryUpdateRequestBody(&RepositoryUpdateParameters{})
 			Expect(body.IgnoreCertWarning).To(Equal("Off"))
 			Expect(body.ApplyUpdate).To(Equal("False"))
-			Expect(body.ApplySameVersions).To(Equal("False"))
-			Expect(body.ApplyDowngradeVersions).To(Equal("False"))
+			Expect(body.ApplySameVersions).To(BeFalse())
+			Expect(body.ApplyDowngradeVersions).To(BeFalse())
 		})
 
-		It("should encode ApplySameVersions and ApplyDowngradeVersions", func() {
+		It("should encode ApplySameVersions and ApplyDowngradeVersions as native JSON booleans", func() {
+			// A real iDRAC rejects the PascalCase string encoding Dell's docs show for
+			// other fields here ("...ApplyDowngradeVersions is invalid...of a different
+			// type than the property can accept"), so these two must stay real bools.
 			body := dellBuildRepositoryUpdateRequestBody(&RepositoryUpdateParameters{
 				ApplySameVersions:      true,
 				ApplyDowngradeVersions: true,
 			})
-			Expect(body.ApplySameVersions).To(Equal("True"))
-			Expect(body.ApplyDowngradeVersions).To(Equal("True"))
+			Expect(body.ApplySameVersions).To(BeTrue())
+			Expect(body.ApplyDowngradeVersions).To(BeTrue())
 		})
 	})
 
@@ -188,6 +191,7 @@ var _ = Describe("Dell OEM", func() {
 				Expect(job.IsCompleted()).To(Equal(expected))
 			},
 			Entry("Completed state", &DellJob{State: "Completed"}, true),
+			Entry("RebootCompleted state", &DellJob{State: "RebootCompleted"}, true),
 			Entry("Running state", &DellJob{State: "Running"}, false),
 			Entry("CompletedWithErrors state", &DellJob{State: "CompletedWithErrors"}, false),
 		)
@@ -210,6 +214,7 @@ var _ = Describe("Dell OEM", func() {
 			},
 			Entry("Completed state", &DellJob{State: "Completed"}, true),
 			Entry("Failed state", &DellJob{State: "Failed"}, true),
+			Entry("RebootCompleted state", &DellJob{State: "RebootCompleted"}, true),
 			Entry("Running state", &DellJob{State: "Running"}, false),
 			Entry("Scheduled state", &DellJob{State: "Scheduled"}, false),
 		)

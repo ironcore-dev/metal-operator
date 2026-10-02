@@ -258,6 +258,21 @@ func (r *BMCReconciler) discoverServers(ctx context.Context, bmcClient bmc.BMC, 
 	if err != nil {
 		return fmt.Errorf("failed to get servers from BMC %s: %w", bmcObj.Name, err)
 	}
+
+	// The BMC might have been deleted while the current reconcile was running
+	currentBMC := &metalv1alpha1.BMC{}
+	if err := r.Get(ctx, client.ObjectKeyFromObject(bmcObj), currentBMC); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.V(1).Info("skipping server discovery, BMC is gone")
+			return nil
+		}
+		return fmt.Errorf("getting BMC %s: %w", bmcObj.Name, err)
+	}
+	if !currentBMC.DeletionTimestamp.IsZero() {
+		log.V(1).Info("skipping server discovery, BMC is being deleted")
+		return nil
+	}
+
 	var errs []error
 	for i, s := range servers {
 		server := &metalv1alpha1.Server{}

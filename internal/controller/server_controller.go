@@ -100,6 +100,7 @@ type ServerReconciler struct {
 	EnforcePowerOff         bool
 	ResyncInterval          time.Duration
 	BMCOptions              bmc.Options
+	Dialer                  bmc.Dialer
 	DiscoveryTimeout        time.Duration
 	MaxConcurrentReconciles int
 	Conditions              *conditionutils.Accessor
@@ -194,7 +195,18 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		}
 	}
 
-	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.WithRegistryURL(r.RegistryURL))
+	// Clear the deprecated spec.power field.
+	// TODO: remove this part once the spec field is gone
+	if server.Spec.Power != "" {
+		serverBase := server.DeepCopy()
+		server.Spec.Power = ""
+		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated spec.power field: %w", err)
+		}
+		log.V(1).Info("Cleared deprecated spec.power field")
+	}
+
+	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, r.Dialer, bmcutils.WithRegistryURL(r.RegistryURL))
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {
 			log.V(1).Info("BMC is not available, skipping", "BMC", server.Spec.BMCRef.Name, "Server", server.Name, "error", err)

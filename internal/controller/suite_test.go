@@ -179,6 +179,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			MACPrefixes:        prefixDB,
 			DefaultProtocol:    metalv1alpha1.HTTPProtocolScheme,
 			SkipCertValidation: true,
+			Dialer:             bmc.DirectDialer{},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		dnsTemplate, err := dns.LoadTemplate("../../test/data/dns_record_template.yaml")
@@ -195,6 +196,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			SSHResetTimeout:        1 * time.Second,
 			DNSRecordTemplate:      dnsTemplate,
 			Conditions:             accessor,
+			Dialer:                 bmc.DirectDialer{},
 			BMCOptions: bmc.Options{
 				ResourcePollingInterval: 50 * time.Millisecond,
 				ResourcePollingTimeout:  200 * time.Millisecond,
@@ -221,6 +223,7 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			EnforceFirstBoot:        true,
 			MaxConcurrentReconciles: 5,
 			Conditions:              accessor,
+			Dialer:                  bmc.DirectDialer{},
 			BMCOptions: bmc.Options{
 				ResourcePollingInterval: 50 * time.Millisecond,
 				ResourcePollingTimeout:  200 * time.Millisecond,

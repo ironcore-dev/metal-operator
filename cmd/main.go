@@ -438,7 +438,7 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "Failed to register session cache shutdown")
 			os.Exit(1)
 		}
-		bmcDialer = bmc.NewPoolDialer(sessionCache)
+		bmcDialer = bmc.NewSessionDialer(sessionCache)
 		setupLog.Info("Redfish session cache enabled", "ttl", bmcSessionCacheTTL)
 	case "basic", "":
 		// default: basic auth, no session cache

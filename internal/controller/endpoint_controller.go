@@ -38,6 +38,7 @@ type EndpointReconciler struct {
 	DefaultProtocol    metalv1alpha1.ProtocolScheme
 	SkipCertValidation bool
 	BMCOptions         bmc.Options
+	Dialer             bmc.Dialer
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -129,7 +130,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmcutils.CreateBMCClientFromOptions(ctx, metalv1alpha1.ProtocolName(m.Protocol), bmcOptions)
+				bmcClient, err := bmcutils.CreateBMCClientFromOptions(ctx, metalv1alpha1.ProtocolName(m.Protocol), bmcOptions, r.Dialer)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

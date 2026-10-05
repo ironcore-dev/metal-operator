@@ -418,6 +418,7 @@ func main() { // nolint: gocyclo
 	}
 
 	var sessionCache *bmc.SessionCache
+	var bmcDialer bmc.Dialer = bmc.DirectDialer{}
 	switch bmcAuthMode {
 	case "session-cache":
 		if bmcSessionCacheTTL <= 0 {
@@ -437,6 +438,7 @@ func main() { // nolint: gocyclo
 			setupLog.Error(err, "Failed to register session cache shutdown")
 			os.Exit(1)
 		}
+		bmcDialer = bmc.NewPoolDialer(sessionCache)
 		setupLog.Info("Redfish session cache enabled", "ttl", bmcSessionCacheTTL)
 	case "basic", "":
 		// default: basic auth, no session cache
@@ -446,7 +448,6 @@ func main() { // nolint: gocyclo
 	}
 
 	bmcBaseOptions := bmc.Options{
-		SessionCache:            sessionCache,
 		PowerPollingInterval:    powerPollingInterval,
 		PowerPollingTimeout:     powerPollingTimeout,
 		ResourcePollingInterval: resourcePollingInterval,
@@ -460,6 +461,7 @@ func main() { // nolint: gocyclo
 		DefaultProtocol:    effectiveProtocol,
 		SkipCertValidation: effectiveSkipCert,
 		BMCOptions:         bmcBaseOptions,
+		Dialer:             bmcDialer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "endpoint")
 		os.Exit(1)
@@ -484,6 +486,7 @@ func main() { // nolint: gocyclo
 		Conditions:             conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		SSHResetTimeout:        sshResetTimeout,
 		BMCOptions:             bmcBaseOptions,
+		Dialer:                 bmcDialer,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "bmc")
 		os.Exit(1)
@@ -509,6 +512,7 @@ func main() { // nolint: gocyclo
 		Conditions:              conditionutils.NewAccessor(conditionutils.AccessorOptions{}),
 		DiscoveryIgnitionPath:   discoveryIgnitionPath,
 		BMCOptions:              bmcBaseOptions,
+		Dialer:                  bmcDialer,
 		DiscoveryTimeout:        discoveryTimeout,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "Failed to create controller", "controller", "server")

@@ -47,6 +47,7 @@ type BMCReconciler struct {
 	// BMCFailureResetDelay defines the duration after which a BMC will be reset upon repeated connection failures.
 	BMCFailureResetDelay time.Duration
 	BMCOptions           bmc.Options
+	Dialer               bmc.Dialer
 	ManagerNamespace     string
 	// BMCResetWaitTime defines the duration to wait after a BMC reset before attempting reconciliation again.
 	BMCResetWaitTime time.Duration
@@ -120,7 +121,7 @@ func (r *BMCReconciler) reconcile(ctx context.Context, bmcObj *metalv1alpha1.BMC
 			RequeueAfter: r.BMCClientRetryInterval,
 		}, nil
 	}
-	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, bmcutils.BMCConnectivityCheckOption)
+	bmcClient, err := bmcutils.GetBMCClientFromBMC(ctx, r.Client, bmcObj, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, r.Dialer, bmcutils.BMCConnectivityCheckOption)
 	if err != nil {
 		if r.shouldResetBMC(bmcObj) {
 			log.V(1).Info("BMC needs reset, resetting", "BMC", bmcObj.Name)

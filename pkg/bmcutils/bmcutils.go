@@ -124,7 +124,7 @@ func GetBMCAddressForBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 
 const DefaultKubeNamespace = "default"
 
-func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...CreateBMCClientOption) (bmc.BMC, error) {
+func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1alpha1.Server, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, dialer bmc.Dialer, opts ...CreateBMCClientOption) (bmc.BMC, error) {
 	if server.Spec.BMCRef != nil {
 		b := &metalv1alpha1.BMC{}
 		bmcName := server.Spec.BMCRef.Name
@@ -136,7 +136,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 		for i, o := range opts {
 			anyOpts[i] = o
 		}
-		return GetBMCClientFromBMC(ctx, c, b, defaultProtocol, skipCertValidation, options, anyOpts...)
+		return GetBMCClientFromBMC(ctx, c, b, defaultProtocol, skipCertValidation, options, dialer, anyOpts...)
 	}
 
 	if server.Spec.BMC != nil {
@@ -157,6 +157,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 			bmcSecret,
 			options,
 			skipCertValidation,
+			dialer,
 			opts...,
 		)
 	}
@@ -164,7 +165,7 @@ func GetBMCClientForServer(ctx context.Context, c client.Client, server *metalv1
 	return nil, fmt.Errorf("server %s has neither a BMCRef nor a BMC configured", server.Name)
 }
 
-func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, opts ...any) (bmc.BMC, error) {
+func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1alpha1.BMC, defaultProtocol metalv1alpha1.ProtocolScheme, skipCertValidation bool, options bmc.Options, dialer bmc.Dialer, opts ...any) (bmc.BMC, error) {
 	var address string
 	var bmcClientOpts []BMCClientOptions
 	var createOpts []CreateBMCClientOption
@@ -201,7 +202,7 @@ func GetBMCClientFromBMC(ctx context.Context, c client.Client, bmcObj *metalv1al
 	}
 
 	protocolScheme := GetProtocolScheme(bmcObj.Spec.Protocol.Scheme, defaultProtocol)
-	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options, skipCertValidation, createOpts...)
+	bmcClient, err := CreateBMCClient(ctx, c, protocolScheme, bmcObj.Spec.Protocol.Name, address, bmcObj.Spec.Protocol.Port, bmcSecret, options, skipCertValidation, dialer, createOpts...)
 	return bmcClient, err
 }
 
@@ -215,10 +216,9 @@ func CreateBMCClient(
 	bmcSecret *metalv1alpha1.BMCSecret,
 	bmcOptions bmc.Options,
 	skipCertValidation bool,
+	dialer bmc.Dialer,
 	opts ...CreateBMCClientOption,
 ) (bmc.BMC, error) {
-	// Resolve the endpoint and credentials up-front so the cache key is
-	// available before and after the first attempt.
 	bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(address, fmt.Sprintf("%d", port)))
 	var err error
 	bmcOptions.Username, bmcOptions.Password, err = GetBMCCredentialsFromSecret(bmcSecret)
@@ -227,37 +227,34 @@ func CreateBMCClient(
 	}
 	bmcOptions.InsecureTLS = skipCertValidation
 
-	return CreateBMCClientFromOptions(ctx, bmcProtocol, bmcOptions, opts...)
+	return CreateBMCClientFromOptions(ctx, bmcProtocol, bmcOptions, dialer, opts...)
 }
 
 // CreateBMCClientFromOptions creates a BMC client from fully-populated options.
 // Unlike CreateBMCClient, it does not resolve credentials from a secret — the
 // caller must set Endpoint, Username, Password, and InsecureTLS on bmcOptions.
-// When session caching is enabled and the first attempt fails with a session-expired
-// error, it invalidates the cache entry and retries once with a fresh session.
+// The provided Dialer is used for Redfish connections; other protocols use their
+// own constructors directly.
 func CreateBMCClientFromOptions(
 	ctx context.Context,
 	bmcProtocol metalv1alpha1.ProtocolName,
 	bmcOptions bmc.Options,
+	dialer bmc.Dialer,
 	opts ...CreateBMCClientOption,
 ) (bmc.BMC, error) {
-	bmcClient, err := doCreateBMCClient(ctx, bmcProtocol, bmcOptions, opts...)
-	if err != nil && bmc.IsSessionExpiredError(err) && bmcOptions.SessionCache != nil {
-		// Cached session was rejected by the BMC (e.g. server-side expiry). Invalidate
-		// and retry once with a fresh session.
-		key := bmc.SessionCacheKey{Endpoint: bmcOptions.Endpoint, Username: bmcOptions.Username}
-		bmcOptions.SessionCache.Invalidate(key)
-		bmcClient, err = doCreateBMCClient(ctx, bmcProtocol, bmcOptions, opts...)
-	}
-	return bmcClient, err
+	return doCreateBMCClient(ctx, bmcProtocol, bmcOptions, dialer, opts...)
 }
 
 func doCreateBMCClient(
 	ctx context.Context,
 	bmcProtocol metalv1alpha1.ProtocolName,
 	bmcOptions bmc.Options,
+	dialer bmc.Dialer,
 	opts ...CreateBMCClientOption,
 ) (bmc.BMC, error) {
+	if dialer == nil {
+		dialer = bmc.DirectDialer{}
+	}
 	var bmcClient bmc.BMC
 	var err error
 
@@ -271,7 +268,7 @@ func doCreateBMCClient(
 
 	switch bmcProtocol {
 	case metalv1alpha1.ProtocolRedfish:
-		bmcClient, err = bmc.NewRedfishBMCClient(ctx, bmcOptions)
+		bmcClient, err = dialer.Dial(ctx, bmcOptions)
 		if err != nil {
 			return nil, err
 		}

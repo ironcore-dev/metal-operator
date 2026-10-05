@@ -23,21 +23,21 @@ func (DirectDialer) Dial(ctx context.Context, o Options) (BMC, error) {
 	return NewRedfishBMCClient(ctx, o)
 }
 
-// PoolDialer dials using a shared SessionCache, reusing tokens across calls.
+// SessionDialer dials using a shared SessionCache, reusing tokens across calls.
 // On 401/403 it invalidates the cached session and retries once.
-type PoolDialer struct {
+type SessionDialer struct {
 	cache *SessionCache
 }
 
-func NewPoolDialer(cache *SessionCache) *PoolDialer {
-	return &PoolDialer{cache: cache}
+func NewSessionDialer(cache *SessionCache) *SessionDialer {
+	return &SessionDialer{cache: cache}
 }
 
 type redfishClientHolder interface {
 	Client() *gofish.APIClient
 }
 
-func (p *PoolDialer) Dial(ctx context.Context, o Options) (BMC, error) {
+func (p *SessionDialer) Dial(ctx context.Context, o Options) (BMC, error) {
 	o.SessionCache = p.cache
 
 	bmcClient, err := NewRedfishBMCClient(ctx, o)

@@ -23,6 +23,7 @@ const (
 	ManufacturerHPE        Manufacturer = "HPE"
 	ManufacturerSupermicro Manufacturer = "Supermicro"
 	ManufacturerFujitsu    Manufacturer = "Fsas"
+	ManufacturerBull       Manufacturer = "BULL"
 )
 
 // ComponentType represents a firmware component type.

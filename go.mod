@@ -5,7 +5,7 @@ go 1.26.3
 require (
 	github.com/go-logr/logr v1.4.4
 	github.com/ironcore-dev/controller-utils v0.14.0
-	github.com/jaypipes/ghw v0.25.0
+	github.com/jaypipes/ghw v0.26.0
 	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.44.0
 	github.com/prometheus/client_golang v1.24.1

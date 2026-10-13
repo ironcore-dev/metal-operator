@@ -195,17 +195,6 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		}
 	}
 
-	// Clear the deprecated spec.power field.
-	// TODO: remove this part once the spec field is gone
-	if server.Spec.Power != "" {
-		serverBase := server.DeepCopy()
-		server.Spec.Power = ""
-		if err := r.Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to clear deprecated spec.power field: %w", err)
-		}
-		log.V(1).Info("Cleared deprecated spec.power field")
-	}
-
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions, r.Dialer, bmcutils.WithRegistryURL(r.RegistryURL))
 	if err != nil {
 		if errors.As(err, &bmcutils.BMCUnAvailableError{}) {

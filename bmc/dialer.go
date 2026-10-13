@@ -5,6 +5,7 @@ package bmc
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 
@@ -99,5 +100,15 @@ func (r *retryRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 
 	retryReq := req.Clone(req.Context())
 	retryReq.Header.Set("X-Auth-Token", session.Token)
+	if req.Body != nil && req.Body != http.NoBody {
+		if req.GetBody == nil {
+			return nil, fmt.Errorf("cannot retry request with non-rewindable body")
+		}
+		freshBody, bodyErr := req.GetBody()
+		if bodyErr != nil {
+			return nil, fmt.Errorf("getting fresh request body for retry: %w", bodyErr)
+		}
+		retryReq.Body = freshBody
+	}
 	return r.base.RoundTrip(retryReq)
 }

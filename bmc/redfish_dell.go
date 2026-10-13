@@ -200,6 +200,23 @@ func (r *DellRedfishBMC) getFilteredBMCRegistryAttributes(manager *schemas.Manag
 	return filteredAttr, nil
 }
 
+// coerceAttributeTypes converts string values in attrs to int for any key the
+// registry defines as IntegerAttributeType. iDRAC requires integer JSON values
+// for these keys; the CRD schema stores all settings as strings.
+func coerceAttributeTypes(attrs schemas.SettingsAttributes, registry map[string]schemas.Attributes) {
+	for key, val := range attrs {
+		entry, ok := registry[key]
+		if !ok || entry.Type != schemas.IntegerAttributeType {
+			continue
+		}
+		if s, ok := val.(string); ok {
+			if n, err := strconv.Atoi(s); err == nil {
+				attrs[key] = n
+			}
+		}
+	}
+}
+
 // --- BMC interface method overrides ---
 
 func (r *DellRedfishBMC) GetBMCAttributeValues(ctx context.Context, req GetBMCAttributeValuesRequest) (schemas.SettingsAttributes, error) {
@@ -417,6 +434,17 @@ func (r *DellRedfishBMC) SetBMCAttributesImmediately(ctx context.Context, bmcUUI
 		return results, err
 	}
 
+	// Registry fetch is best-effort: a missing ManagerAttributeRegistry Location
+	// must not block the PATCH. Coerce integer types when the registry is available.
+	if registryAttrs, regErr := r.getFilteredBMCRegistryAttributes(manager, false, false); regErr == nil {
+		for name, attr := range dellCommonBMCAttributes {
+			if _, exists := registryAttrs[name]; !exists {
+				registryAttrs[name] = attr
+			}
+		}
+		coerceAttributeTypes(dellAttrs, registryAttrs)
+	}
+
 	bmcAttrValues, err := r.getCurrentBMCSettingAttribute(manager)
 	if err != nil {
 		return results, err
@@ -540,6 +568,7 @@ func (r *DellRedfishBMC) CheckBMCAttributes(ctx context.Context, bmcUUID string,
 	if len(filteredAttr) == 0 {
 		return false, nil
 	}
+	coerceAttributeTypes(dellAttrs, filteredAttr)
 	return checkAttributes(dellAttrs, filteredAttr)
 }
 

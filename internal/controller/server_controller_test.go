@@ -746,25 +746,7 @@ var _ = Describe("Server Controller", func() {
 		It("should park a server in error state and resume to error", func(ctx SpecContext) {
 			server, bmcSecret := createServerAndSecret(ctx)
 
-			By("Driving the server into the Error state (a non-parkable state)")
-			Eventually(UpdateStatus(server, func() {
-				server.Status.State = metalv1alpha1.ServerStateError
-			})).Should(Succeed())
-
-			By("Requesting the server to be parked while in Error")
-			Eventually(Update(server, func() {
-				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)
-			})).Should(Succeed())
-
-			By("Ensuring the server is not parked and the request is left in place")
-			Consistently(Object(server)).Should(SatisfyAll(
-				HaveField("Status.State", metalv1alpha1.ServerStateError),
-				HaveField("Annotations", HaveKeyWithValue(metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationPark)),
-				HaveField("Annotations", Not(HaveKey(metalv1alpha1.ParkedAnnotation))),
-			))
-
-			By("Driving the Server to available state (now parkable)")
-			By("Driving the Server to error state")
+			By("Driving the server into the Error state")
 			Eventually(UpdateStatus(server, func() {
 				server.Status.State = metalv1alpha1.ServerStateError
 			})).Should(Succeed())

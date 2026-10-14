@@ -263,6 +263,7 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 				errs = append(errs, fmt.Errorf("failed to GET ETag for PATCH %s: %w", url, getErr))
 				continue
 			}
+			_, _ = io.Copy(io.Discard, getResp.Body)
 			getResp.Body.Close() // nolint: errcheck
 			if getResp.StatusCode < http.StatusOK || getResp.StatusCode >= http.StatusMultipleChoices {
 				errs = append(errs, fmt.Errorf("failed to GET ETag for PATCH %s: status %d", url, getResp.StatusCode))
@@ -282,10 +283,16 @@ func httpBasedUpdateBMCAttributes(c schemas.Client, attrs schemas.SettingsAttrib
 				continue
 			}
 			appliedETag := resp.Header.Get("ETag")
-			if appliedETag == "" {
-				if getResp, err := c.Get(url); err == nil {
-					getResp.Body.Close() // nolint: errcheck
-					appliedETag = getResp.Header.Get("ETag")
+			// HPE iLO (and possibly other BMCs) issue a "transaction" ETag in the PATCH
+			// response that does not match the resource's stable GET ETag. Storing the
+			// PATCH-response ETag causes FetchETags to detect a mismatch on every
+			// reconcile, re-applying identical settings indefinitely. Confirmed on
+			// iLO 6 v1.76 and iLO 7 (Gen12).
+			if getResp, err := c.Get(url); err == nil {
+				_, _ = io.Copy(io.Discard, getResp.Body)
+				getResp.Body.Close() // nolint: errcheck
+				if getETag := getResp.Header.Get("ETag"); getETag != "" {
+					appliedETag = getETag
 				}
 			}
 			results[attr] = ApplyResult{URI: url, ETag: appliedETag}
@@ -488,6 +495,7 @@ func httpFetchETags(c schemas.Client, uris []string) (map[string]string, error) 
 			errs = append(errs, fmt.Errorf("FetchETags GET %s: %w", uri, err))
 			continue
 		}
+		_, _ = io.Copy(io.Discard, resp.Body)
 		resp.Body.Close() // nolint: errcheck
 		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 			errs = append(errs, fmt.Errorf("FetchETags GET %s: unexpected status %d", uri, resp.StatusCode))

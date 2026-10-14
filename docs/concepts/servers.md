@@ -347,7 +347,7 @@ and the parked marker stay the same regardless of how the request arrives.
 Parking is admitted only from the `Available` and `Reserved` states, the in-use states. A `park`
 request on a server in any other state (`Released`, `Error`)
 is **deferred**: the request annotation is left in place and retried on the next resync, so a server
-that is still discovering (or otherwise not yet parkable) is parked automatically once it reaches a
+that is not yet parkable is parked automatically once it reaches a
 parkable state, without the requestor having to re-issue the request.
 
 ### Interaction with deletion

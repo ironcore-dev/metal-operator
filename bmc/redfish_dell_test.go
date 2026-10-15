@@ -218,6 +218,16 @@ var _ = Describe("Dell OEM", func() {
 			Entry("Running state", &DellJob{State: "Running"}, false),
 			Entry("Scheduled state", &DellJob{State: "Scheduled"}, false),
 		)
+
+		DescribeTable("IsScheduled",
+			func(job *DellJob, expected bool) {
+				Expect(job.IsScheduled()).To(Equal(expected))
+			},
+			Entry("Scheduled state", &DellJob{State: "Scheduled"}, true),
+			Entry("Running state", &DellJob{State: "Running"}, false),
+			Entry("Completed state", &DellJob{State: "Completed"}, false),
+			Entry("Failed state", &DellJob{State: "Failed"}, false),
+		)
 	})
 
 	Describe("InstallFirmwareFromRepository", func() {

@@ -728,6 +728,9 @@ const (
 	// dellJobStateRebootCompleted is the terminal success state for RebootForce
 	// jobs specifically - unlike other job types, these never reach "Completed".
 	dellJobStateRebootCompleted = "RebootCompleted"
+	// dellJobStateScheduled means the job is queued and waiting - typically for
+	// the server to be rebooted/power-cycled - before it can actually execute.
+	dellJobStateScheduled = "Scheduled"
 )
 
 // IsCompleted reports whether the job has reached a successful terminal state.
@@ -751,6 +754,12 @@ func (j *DellJob) IsFailed() bool {
 // IsTerminal reports whether the job has reached any terminal state.
 func (j *DellJob) IsTerminal() bool {
 	return j.IsCompleted() || j.IsFailed()
+}
+
+// IsScheduled reports whether the job is queued and waiting - typically for
+// the server to be rebooted/power-cycled - before it can actually execute.
+func (j *DellJob) IsScheduled() bool {
+	return j.State == dellJobStateScheduled
 }
 
 // FirmwareUpdaterDell is not part of the BMC union; assert separately from bmc.go.

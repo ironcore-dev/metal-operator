@@ -16,6 +16,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -860,6 +861,53 @@ var _ = Describe("Server Controller", func() {
 
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).Should(Succeed())
+		})
+
+		// TODO: remove together with the legacy Initial/Discovery migration in the server reconciler.
+		It("should migrate a legacy unclaimed Discovery server to Available and clean up its discovery boot configuration", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Creating the leftover internal discovery boot configuration")
+			discoveryConfig := &metalv1alpha1.ServerBootConfiguration{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "discovery-" + server.Name,
+					Namespace: ns.Name,
+					Annotations: map[string]string{
+						"metal.ironcore.dev/type": "Internal",
+					},
+				},
+				Spec: metalv1alpha1.ServerBootConfigurationSpec{
+					ServerRef: v1.LocalObjectReference{Name: server.Name},
+					Image:     "discovery:latest",
+				},
+			}
+			Expect(k8sClient.Create(ctx, discoveryConfig)).To(Succeed())
+
+			By("Simulating the legacy Discovery state with the discovery bootconfig ref")
+			Eventually(Update(server, func() {
+				server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
+					Namespace: discoveryConfig.Namespace,
+					Name:      discoveryConfig.Name,
+				}
+			})).Should(Succeed())
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = "Discovery"
+			})).Should(Succeed())
+
+			By("Ensuring the server is migrated to Available and its bootconfig ref is cleared")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Spec.BootConfigurationRef", BeNil()),
+			))
+
+			By("Ensuring the leftover discovery boot configuration is deleted")
+			Eventually(func(g Gomega) {
+				err := k8sClient.Get(ctx, client.ObjectKeyFromObject(discoveryConfig), &metalv1alpha1.ServerBootConfiguration{})
+				g.Expect(apierrors.IsNotFound(err)).To(BeTrue())
+			}).Should(Succeed())
+
+			Expect(k8sClient.Delete(ctx, server)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		})
 	})
 })

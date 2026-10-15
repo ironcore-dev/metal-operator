@@ -144,7 +144,37 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 	}
 
 	// do late state initialization
-	if server.Status.State == "" {
+	// "Initial" and "Discovery" are legacy states from before in-band discovery was removed.
+	// Servers still carrying them are re-initialized from spec.ServerClaimRef.
+	// TODO: remove this legacy migration (and its test) in a future version, once no
+	// supported upgrade path can still produce servers in Initial/Discovery state.
+	if s := server.Status.State; s == "" || s == "Initial" || s == "Discovery" {
+		// Clear the leftover internal discovery boot configuration on unclaimed legacy
+		// servers. Claimed servers keep it; the claim controller ignores it.
+		if s == "Discovery" && server.Spec.ServerClaimRef == nil && server.Spec.BootConfigurationRef != nil {
+			config := &metalv1alpha1.ServerBootConfiguration{}
+			if err := r.Get(ctx, client.ObjectKey{
+				Namespace: server.Spec.BootConfigurationRef.Namespace,
+				Name:      server.Spec.BootConfigurationRef.Name,
+			}, config); err != nil {
+				if !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, fmt.Errorf("failed to get discovery server boot configuration: %w", err)
+				}
+			} else if config.Annotations["metal.ironcore.dev/type"] == "Internal" {
+				if err := r.Delete(ctx, config); err != nil && !apierrors.IsNotFound(err) {
+					return ctrl.Result{}, fmt.Errorf("failed to delete discovery server boot configuration: %w", err)
+				}
+				log.V(1).Info("Deleted internal discovery server boot configuration", "Namespace", config.Namespace, "Name", config.Name)
+			}
+
+			base := server.DeepCopy()
+			server.Spec.BootConfigurationRef = nil
+			if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to clear spec.bootConfigurationRef: %w", err)
+			}
+			log.V(1).Info("Cleared boot configuration ref")
+		}
+
 		state := metalv1alpha1.ServerStateAvailable
 		if server.Spec.ServerClaimRef != nil {
 			state = metalv1alpha1.ServerStateReserved
@@ -177,6 +207,15 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, err
 	}
 	log.V(1).Info("Ensured finalizer has been added")
+
+	// Refresh the hardware inventory once it is missing (e.g. for servers that were
+	// claimed before their first available-state pass), regardless of lifecycle state.
+	if server.Status.Manufacturer == "" {
+		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to update server status system info: %w", err)
+		}
+		log.V(1).Info("Updated Server status system info")
+	}
 
 	if err := r.updateServerStatus(ctx, bmcClient, server); err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed to update server status: %w", err)
@@ -233,12 +272,6 @@ func (r *ServerReconciler) ensureServerStateTransition(ctx context.Context, bmcC
 
 func (r *ServerReconciler) handleAvailableState(ctx context.Context, bmcClient bmc.BMC, server *metalv1alpha1.Server) (bool, error) {
 	log := ctrl.LoggerFrom(ctx)
-	if server.Status.Manufacturer == "" {
-		if err := r.updateServerStatusFromSystemInfo(ctx, bmcClient, server); err != nil {
-			return false, fmt.Errorf("failed to update server status system info: %w", err)
-		}
-		log.V(1).Info("Updated Server status system info")
-	}
 	if server.Status.PowerState != metalv1alpha1.ServerOffPowerState {
 		if err := r.ensureServerPowerState(ctx, bmcClient, server, metalv1alpha1.PowerOff); err != nil {
 			return false, fmt.Errorf("failed to ensure server power state: %w", err)

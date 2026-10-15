@@ -143,45 +143,9 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 		return ctrl.Result{}, nil
 	}
 
-	// do late state initialization
-	// "Initial" and "Discovery" are legacy states from before in-band discovery was removed.
-	// Servers still carrying them are re-initialized from spec.ServerClaimRef.
-	// TODO: remove this legacy migration (and its test) in a future version, once no
-	// supported upgrade path can still produce servers in Initial/Discovery state.
-	if s := server.Status.State; s == "" || s == "Initial" || s == "Discovery" {
-		// Clear the leftover internal discovery boot configuration on unclaimed legacy
-		// servers. Claimed servers keep it; the claim controller ignores it.
-		if s == "Discovery" && server.Spec.ServerClaimRef == nil && server.Spec.BootConfigurationRef != nil {
-			config := &metalv1alpha1.ServerBootConfiguration{}
-			if err := r.Get(ctx, client.ObjectKey{
-				Namespace: server.Spec.BootConfigurationRef.Namespace,
-				Name:      server.Spec.BootConfigurationRef.Name,
-			}, config); err != nil {
-				if !apierrors.IsNotFound(err) {
-					return ctrl.Result{}, fmt.Errorf("failed to get discovery server boot configuration: %w", err)
-				}
-			} else if config.Annotations["metal.ironcore.dev/type"] == "Internal" {
-				if err := r.Delete(ctx, config); err != nil && !apierrors.IsNotFound(err) {
-					return ctrl.Result{}, fmt.Errorf("failed to delete discovery server boot configuration: %w", err)
-				}
-				log.V(1).Info("Deleted internal discovery server boot configuration", "Namespace", config.Namespace, "Name", config.Name)
-			}
-
-			base := server.DeepCopy()
-			server.Spec.BootConfigurationRef = nil
-			if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to clear spec.bootConfigurationRef: %w", err)
-			}
-			log.V(1).Info("Cleared boot configuration ref")
-		}
-
-		state := metalv1alpha1.ServerStateAvailable
-		if server.Spec.ServerClaimRef != nil {
-			state = metalv1alpha1.ServerStateReserved
-		}
-		if modified, err := r.patchServerState(ctx, server, state); err != nil || modified {
-			return ctrl.Result{}, err
-		}
+	// do late state initialization for empty/legacy states
+	if modified, err := r.migrateLegacyState(ctx, server); err != nil || modified {
+		return ctrl.Result{}, err
 	}
 
 	bmcClient, err := bmcutils.GetBMCClientForServer(ctx, r.Client, server, r.DefaultProtocol, r.SkipCertValidation, r.BMCOptions)
@@ -237,6 +201,48 @@ func (r *ServerReconciler) reconcile(ctx context.Context, server *metalv1alpha1.
 
 	log.V(1).Info("Reconciled Server")
 	return ctrl.Result{RequeueAfter: r.ResyncInterval}, nil
+}
+
+// migrateLegacyState re-initializes servers carrying empty or legacy state.
+// TODO: remove this legacy migration (and its test) in a future version, once no
+// supported upgrade path can still produce servers in Initial/Discovery state.
+func (r *ServerReconciler) migrateLegacyState(ctx context.Context, server *metalv1alpha1.Server) (bool, error) {
+	log := ctrl.LoggerFrom(ctx)
+	s := server.Status.State
+	if s != "" && s != "Initial" && s != "Discovery" {
+		return false, nil
+	}
+
+	// Clear the leftover internal discovery boot configuration on unclaimed legacy servers.
+	if s == "Discovery" && server.Spec.ServerClaimRef == nil && server.Spec.BootConfigurationRef != nil {
+		config := &metalv1alpha1.ServerBootConfiguration{}
+		if err := r.Get(ctx, client.ObjectKey{
+			Namespace: server.Spec.BootConfigurationRef.Namespace,
+			Name:      server.Spec.BootConfigurationRef.Name,
+		}, config); err != nil {
+			if !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("failed to get discovery server boot configuration: %w", err)
+			}
+		} else if config.Annotations["metal.ironcore.dev/type"] == "Internal" {
+			if err := r.Delete(ctx, config); err != nil && !apierrors.IsNotFound(err) {
+				return false, fmt.Errorf("failed to delete discovery server boot configuration: %w", err)
+			}
+			log.V(1).Info("Deleted internal discovery server boot configuration", "Namespace", config.Namespace, "Name", config.Name)
+		}
+
+		base := server.DeepCopy()
+		server.Spec.BootConfigurationRef = nil
+		if err := r.Patch(ctx, server, client.MergeFrom(base)); err != nil {
+			return false, fmt.Errorf("failed to clear spec.bootConfigurationRef: %w", err)
+		}
+		log.V(1).Info("Cleared boot configuration ref")
+	}
+
+	state := metalv1alpha1.ServerStateAvailable
+	if server.Spec.ServerClaimRef != nil {
+		state = metalv1alpha1.ServerStateReserved
+	}
+	return r.patchServerState(ctx, server, state)
 }
 
 // Server state-machine:

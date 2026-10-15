@@ -78,12 +78,13 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 	}
 
 	client := ev.GetClient()
-	// some implementations (like Dell) do not support ResourceTypes and RegistryPrefixes
-	if len(ev.ResourceTypes) == 0 {
-		payload.EventTypes = []schemas.EventType{}
+	// For MetricReport subscriptions, explicitly set EventTypes to ["MetricReport"] so that
+	// iDRAC 10 (and similar firmware) does not fall back to its default ["Alert", "Other"].
+	if eventFormatType == schemas.MetricReportEventFormatType {
+		payload.EventTypes = []schemas.EventType{schemas.MetricReportEventType}
 	}
-	// Omit RegistryPrefixes and ResourceTypes to allow all events.
-	// Sending empty strings ("") causes 400 errors on BMCs that validate enum values.
+	// Omit RegistryPrefixes and ResourceTypes unconditionally — sending empty strings ("")
+	// causes 400 errors on BMCs that validate enum values.
 
 	resp, err := client.Post(ev.SubscriptionsLink, payload)
 	if err != nil {

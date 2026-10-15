@@ -6,6 +6,7 @@ package bmc
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -656,6 +657,55 @@ var _ = Describe("RedfishBaseBMC CreateEventSubscription", func() {
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).NotTo(ContainSubstring("failed to recover existing subscription"))
 		Expect(link).To(BeEmpty())
+	})
+	It("should set EventTypes to MetricReport for MetricReport format subscriptions (iDRAC 10 fix)", func() {
+		var capturedBody []byte
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				capturedBody, _ = io.ReadAll(r.Body)
+				w.Header().Set("Location", "/redfish/v1/EventService/Subscriptions/new-1")
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		_, err := bmc.CreateEventSubscription(ctx, destination, schemas.MetricReportEventFormatType, schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).NotTo(HaveOccurred())
+
+		var posted map[string]any
+		Expect(json.Unmarshal(capturedBody, &posted)).To(Succeed())
+		Expect(posted["EventTypes"]).To(ConsistOf("MetricReport"))
+	})
+
+	It("should not set EventTypes for Event format subscriptions (no regression)", func() {
+		var capturedBody []byte
+		mux := http.NewServeMux()
+		baseHandlers(mux)
+		mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				capturedBody, _ = io.ReadAll(r.Body)
+				w.Header().Set("Location", "/redfish/v1/EventService/Subscriptions/new-1")
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+		})
+
+		server := httptest.NewServer(mux)
+		defer server.Close()
+
+		bmc := newTestRedfishBMC(server)
+		_, err := bmc.CreateEventSubscription(ctx, destination, schemas.EventEventFormatType, schemas.DeliveryRetryPolicy("RetryForever"))
+		Expect(err).NotTo(HaveOccurred())
+
+		var posted map[string]any
+		Expect(json.Unmarshal(capturedBody, &posted)).To(Succeed())
+		Expect(posted).NotTo(HaveKey("EventTypes"))
 	})
 })
 

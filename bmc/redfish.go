@@ -1202,6 +1202,103 @@ type subscriptionPayload struct {
 	Context             string                           `json:"Context,omitempty"`
 }
 
+// defaultIsDuplicate reports whether an event-subscription POST error from a BMC indicates
+// a duplicate subscription. It matches ResourceAlreadyExists (used by most BMCs) and
+// PropertyValueModified when the destination URL also appears in the error body (Dell iDRAC
+// uses this for duplicates; including the destination URL prevents false-positive recovery
+// on unrelated property validation failures).
+func defaultIsDuplicate(errText, destination string) bool {
+	return strings.Contains(errText, "ResourceAlreadyExists") ||
+		(strings.Contains(errText, "PropertyValueModified") && strings.Contains(errText, destination))
+}
+
+// hpeIsDuplicate is the stricter HPE iLO variant: PropertyValueModified is a general property
+// validation error on iLO and must not trigger subscription recovery.
+func hpeIsDuplicate(errText, _ string) bool {
+	return strings.Contains(errText, "ResourceAlreadyExists")
+}
+
+// eventSubscriptionCompatible reports whether an existing subscription is compatible with
+// the desired payload. An empty EventFormatType on the existing subscription (many BMCs omit
+// it in GET responses) is treated as unknown and skipped; we still validate EventTypes when
+// the payload explicitly requests a specific set (e.g. Dell MetricReport subscriptions).
+func eventSubscriptionCompatible(existing *schemas.EventDestination, payload *subscriptionPayload) bool {
+	if existing.EventFormatType != "" && existing.EventFormatType != payload.EventFormatType {
+		return false
+	}
+	if len(payload.EventTypes) > 0 {
+		existingTypes := existing.EventTypes //nolint:staticcheck
+		existingSet := make(map[string]struct{}, len(existingTypes))
+		for _, t := range existingTypes {
+			existingSet[string(t)] = struct{}{}
+		}
+		for _, t := range payload.EventTypes {
+			if _, ok := existingSet[string(t)]; !ok {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// doPostSubscription posts payload and returns the normalised subscription link from
+// the Location header. It is the shared post+extract step used by postEventSubscription.
+func (r *RedfishBaseBMC) doPostSubscription(client schemas.Client, subscriptionsLink string, payload *subscriptionPayload) (string, error) {
+	resp, err := client.Post(subscriptionsLink, payload)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	subscriptionLink := resp.Header.Get("Location")
+	if subscriptionLink == "" {
+		return "", fmt.Errorf("failed to get subscription link from response header")
+	}
+	if urlParser, err := url.ParseRequestURI(subscriptionLink); err == nil {
+		subscriptionLink = urlParser.RequestURI()
+	}
+	return subscriptionLink, nil
+}
+
+// postEventSubscription POSTs payload to subscriptionsLink and returns the subscription link.
+// On a duplicate error it fetches the existing subscription and validates it against the
+// payload's EventFormatType and EventTypes. A compatible existing subscription is returned
+// directly; an incompatible one is deleted and the payload is re-posted before returning.
+// isDuplicate determines whether a POST error is treated as a duplicate.
+func (r *RedfishBaseBMC) postEventSubscription(
+	subscriptionsLink string,
+	client schemas.Client,
+	payload *subscriptionPayload,
+	destination string,
+	isDuplicate func(errText, destination string) bool,
+) (string, error) {
+	link, postErr := r.doPostSubscription(client, subscriptionsLink, payload)
+	if postErr == nil {
+		return link, nil
+	}
+	if !isDuplicate(postErr.Error(), destination) {
+		return "", postErr
+	}
+	existing, findErr := r.findExistingSubscription(destination)
+	if findErr != nil {
+		return "", fmt.Errorf("%w: failed to recover existing subscription: %v", postErr, findErr)
+	}
+	if eventSubscriptionCompatible(existing, payload) {
+		return existing.ODataID, nil
+	}
+	// Existing subscription has incompatible EventFormatType or EventTypes — replace it.
+	if deleteErr := r.DeleteEventSubscription(context.Background(), existing.ODataID); deleteErr != nil {
+		return "", fmt.Errorf("%w: failed to replace incompatible subscription (delete): %v", postErr, deleteErr)
+	}
+	link, replaceErr := r.doPostSubscription(client, subscriptionsLink, payload)
+	if replaceErr != nil {
+		// Subscription was deleted but re-post failed; BMC has no subscription — caller must retry.
+		return "", fmt.Errorf("%w: failed to replace incompatible subscription (re-post): %v", postErr, replaceErr)
+	}
+	return link, nil
+}
+
 func (r *RedfishBaseBMC) CreateEventSubscription(
 	ctx context.Context,
 	destination string,
@@ -1218,69 +1315,27 @@ func (r *RedfishBaseBMC) CreateEventSubscription(
 	}
 	payload := &subscriptionPayload{
 		Destination:         destination,
-		EventFormatType:     eventFormatType, // event or metricreport
+		EventFormatType:     eventFormatType,
 		Protocol:            schemas.RedfishEventDestinationProtocol,
-		DeliveryRetryPolicy: retry, // Note: HPE iLO doesn't support this field; HPERedfishBMC overrides this method to omit it
+		DeliveryRetryPolicy: retry, // HPERedfishBMC overrides this method to omit it
 		Context:             "metal-operator",
+		// Omit EventTypes, RegistryPrefixes, ResourceTypes — sending empty strings ("")
+		// causes 400 errors on BMCs that validate enum values.
+		// DellRedfishBMC overrides to set EventTypes for MetricReport subscriptions.
 	}
-	client := ev.GetClient()
-	// For MetricReport subscriptions, explicitly set EventTypes to ["MetricReport"] so that
-	// iDRAC 10 (and similar firmware) does not fall back to its default ["Alert", "Other"].
-	// The Redfish spec states: "for metric reports, the EventTypes property should include MetricReport".
-	// iDRAC 9 infers this from EventFormatType; iDRAC 10 requires it to be explicit.
-	if eventFormatType == schemas.MetricReportEventFormatType {
-		payload.EventTypes = []schemas.EventType{schemas.MetricReportEventType}
-	}
-	// For Event format subscriptions: omit EventTypes entirely (accept all event types).
-	// Omit RegistryPrefixes and ResourceTypes unconditionally — sending empty strings ("")
-	// causes 400 errors on BMCs that validate enum values.
-	resp, err := client.Post(ev.SubscriptionsLink, payload)
-	if err != nil {
-		// Gofish returns non-2xx responses as errors (format: "STATUS_CODE: BODY").
-		// Check if it's a "resource already exists" error and recover the existing subscription URI.
-		// PropertyValueModified is also checked but only when the destination URL appears in the
-		// error text — Dell iDRAC uses it for duplicate subscriptions and the duplicate destination
-		// is included in the error body, which prevents false-positive recovery on unrelated
-		// property validation failures.
-		errText := err.Error()
-		isDuplicate := strings.Contains(errText, "ResourceAlreadyExists") ||
-			(strings.Contains(errText, "PropertyValueModified") && strings.Contains(errText, destination))
-		if isDuplicate {
-			existingLink, findErr := r.findExistingSubscription(destination)
-			if findErr == nil {
-				return existingLink, nil
-			}
-			return "", fmt.Errorf("%w: failed to recover existing subscription: %v", err, findErr)
-		}
-		return "", err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	// return subscription link from returned location
-	subscriptionLink := resp.Header.Get("Location")
-	if subscriptionLink == "" {
-		return "", fmt.Errorf("failed to get subscription link from response header")
-	}
-	urlParser, err := url.ParseRequestURI(subscriptionLink)
-	if err == nil {
-		subscriptionLink = urlParser.RequestURI()
-	}
-	return subscriptionLink, nil
+	return r.postEventSubscription(ev.SubscriptionsLink, ev.GetClient(), payload, destination, defaultIsDuplicate)
 }
 
 // findExistingSubscription queries the BMC for an existing subscription with the given destination.
-// Returns the subscription URI if found, error otherwise.
-// Matches by Destination + Context ("metal-operator") rather than EventFormatType,
-// because many BMCs do not return EventFormatType in subscription responses.
-func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, error) {
+// Returns the matching EventDestination (for compatibility validation by the caller), or an error.
+// Matches by Destination + Context ("metal-operator").
+func (r *RedfishBaseBMC) findExistingSubscription(destination string) (*schemas.EventDestination, error) {
 	service := r.client.GetService()
 	ev, err := service.EventService()
 	if err != nil {
-		return "", fmt.Errorf("failed to get event service: %w", err)
+		return nil, fmt.Errorf("failed to get event service: %w", err)
 	}
 
-	// Get all subscriptions
 	subscriptions, err := ev.Subscriptions()
 	if err != nil {
 		// CollectionError means some members failed to fetch but others may have succeeded.
@@ -1290,21 +1345,17 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (string, e
 		// was returned; only bail on other error types.
 		var collErr *schemas.CollectionError
 		if !errors.As(err, &collErr) {
-			return "", fmt.Errorf("failed to list subscriptions: %w", err)
+			return nil, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 	}
 
-	// Find subscription matching our destination and context
 	for _, sub := range subscriptions {
-		if sub.Destination == destination && sub.Context == "metal-operator" {
-			// Extract URI from OData ID
-			if sub.ODataID != "" {
-				return sub.ODataID, nil
-			}
+		if sub.Destination == destination && sub.Context == "metal-operator" && sub.ODataID != "" {
+			return sub, nil
 		}
 	}
 
-	return "", fmt.Errorf("existing subscription not found for destination: %s", destination)
+	return nil, fmt.Errorf("existing subscription not found for destination: %s", destination)
 }
 
 func (r *RedfishBaseBMC) DeleteEventSubscription(_ context.Context, uri string) error {

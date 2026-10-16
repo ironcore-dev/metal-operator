@@ -998,3 +998,35 @@ func (r *DellRedfishBMC) GetJob(_ context.Context, UUID string, jobID string) (*
 		PercentComplete: dellParsePercentComplete(dj.PercentComplete),
 	}, nil
 }
+
+// CreateEventSubscription overrides the base implementation to set EventTypes for MetricReport
+// subscriptions. Dell iDRAC 10 (17G Monolithic firmware) does not infer EventTypes from
+// EventFormatType as iDRAC 9 did — it must be sent explicitly for MetricReport subscriptions,
+// otherwise iDRAC 10 defaults to ["Alert", "Other"] and delivers sensor Event payloads instead
+// of MetricReport payloads. iDRAC 9 accepts this field and continues to work correctly.
+func (r *DellRedfishBMC) CreateEventSubscription(
+	ctx context.Context,
+	destination string,
+	eventFormatType schemas.EventFormatType,
+	retry schemas.DeliveryRetryPolicy,
+) (string, error) {
+	service := r.client.GetService()
+	ev, err := service.EventService()
+	if err != nil {
+		return "", fmt.Errorf("failed to get event service: %w", err)
+	}
+	if !ev.ServiceEnabled {
+		return "", fmt.Errorf("event service is not enabled")
+	}
+	payload := &subscriptionPayload{
+		Destination:         destination,
+		EventFormatType:     eventFormatType,
+		Protocol:            schemas.RedfishEventDestinationProtocol,
+		DeliveryRetryPolicy: retry,
+		Context:             "metal-operator",
+	}
+	if eventFormatType == schemas.MetricReportEventFormatType {
+		payload.EventTypes = []schemas.EventType{schemas.MetricReportEventType}
+	}
+	return r.postEventSubscription(ev.SubscriptionsLink, ev.GetClient(), payload, destination, defaultIsDuplicate)
+}

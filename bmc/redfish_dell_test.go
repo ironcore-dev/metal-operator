@@ -5,6 +5,7 @@ package bmc
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -408,6 +409,69 @@ var _ = Describe("Dell OEM", func() {
 			Expect(job.State).To(Equal("Running"))
 			Expect(job.Message).To(Equal("Job execution in progress."))
 			Expect(job.PercentComplete).To(Equal(int32(50)))
+		})
+	})
+
+	Describe("CreateEventSubscription", func() {
+		addBaseHandlers := func(mux *http.ServeMux) {
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(serviceRootWithEventServiceJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/EventService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(eventServiceJSON()) //nolint:errcheck
+			})
+		}
+
+		It("should set EventTypes to MetricReport for MetricReport format subscriptions (iDRAC 10 fix)", func() {
+			var capturedBody []byte
+			mux := http.NewServeMux()
+			addBaseHandlers(mux)
+			mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					capturedBody, _ = io.ReadAll(r.Body)
+					w.Header().Set("Location", "/redfish/v1/EventService/Subscriptions/new-1")
+					w.WriteHeader(http.StatusCreated)
+					return
+				}
+			})
+
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			dell.RedfishBaseBMC = newTestRedfishBMC(server)
+			_, err := dell.CreateEventSubscription(context.Background(), "https://example.com/events", schemas.MetricReportEventFormatType, schemas.DeliveryRetryPolicy("RetryForever"))
+			Expect(err).NotTo(HaveOccurred())
+
+			var posted map[string]any
+			Expect(json.Unmarshal(capturedBody, &posted)).To(Succeed())
+			Expect(posted["EventTypes"]).To(ConsistOf("MetricReport"))
+		})
+
+		It("should not set EventTypes for Event format subscriptions", func() {
+			var capturedBody []byte
+			mux := http.NewServeMux()
+			addBaseHandlers(mux)
+			mux.HandleFunc("/redfish/v1/EventService/Subscriptions", func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					capturedBody, _ = io.ReadAll(r.Body)
+					w.Header().Set("Location", "/redfish/v1/EventService/Subscriptions/new-1")
+					w.WriteHeader(http.StatusCreated)
+					return
+				}
+			})
+
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			dell.RedfishBaseBMC = newTestRedfishBMC(server)
+			_, err := dell.CreateEventSubscription(context.Background(), "https://example.com/events", schemas.EventEventFormatType, schemas.DeliveryRetryPolicy("RetryForever"))
+			Expect(err).NotTo(HaveOccurred())
+
+			var posted map[string]any
+			Expect(json.Unmarshal(capturedBody, &posted)).To(Succeed())
+			Expect(posted).NotTo(HaveKey("EventTypes"))
 		})
 	})
 

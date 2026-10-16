@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -74,46 +73,10 @@ func (r *HPERedfishBMC) CreateEventSubscription(
 		EventFormatType: eventFormatType,
 		Protocol:        schemas.RedfishEventDestinationProtocol,
 		Context:         "metal-operator",
-		// NOTE: DeliveryRetryPolicy is intentionally omitted for HPE iLO compatibility
+		// DeliveryRetryPolicy intentionally omitted: HPE iLO rejects it.
+		// EventTypes intentionally omitted: HPE iLO infers the type from EventFormatType.
 	}
-
-	client := ev.GetClient()
-	// For MetricReport subscriptions, explicitly set EventTypes to ["MetricReport"] so that
-	// iDRAC 10 (and similar firmware) does not fall back to its default ["Alert", "Other"].
-	if eventFormatType == schemas.MetricReportEventFormatType {
-		payload.EventTypes = []schemas.EventType{schemas.MetricReportEventType}
-	}
-	// Omit RegistryPrefixes and ResourceTypes unconditionally — sending empty strings ("")
-	// causes 400 errors on BMCs that validate enum values.
-
-	resp, err := client.Post(ev.SubscriptionsLink, payload)
-	if err != nil {
-		// Gofish returns non-2xx responses as errors (format: "STATUS_CODE: BODY").
-		// Check if it's a "resource already exists" error and recover the existing subscription URI.
-		// Note: PropertyValueModified is intentionally excluded here — HPE iLO uses it for general
-		// property validation failures (e.g. read-only fields), not duplicate subscriptions.
-		if strings.Contains(err.Error(), "ResourceAlreadyExists") {
-			existingLink, findErr := r.findExistingSubscription(destination)
-			if findErr == nil {
-				return existingLink, nil
-			}
-			return "", fmt.Errorf("%w: failed to recover existing subscription: %v", err, findErr)
-		}
-		return "", err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	// return subscription link from returned location
-	subscriptionLink := resp.Header.Get("Location")
-	if subscriptionLink == "" {
-		return "", fmt.Errorf("failed to get subscription link from response header")
-	}
-	urlParser, err := url.ParseRequestURI(subscriptionLink)
-	if err == nil {
-		subscriptionLink = urlParser.RequestURI()
-	}
-	return subscriptionLink, nil
+	return r.postEventSubscription(ev.SubscriptionsLink, ev.GetClient(), payload, destination, hpeIsDuplicate)
 }
 
 // --- Firmware upgrade overrides ---

@@ -347,9 +347,9 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/1"))
+		Expect(sub.ODataID).To(Equal("/redfish/v1/EventService/Subscriptions/1"))
 	})
 
 	It("should not match subscription with different context", func() {
@@ -376,10 +376,10 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
-		Expect(link).To(BeEmpty())
+		Expect(sub).To(BeNil())
 	})
 
 	It("should return error when no subscriptions exist", func() {
@@ -401,10 +401,10 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
-		Expect(link).To(BeEmpty())
+		Expect(sub).To(BeNil())
 	})
 
 	It("should find correct subscription among multiple", func() {
@@ -443,9 +443,9 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
+		Expect(sub.ODataID).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
 	})
 
 	It("should find subscription even if some other subscriptions fail to fetch (CollectionError)", func() {
@@ -478,9 +478,9 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).NotTo(HaveOccurred())
-		Expect(link).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
+		Expect(sub.ODataID).To(Equal("/redfish/v1/EventService/Subscriptions/2"))
 	})
 
 	It("should return 'not found' when subscription collection endpoint itself fails", func() {
@@ -506,10 +506,10 @@ var _ = Describe("RedfishBaseBMC findExistingSubscription", func() {
 		defer server.Close()
 
 		bmc := newTestRedfishBMC(server)
-		link, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
+		sub, err := bmc.findExistingSubscription("http://operator/serverevents/alerts/node1")
 		Expect(err).To(HaveOccurred())
 		Expect(err.Error()).To(ContainSubstring("existing subscription not found"))
-		Expect(link).To(BeEmpty())
+		Expect(sub).To(BeNil())
 	})
 })
 
@@ -658,7 +658,7 @@ var _ = Describe("RedfishBaseBMC CreateEventSubscription", func() {
 		Expect(err.Error()).NotTo(ContainSubstring("failed to recover existing subscription"))
 		Expect(link).To(BeEmpty())
 	})
-	It("should set EventTypes to MetricReport for MetricReport format subscriptions (iDRAC 10 fix)", func() {
+	It("should not set EventTypes for MetricReport format subscriptions on base (non-Dell)", func() {
 		var capturedBody []byte
 		mux := http.NewServeMux()
 		baseHandlers(mux)
@@ -680,7 +680,7 @@ var _ = Describe("RedfishBaseBMC CreateEventSubscription", func() {
 
 		var posted map[string]any
 		Expect(json.Unmarshal(capturedBody, &posted)).To(Succeed())
-		Expect(posted["EventTypes"]).To(ConsistOf("MetricReport"))
+		Expect(posted).NotTo(HaveKey("EventTypes"))
 	})
 
 	It("should not set EventTypes for Event format subscriptions (no regression)", func() {

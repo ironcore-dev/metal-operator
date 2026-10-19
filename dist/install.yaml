@@ -2687,6 +2687,7 @@ spec:
       containers:
       - command:
         - /metaldata
+        env: []
         image: metaldata:latest
         livenessProbe:
           httpGet:
@@ -2723,12 +2724,14 @@ spec:
           capabilities:
             drop:
             - ALL
+        volumeMounts: []
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: metal-operator-metaldata
       terminationGracePeriodSeconds: 10
+      volumes: []
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate

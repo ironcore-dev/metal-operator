@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: metaldata
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+      - name: metaldata
+        env: []
+        volumeMounts: []
+      volumes: []

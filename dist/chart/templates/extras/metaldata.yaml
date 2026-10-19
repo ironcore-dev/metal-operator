@@ -29,6 +29,7 @@ spec:
       containers:
       - command:
         - /metaldata
+        env: []
         image: "{{ .Values.metaldata.image.repository }}:{{ .Values.metaldata.image.tag | default .Chart.AppVersion }}"
         {{- with .Values.metaldata.image.pullPolicy }}
         imagePullPolicy: {{ . }}
@@ -68,9 +69,11 @@ spec:
           capabilities:
             drop:
             - ALL
+        volumeMounts: []
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       serviceAccountName: {{ include "metal-operator.resourceName" (dict "suffix" "metaldata" "context" $) }}
       terminationGracePeriodSeconds: 10
+      volumes: []

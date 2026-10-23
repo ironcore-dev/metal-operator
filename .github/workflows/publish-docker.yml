@@ -26,8 +26,6 @@ jobs:
         image:
         - name: metal-operator-controller-manager
           target: manager
-        - name: metalprobe
-          target: probe
         - name: metaldata
           target: metaldata
     permissions:

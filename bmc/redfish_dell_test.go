@@ -348,6 +348,32 @@ var _ = Describe("Dell OEM", func() {
 			Expect(packageList).To(BeEmpty())
 		})
 
+		It("should treat a SUP029 error response as no pending packages", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(serviceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/Systems/1/Oem/Dell/DellSoftwareInstallationService/Actions/DellSoftwareInstallationService.GetRepoBasedUpdateList",
+				func(w http.ResponseWriter, r *http.Request) {
+					// Real iDRAC response body, captured from a live cluster: SUP029 is a
+					// benign "firmware already matches the repository" message (Dell KB
+					// 000200053), not a fatal error.
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusBadRequest)
+					w.Write([]byte(`{"error":{"@Message.ExtendedInfo":[{"Message":"Unable to complete the operation because the catalog name entered has either unsupported firmware packages or same version installed on the server.","MessageArgs":[],"MessageArgs@odata.count":0,"MessageId":"IDRAC.2.9.SUP029","RelatedProperties":[],"RelatedProperties@odata.count":0,"Resolution":"Make sure a valid catalog is used which has applicable and supported Windows Update Packages in the repository.","Severity":"Warning"}],"code":"Base.1.12.GeneralError","message":"A general error has occurred. See ExtendedInfo for more information"}}`)) //nolint:errcheck
+				})
+
+			server := httptest.NewServer(mux)
+			defer server.Close()
+
+			dell.RedfishBaseBMC = newTestRedfishBMC(server)
+			hasPending, packageList, err := dell.GetRepositoryUpdateList(context.Background(), "/redfish/v1/Systems/1")
+			Expect(err).ToNot(HaveOccurred())
+			Expect(hasPending).To(BeFalse())
+			Expect(packageList).To(BeEmpty())
+		})
+
 		It("should return an error on an unrelated failure response", func() {
 			mux := http.NewServeMux()
 			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {

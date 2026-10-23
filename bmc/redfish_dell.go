@@ -861,15 +861,18 @@ func (r *DellRedfishBMC) GetRepositoryUpdateList(_ context.Context, systemURI st
 
 	resp, err := client.Post(target, map[string]any{})
 	if err != nil {
-		// Treat a "no catalog match" or SUP099 (no applicable updates) as nothing pending.
-		var redfishErr *schemas.Error
-		if errors.As(err, &redfishErr) {
+		// Treat a "no catalog match" or SUP099/SUP029 (no applicable updates /
+		// already up to date) as nothing pending.
+		// https://www.dell.com/support/kbdoc/en-us/000200053/sup029-error-when-trying-to-update-firmware-using-https-method.
+		if redfishErr, ok := errors.AsType[*schemas.Error](err); ok {
 			msg := strings.ToLower(redfishErr.Message)
-			if strings.Contains(msg, "match catalog") {
+			if strings.Contains(msg, "match catalog") || strings.Contains(msg, "same version installed on the server") {
 				return false, "", nil
 			}
 			for _, ei := range redfishErr.ExtendedInfos {
-				if ei.MessageID == "IDRAC.2.1.SUP099" {
+				msg := strings.ToLower(ei.Message)
+				if ei.MessageID == "IDRAC.2.1.SUP099" || ei.MessageID == "IDRAC.2.9.SUP029" ||
+					strings.Contains(msg, "same version installed on the server") {
 					return false, "", nil
 				}
 			}

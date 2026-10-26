@@ -44,26 +44,22 @@ const (
 
 // Options contain the options for the BMC redfish client.
 type Options struct {
-	Endpoint  string
-	Username  string
-	Password  string
-	BasicAuth bool
+	Endpoint string
+	Username string
+	Password string
 
-	// TLS configuration
-	InsecureTLS bool // Skip TLS certificate verification
+	InsecureTLS bool
 
 	ResourcePollingInterval time.Duration
 	ResourcePollingTimeout  time.Duration
 	PowerPollingInterval    time.Duration
 	PowerPollingTimeout     time.Duration
 
-	// AdditionalVendors maps a manufacturer string (as reported by Redfish)
-	// to a factory that wraps the base Redfish client in a vendor-specific
-	// implementation. Entries are merged on top of DefaultVendors() by
-	// NewRedfishBMCClient, so callers only need to supply the extra OEMs
-	// they want to add. Existing built-in manufacturers can be overridden
-	// by registering the same key.
 	AdditionalVendors map[Manufacturer]VendorFactory
+
+	// SessionCache enables Redfish session token caching when non-nil.
+	// Created by the manager at startup and shared across all controllers.
+	SessionCache *SessionCache
 }
 
 // RedfishBaseBMC is the base implementation of the BMC interface for Redfish.
@@ -84,19 +80,33 @@ func (e *InvalidBIOSSettingsError) Error() string {
 	return fmt.Sprintf("Settings Name: %s\nSettings Value: %v\nError: %s", e.SettingName, e.SettingValue, e.Message)
 }
 
-// newRedfishBaseBMCClient creates a new RedfishBaseBMC with the given connection details (internal use only).
 func newRedfishBaseBMCClient(ctx context.Context, options Options) (*RedfishBaseBMC, error) {
-	clientConfig := gofish.ClientConfig{
-		Endpoint:  options.Endpoint,
-		Username:  options.Username,
-		Password:  options.Password,
-		Insecure:  options.InsecureTLS,
-		BasicAuth: options.BasicAuth,
+	var client *gofish.APIClient
+	var err error
+
+	if options.SessionCache != nil {
+		session, sessionErr := options.SessionCache.GetOrCreate(ctx, options)
+		if sessionErr != nil {
+			return nil, sessionErr
+		}
+		client, err = gofish.ConnectContext(ctx, gofish.ClientConfig{
+			Endpoint: options.Endpoint,
+			Session:  session,
+			Insecure: options.InsecureTLS,
+		})
+	} else {
+		client, err = gofish.ConnectContext(ctx, gofish.ClientConfig{
+			Endpoint:  options.Endpoint,
+			Username:  options.Username,
+			Password:  options.Password,
+			Insecure:  options.InsecureTLS,
+			BasicAuth: true,
+		})
 	}
-	client, err := gofish.ConnectContext(ctx, clientConfig)
 	if err != nil {
 		return nil, err
 	}
+
 	bmc := &RedfishBaseBMC{client: client}
 	if options.ResourcePollingInterval == 0 {
 		options.ResourcePollingInterval = DefaultResourcePollingInterval
@@ -129,8 +139,12 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 
 	manufacturer, err := base.getSystemManufacturer()
 	if err != nil {
-		// If we can't determine the manufacturer (e.g. no systems yet during
-		// endpoint discovery), fall back to the base implementation.
+		// Propagate authentication errors so the caller can invalidate the session
+		// cache and retry. For other errors (e.g. no systems yet during endpoint
+		// discovery), fall back to the base implementation.
+		if IsSessionExpiredError(err) {
+			return nil, err
+		}
 		return base, nil
 	}
 	base.manufacturer = manufacturer
@@ -143,9 +157,6 @@ func NewRedfishBMCClient(ctx context.Context, options Options) (BMC, error) {
 		vendors[k] = v
 	}
 	if factory, ok := vendors[Manufacturer(manufacturer)]; ok {
-		if factory == nil {
-			return nil, fmt.Errorf("nil vendor factory registered for manufacturer %q", manufacturer)
-		}
 		client := factory(base)
 		if client == nil {
 			return nil, fmt.Errorf("vendor factory for manufacturer %q returned nil", manufacturer)
@@ -176,11 +187,17 @@ func (r *RedfishBaseBMC) Manufacturer() Manufacturer {
 	return Manufacturer(r.manufacturer)
 }
 
-// Logout closes the BMC client connection by logging out
+// Logout closes the BMC client connection. When session caching is enabled
+// the session is owned by the cache, so Logout only closes idle connections.
 func (r *RedfishBaseBMC) Logout() {
-	if r.client != nil {
-		r.client.Logout()
+	if r.client == nil {
+		return
 	}
+	if r.options.SessionCache != nil {
+		r.client.HTTPClient.CloseIdleConnections()
+		return
+	}
+	r.client.Logout()
 }
 
 // PowerOn powers on the system using Redfish.

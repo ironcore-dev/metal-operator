@@ -38,6 +38,7 @@ type EndpointReconciler struct {
 	DefaultProtocol    metalv1alpha1.ProtocolScheme
 	SkipCertValidation bool
 	BMCOptions         bmc.Options
+	Dialer             bmc.Dialer
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=bmcs,verbs=get;list;watch;create;update;patch;delete
@@ -95,12 +96,10 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 				return ctrl.Result{}, fmt.Errorf("no default credentials present for BMC %s", endpoint.Spec.MACAddress)
 			}
 
-			bmcOptions := bmc.Options{
-				BasicAuth:   true,
-				Username:    m.DefaultCredentials[0].Username,
-				Password:    m.DefaultCredentials[0].Password,
-				InsecureTLS: r.SkipCertValidation,
-			}
+			bmcOptions := r.BMCOptions
+			bmcOptions.Username = m.DefaultCredentials[0].Username
+			bmcOptions.Password = m.DefaultCredentials[0].Password
+			bmcOptions.InsecureTLS = r.SkipCertValidation
 
 			protocolScheme := bmcutils.GetProtocolScheme(m.ProtocolScheme, r.DefaultProtocol)
 			bmcOptions.Endpoint = fmt.Sprintf("%s://%s", protocolScheme, net.JoinHostPort(endpoint.Spec.IP.String(), fmt.Sprintf("%d", m.Port)))
@@ -108,7 +107,7 @@ func (r *EndpointReconciler) reconcile(ctx context.Context, endpoint *metalv1alp
 			switch m.Protocol {
 			case metalv1alpha1.ProtocolRedfish:
 				log.V(1).Info("Creating client for BMC", "Address", bmcOptions.Endpoint)
-				bmcClient, err := bmc.NewRedfishBMCClient(ctx, bmcOptions)
+				bmcClient, err := bmcutils.CreateBMCClientFromOptions(ctx, metalv1alpha1.ProtocolName(m.Protocol), bmcOptions, r.Dialer)
 				if err != nil {
 					return ctrl.Result{}, fmt.Errorf("failed to create BMC client: %w", err)
 				}

@@ -322,7 +322,6 @@ _Appears in:_
 - [BMCStatus](#bmcstatus)
 - [EndpointSpec](#endpointspec)
 - [InlineEndpoint](#inlineendpoint)
-- [NetworkInterface](#networkinterface)
 
 
 
@@ -381,47 +380,6 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `macAddress` _string_ | MACAddress is the MAC address of the endpoint. |  |  |
 | `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
-
-
-#### LLDPNeighbor
-
-
-
-LLDPNeighbor defines the details of an LLDP neighbor.
-
-
-
-_Appears in:_
-- [NetworkInterface](#networkinterface)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the LLDP neighbor. |  |  |
-| `portID` _string_ | PortID is the port identifier of the LLDP neighbor. |  |  |
-| `portDescription` _string_ | PortDescription is the port description of the LLDP neighbor. |  |  |
-| `systemName` _string_ | SystemName is the system name of the LLDP neighbor. |  |  |
-| `systemDescription` _string_ | SystemDescription is the system description of the LLDP neighbor. |  |  |
-
-
-#### NetworkInterface
-
-
-
-NetworkInterface defines the details of a network interface.
-
-
-
-_Appears in:_
-- [ServerStatus](#serverstatus)
-
-| Field | Description | Default | Validation |
-| --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the network interface. |  |  |
-| `ip` _[IP](#ip)_ | IP is the IP address assigned to the network interface.<br />Deprecated: Use IPs instead. Kept for backward compatibility, always nil. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
-| `ips` _[IP](#ip) array_ | IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface. |  | Format: ip <br />Type: string <br /> |
-| `macAddress` _string_ | MACAddress is the MAC address of the network interface. |  |  |
-| `carrierStatus` _string_ | CarrierStatus is the operational carrier status of the network interface. |  |  |
-| `neighbors` _[LLDPNeighbor](#lldpneighbor) array_ | Neighbors contains the LLDP neighbors discovered on this interface. |  |  |
 
 
 #### ObjectReference
@@ -833,8 +791,6 @@ _Appears in:_
 
 | Field | Description |
 | --- | --- |
-| `Initial` | ServerStateInitial indicates that the server is in its initial state.<br /> |
-| `Discovery` | ServerStateDiscovery indicates that the server is in its discovery state.<br /> |
 | `Available` | ServerStateAvailable indicates that the server is available for use.<br /> |
 | `Reserved` | ServerStateReserved indicates that the server is reserved for a specific use or user.<br /> |
 | `Released` | ServerStateReleased indicates that the server is released after use.<br /> |
@@ -863,7 +819,6 @@ _Appears in:_
 | `powerState` _[ServerPowerState](#serverpowerstate)_ | PowerState represents the current power state of the server. |  |  |
 | `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the current state of the server's indicator LED. |  |  |
 | `state` _[ServerState](#serverstate)_ | State represents the current state of the server. |  |  |
-| `networkInterfaces` _[NetworkInterface](#networkinterface) array_ | NetworkInterfaces is a list of network interfaces associated with the server. |  |  |
 | `totalSystemMemory` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | TotalSystemMemory is the total amount of memory in bytes available on the server. |  |  |
 | `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  |  |
 | `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  |  |

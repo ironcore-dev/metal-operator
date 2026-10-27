@@ -148,12 +148,6 @@ type ServerSpec struct {
 type ServerState string
 
 const (
-	// ServerStateInitial indicates that the server is in its initial state.
-	ServerStateInitial ServerState = "Initial"
-
-	// ServerStateDiscovery indicates that the server is in its discovery state.
-	ServerStateDiscovery ServerState = "Discovery"
-
 	// ServerStateAvailable indicates that the server is available for use.
 	ServerStateAvailable ServerState = "Available"
 
@@ -232,10 +226,6 @@ type ServerStatus struct {
 	// +optional
 	State ServerState `json:"state,omitempty"`
 
-	// NetworkInterfaces is a list of network interfaces associated with the server.
-	// +optional
-	NetworkInterfaces []NetworkInterface `json:"networkInterfaces,omitempty"`
-
 	// TotalSystemMemory is the total amount of memory in bytes available on the server.
 	// +optional
 	TotalSystemMemory *resource.Quantity `json:"totalSystemMemory,omitempty"`
@@ -292,59 +282,6 @@ type Processor struct {
 	// TotalThreads is the total number of threads in the Processor.
 	// +optional
 	TotalThreads int32 `json:"totalThreads,omitempty"`
-}
-
-// NetworkInterface defines the details of a network interface.
-type NetworkInterface struct {
-	// Name is the name of the network interface.
-	// +required
-	Name string `json:"name"`
-
-	// IP is the IP address assigned to the network interface.
-	// Deprecated: Use IPs instead. Kept for backward compatibility, always nil.
-	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Schemaless
-	// +optional
-	IP *IP `json:"ip,omitempty"`
-
-	// IPs is a list of IP addresses (both IPv4 and IPv6) assigned to the network interface.
-	// +optional
-	IPs []IP `json:"ips,omitempty"`
-
-	// MACAddress is the MAC address of the network interface.
-	// +required
-	MACAddress string `json:"macAddress"`
-
-	// CarrierStatus is the operational carrier status of the network interface.
-	// +optional
-	CarrierStatus string `json:"carrierStatus,omitempty"`
-
-	// Neighbors contains the LLDP neighbors discovered on this interface.
-	// +optional
-	Neighbors []LLDPNeighbor `json:"neighbors,omitempty"`
-}
-
-// LLDPNeighbor defines the details of an LLDP neighbor.
-type LLDPNeighbor struct {
-	// MACAddress is the MAC address of the LLDP neighbor.
-	// +optional
-	MACAddress string `json:"macAddress,omitempty"`
-
-	// PortID is the port identifier of the LLDP neighbor.
-	// +optional
-	PortID string `json:"portID,omitempty"`
-
-	// PortDescription is the port description of the LLDP neighbor.
-	// +optional
-	PortDescription string `json:"portDescription,omitempty"`
-
-	// SystemName is the system name of the LLDP neighbor.
-	// +optional
-	SystemName string `json:"systemName,omitempty"`
-
-	// SystemDescription is the system description of the LLDP neighbor.
-	// +optional
-	SystemDescription string `json:"systemDescription,omitempty"`
 }
 
 // StorageDrive defines the details of one storage drive.

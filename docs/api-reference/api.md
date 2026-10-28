@@ -53,9 +53,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
-| `address` _string_ | Address is the address of the BMC. |  |  |
-| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
+| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  | Required: \{\} <br /> |
+| `address` _string_ | Address is the address of the BMC. |  | Required: \{\} <br /> |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  | Required: \{\} <br /> |
 
 
 #### BMCPowerState
@@ -93,11 +93,11 @@ BMCSecret is the Schema for the bmcsecrets API
 | --- | --- | --- | --- |
 | `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
 | `kind` _string_ | `BMCSecret` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `immutable` _boolean_ | Immutable, if set to true, ensures that data stored in the Secret cannot<br />be updated (only object metadata can be modified).<br />If not set to true, the field can be modified at any time.<br />Defaulted to nil. |  |  |
-| `data` _object (keys:string, values:integer array)_ | Data contains the secret data. Each key must consist of alphanumeric<br />characters, '-', '_' or '.'. The serialized form of the secret data is a<br />base64 encoded string, representing the arbitrary (possibly non-string)<br />data value here. Described in https://tools.ietf.org/html/rfc4648#section-4 |  |  |
-| `stringData` _object (keys:string, values:string)_ | stringData allows specifying non-binary secret data in string form.<br />It is provided as a write-only input field for convenience.<br />All keys and values are merged into the data field on write, overwriting any existing values.<br />The stringData field is never output when reading from the API. |  |  |
-| `type` _[SecretType](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secrettype-v1-core)_ | Used to facilitate programmatic handling of secret data.<br />More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types |  |  |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `immutable` _boolean_ | Immutable, if set to true, ensures that data stored in the Secret cannot<br />be updated (only object metadata can be modified).<br />If not set to true, the field can be modified at any time.<br />Defaulted to nil. |  | Optional: \{\} <br /> |
+| `data` _object (keys:string, values:integer array)_ | Data contains the secret data. Each key must consist of alphanumeric<br />characters, '-', '_' or '.'. The serialized form of the secret data is a<br />base64 encoded string, representing the arbitrary (possibly non-string)<br />data value here. Described in https://tools.ietf.org/html/rfc4648#section-4 |  | Optional: \{\} <br /> |
+| `stringData` _object (keys:string, values:string)_ | stringData allows specifying non-binary secret data in string form.<br />It is provided as a write-only input field for convenience.<br />All keys and values are merged into the data field on write, overwriting any existing values.<br />The stringData field is never output when reading from the API. |  | Optional: \{\} <br /> |
+| `type` _[SecretType](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#secrettype-v1-core)_ | Used to facilitate programmatic handling of secret data.<br />More info: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types |  | Optional: \{\} <br /> |
 
 
 #### BMCSpec
@@ -113,13 +113,13 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `bmcUUID` _string_ | BMCUUID is the unique identifier for the BMC as defined in Redfish API. |  | Optional: \{\} <br /> |
-| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.<br />Deprecated: The Endpoint resource is deprecated. Specify the network access inline via<br />access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an<br />Endpoint object. |  | Optional: \{\} <br /> |
-| `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint specifies inline network access details for the BMC. |  | Optional: \{\} <br /> |
-| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  |  |
-| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  |  |
-| `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  |  |
-| `hostname` _string_ | Hostname is the hostname of the BMC. |  |  |
+| `bmcUUID` _string_ | BMCUUID is the unique identifier for the BMC as defined in Redfish API. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `endpointRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | EndpointRef is a reference to the Endpoint object that contains the network access information for the BMC.<br />Deprecated: The Endpoint resource is deprecated. Specify the network access inline via<br />access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an<br />Endpoint object. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `access` _[InlineEndpoint](#inlineendpoint)_ | Endpoint specifies inline network access details for the BMC. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `bmcSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCSecretRef is a reference to the BMCSecret object that contains the credentials<br />required to access the BMC. |  | Required: \{\} <br /> |
+| `protocol` _[Protocol](#protocol)_ | Protocol specifies the protocol to be used for communicating with the BMC. |  | Required: \{\} <br /> |
+| `consoleProtocol` _[ConsoleProtocol](#consoleprotocol)_ | ConsoleProtocol specifies the protocol to be used for console access to the BMC. |  | Optional: \{\} <br /> |
+| `hostname` _string_ | Hostname is the hostname of the BMC. |  | Optional: \{\} <br /> |
 
 
 #### BMCState
@@ -153,17 +153,17 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the BMC. |  | Pattern: `^([0-9A-Fa-f]\{2\}[:-])\{5\}([0-9A-Fa-f]\{2\})$` <br /> |
-| `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
-| `manufacturer` _string_ | Manufacturer is the name of the BMC manufacturer. |  |  |
-| `model` _string_ | Model is the model number or name of the BMC. |  |  |
-| `sku` _string_ | SKU is the stock keeping unit identifier for the BMC. |  |  |
-| `serialNumber` _string_ | SerialNumber is the serial number of the BMC. |  |  |
-| `firmwareVersion` _string_ | FirmwareVersion is the version of the firmware currently running on the BMC. |  |  |
-| `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending |  |
-| `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  |  |
-| `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  |  |
+| `macAddress` _string_ | MACAddress is the MAC address of the BMC. |  | Pattern: `^([0-9A-Fa-f]\{2\}[:-])\{5\}([0-9A-Fa-f]\{2\})$` <br />Optional: \{\} <br /> |
+| `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br />Optional: \{\} <br /> |
+| `manufacturer` _string_ | Manufacturer is the name of the BMC manufacturer. |  | Optional: \{\} <br /> |
+| `model` _string_ | Model is the model number or name of the BMC. |  | Optional: \{\} <br /> |
+| `sku` _string_ | SKU is the stock keeping unit identifier for the BMC. |  | Optional: \{\} <br /> |
+| `serialNumber` _string_ | SerialNumber is the serial number of the BMC. |  | Optional: \{\} <br /> |
+| `firmwareVersion` _string_ | FirmwareVersion is the version of the firmware currently running on the BMC. |  | Optional: \{\} <br /> |
+| `state` _[BMCState](#bmcstate)_ | State represents the current state of the BMC.<br />kubebuilder:validation:Enum=Enabled;Error;Pending | Pending | Optional: \{\} <br /> |
+| `powerState` _[BMCPowerState](#bmcpowerstate)_ | PowerState represents the current power state of the BMC. |  | Optional: \{\} <br /> |
+| `lastResetTime` _[Time](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#time-v1-meta)_ | LastResetTime is the timestamp of the last reset operation performed on the BMC. |  | Optional: \{\} <br /> |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the BMC's current state. |  | Optional: \{\} <br /> |
 
 
 #### BootOrder
@@ -198,8 +198,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `type` _string_ | Type of server condition<br />Following kubebuilder validation is referred from https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition |  | MaxLength: 316 <br />MinLength: 1 <br /> |
-| `requiredStatus` _[ConditionStatus](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#conditionstatus-v1-meta)_ | RequiredStatus is status of the condition, one of True, False, Unknown. |  | Enum: [True False Unknown] <br /> |
+| `type` _string_ | Type of server condition<br />Following kubebuilder validation is referred from https://pkg.go.dev/k8s.io/apimachinery/pkg/apis/meta/v1#Condition |  | MaxLength: 316 <br />MinLength: 1 <br />Required: \{\} <br /> |
+| `requiredStatus` _[ConditionStatus](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#conditionstatus-v1-meta)_ | RequiredStatus is status of the condition, one of True, False, Unknown. |  | Enum: [True False Unknown] <br />Required: \{\} <br /> |
 
 
 #### ConsoleProtocol
@@ -215,8 +215,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _[ConsoleProtocolName](#consoleprotocolname)_ | Name specifies the name of the console protocol. |  | Enum: [IPMI SSH SSHLenovo] <br /> |
-| `port` _integer_ | Port specifies the port number used for console access. |  |  |
+| `name` _[ConsoleProtocolName](#consoleprotocolname)_ | Name specifies the name of the console protocol. |  | Enum: [IPMI SSH SSHLenovo] <br />Required: \{\} <br /> |
+| `port` _integer_ | Port specifies the port number used for console access. |  | Required: \{\} <br /> |
 
 
 #### ConsoleProtocolName
@@ -273,8 +273,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the endpoint. |  |  |
-| `ip` _[IP](#ip)_ | IP is the IP address of the endpoint. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
+| `macAddress` _string_ | MACAddress is the MAC address of the endpoint. |  | Optional: \{\} <br /> |
+| `ip` _[IP](#ip)_ | IP is the IP address of the endpoint. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br />Optional: \{\} <br /> |
 
 
 #### EndpointStatus
@@ -341,8 +341,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br /> |
-| `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br /> |
+| `namespace` _string_ | Namespace is the namespace of the referenced object. |  | MaxLength: 63 <br />Required: \{\} <br /> |
+| `name` _string_ | Name is the name of the referenced object. |  | MaxLength: 253 <br />Required: \{\} <br /> |
 
 
 #### IndicatorLED
@@ -378,8 +378,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `macAddress` _string_ | MACAddress is the MAC address of the endpoint. |  |  |
-| `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br /> |
+| `macAddress` _string_ | MACAddress is the MAC address of the endpoint. |  | Optional: \{\} <br /> |
+| `ip` _[IP](#ip)_ | IP is the IP address of the BMC. |  | Format: ip <br />Schemaless: \{\} <br />Type: string <br />Optional: \{\} <br /> |
 
 
 #### ObjectReference
@@ -395,8 +395,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `namespace` _string_ | Namespace is the namespace of the referenced object. |  |  |
-| `name` _string_ | Name is the name of the referenced object. |  |  |
+| `namespace` _string_ | Namespace is the namespace of the referenced object. |  | Required: \{\} <br /> |
+| `name` _string_ | Name is the name of the referenced object. |  | Required: \{\} <br /> |
 
 
 #### Phase
@@ -446,15 +446,15 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `id` _string_ | ID is the name of the Processor. |  |  |
-| `type` _string_ | Type is the type of the Processor. |  |  |
-| `architecture` _string_ | Architecture is the architecture of the Processor. |  |  |
-| `instructionSet` _string_ | InstructionSet is the instruction set of the Processor. |  |  |
-| `manufacturer` _string_ | Manufacturer is the manufacturer of the Processor. |  |  |
-| `model` _string_ | Model is the model of the Processor. |  |  |
-| `maxSpeedMHz` _integer_ | MaxSpeedMHz is the maximum speed of the Processor in MHz. |  |  |
-| `totalCores` _integer_ | TotalCores is the total number of cores in the Processor. |  |  |
-| `totalThreads` _integer_ | TotalThreads is the total number of threads in the Processor. |  |  |
+| `id` _string_ | ID is the name of the Processor. |  | Required: \{\} <br /> |
+| `type` _string_ | Type is the type of the Processor. |  | Optional: \{\} <br /> |
+| `architecture` _string_ | Architecture is the architecture of the Processor. |  | Optional: \{\} <br /> |
+| `instructionSet` _string_ | InstructionSet is the instruction set of the Processor. |  | Optional: \{\} <br /> |
+| `manufacturer` _string_ | Manufacturer is the manufacturer of the Processor. |  | Optional: \{\} <br /> |
+| `model` _string_ | Model is the model of the Processor. |  | Optional: \{\} <br /> |
+| `maxSpeedMHz` _integer_ | MaxSpeedMHz is the maximum speed of the Processor in MHz. |  | Optional: \{\} <br /> |
+| `totalCores` _integer_ | TotalCores is the total number of cores in the Processor. |  | Optional: \{\} <br /> |
+| `totalThreads` _integer_ | TotalThreads is the total number of threads in the Processor. |  | Optional: \{\} <br /> |
 
 
 #### Protocol
@@ -564,9 +564,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to the server for which this boot configuration is intended. |  |  |
-| `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
-| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to the server for which this boot configuration is intended. |  | Required: \{\} <br /> |
+| `image` _string_ | Image specifies the boot image to be used for the server. |  | Optional: \{\} <br /> |
+| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  | Optional: \{\} <br /> |
 
 
 #### ServerBootConfigurationState
@@ -600,8 +600,8 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `state` _[ServerBootConfigurationState](#serverbootconfigurationstate)_ | State represents the current state of the boot configuration. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the ServerBootConfig's current state. |  |  |
+| `state` _[ServerBootConfigurationState](#serverbootconfigurationstate)_ | State represents the current state of the boot configuration. |  | Optional: \{\} <br /> |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the ServerBootConfig's current state. |  | Optional: \{\} <br /> |
 
 
 #### ServerClaim
@@ -636,13 +636,13 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  |  |
-| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed. |  | Optional: \{\} <br /> |
-| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br /> |
-| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  |  |
-| `userDataRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | UserDataRef references a Secret in the same namespace as this ServerClaim<br />containing user-data exposed to the claimed server via the metaldata<br />service. The referenced Secret must be of type metal.ironcore.dev/user-data. |  |  |
-| `image` _string_ | Image specifies the boot image to be used for the server. |  |  |
-| `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  |  |
+| `power` _[Power](#power)_ | Power specifies the desired power state of the server. |  | Required: \{\} <br /> |
+| `serverRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | ServerRef is a reference to a specific server to be claimed. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector specifies a label selector to identify the server to be claimed. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `ignitionSecretRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | IgnitionSecretRef is a reference to the Secret object that contains<br />the ignition configuration for the server. |  | Optional: \{\} <br /> |
+| `userDataRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | UserDataRef references a Secret in the same namespace as this ServerClaim<br />containing user-data exposed to the claimed server via the metaldata<br />service. The referenced Secret must be of type metal.ironcore.dev/user-data. |  | Optional: \{\} <br /> |
+| `image` _string_ | Image specifies the boot image to be used for the server. |  | Required: \{\} <br /> |
+| `tolerations` _[Toleration](#toleration) array_ | Tolerations allow a ServerClaim to bind to a Server with matching taints. |  | Optional: \{\} <br /> |
 
 
 #### ServerClaimStatus
@@ -658,7 +658,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `phase` _[Phase](#phase)_ | Phase represents the current phase of the server claim. |  |  |
+| `phase` _[Phase](#phase)_ | Phase represents the current phase of the server claim. |  | Optional: \{\} <br /> |
 
 
 #### ServerPowerState
@@ -695,9 +695,9 @@ ServerReadinessRule is the Schema for the serverreadinessrules API
 | --- | --- | --- | --- |
 | `apiVersion` _string_ | `metal.ironcore.dev/v1alpha1` | | |
 | `kind` _string_ | `ServerReadinessRule` | | |
-| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |
-| `spec` _[ServerReadinessRuleSpec](#serverreadinessrulespec)_ | spec defines the desired state of ServerReadinessRule |  |  |
-| `status` _[ServerReadinessRuleStatus](#serverreadinessrulestatus)_ | status defines the observed state of ServerReadinessRule |  |  |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  | Optional: \{\} <br /> |
+| `spec` _[ServerReadinessRuleSpec](#serverreadinessrulespec)_ | spec defines the desired state of ServerReadinessRule |  | Required: \{\} <br /> |
+| `status` _[ServerReadinessRuleStatus](#serverreadinessrulestatus)_ | status defines the observed state of ServerReadinessRule |  | Optional: \{\} <br /> |
 
 
 #### ServerReadinessRuleSpec
@@ -713,10 +713,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `conditions` _[ConditionRequirement](#conditionrequirement) array_ | Conditions contains a list of the Server conditions that defines the specific<br />criteria that must be met for taints to be managed on the target Server.<br />The presence or status of these conditions directly triggers the application or removal of Server taints. |  | MaxItems: 32 <br />MinItems: 1 <br /> |
-| `enforcementMode` _[EnforcementMode](#enforcementmode)_ | EnforcementMode specifies how the controller maintains the desired state.<br />enforcementMode is one of BootstrapOnly, Continuous.<br />"BootstrapOnly" applies the configuration once during initial setup.<br />"Continuous" ensures the state is monitored and corrected throughout the resource lifecycle. |  | Enum: [BootstrapOnly Continuous] <br /> |
-| `taint` _[Taint](#taint)_ | Taint defines the specific Taint (Key, Value, and Effect) to be managed<br />on Servers that meet the defined condition criteria. |  |  |
-| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector limits the scope of this rule to a specific subset of Servers. |  |  |
+| `conditions` _[ConditionRequirement](#conditionrequirement) array_ | Conditions contains a list of the Server conditions that defines the specific<br />criteria that must be met for taints to be managed on the target Server.<br />The presence or status of these conditions directly triggers the application or removal of Server taints. |  | MaxItems: 32 <br />MinItems: 1 <br />Required: \{\} <br /> |
+| `enforcementMode` _[EnforcementMode](#enforcementmode)_ | EnforcementMode specifies how the controller maintains the desired state.<br />enforcementMode is one of BootstrapOnly, Continuous.<br />"BootstrapOnly" applies the configuration once during initial setup.<br />"Continuous" ensures the state is monitored and corrected throughout the resource lifecycle. |  | Enum: [BootstrapOnly Continuous] <br />Required: \{\} <br /> |
+| `taint` _[Taint](#taint)_ | Taint defines the specific Taint (Key, Value, and Effect) to be managed<br />on Servers that meet the defined condition criteria. |  | Required: \{\} <br /> |
+| `serverSelector` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#labelselector-v1-meta)_ | ServerSelector limits the scope of this rule to a specific subset of Servers. |  | Required: \{\} <br /> |
 
 
 #### ServerReadinessRuleStatus
@@ -732,7 +732,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | conditions represent the current state of the ServerReadinessRule resource.<br />Each condition has a unique type and reflects the status of a specific aspect of the resource.<br />Standard condition types include:<br />- "Available": the resource is fully functional<br />- "Progressing": the resource is being created or updated<br />- "Degraded": the resource failed to reach or maintain its desired state<br />The status of each condition is one of True, False, or Unknown. |  |  |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | conditions represent the current state of the ServerReadinessRule resource.<br />Each condition has a unique type and reflects the status of a specific aspect of the resource.<br />Standard condition types include:<br />- "Available": the resource is fully functional<br />- "Progressing": the resource is being created or updated<br />- "Degraded": the resource failed to reach or maintain its desired state<br />The status of each condition is one of True, False, or Unknown. |  | Optional: \{\} <br /> |
 
 
 #### ServerReclaimPolicy
@@ -765,17 +765,17 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  |  |
+| `systemUUID` _string_ | SystemUUID is the unique identifier for the server. |  | Required: \{\} <br /> |
 | `systemURI` _string_ | SystemURI is the unique URI for the server resource in REDFISH API. |  |  |
-| `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  |  |
+| `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the desired state of the server's indicator LED. |  | Optional: \{\} <br /> |
 | `reclaimPolicy` _[ServerReclaimPolicy](#serverreclaimpolicy)_ | ReclaimPolicy specifies how the server is reclaimed after use.<br />Can be<br />- Recycle (default), immediately transitioning the server to `Available` after use.<br />- Retain, transitioning the server to `Released` after use, leaving `spec.serverClaimRef` set,<br />  transitioning to `Available` once `spec.serverClaimRef` is removed. | Recycle | Enum: [Recycle Retain] <br /> |
-| `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br /> |
-| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  |  |
-| `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC. |  |  |
-| `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  |  |
-| `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  |  |
-| `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  |  |
-| `unclaimable` _boolean_ | Unclaimable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false |  |
+| `serverClaimRef` _[ImmutableObjectReference](#immutableobjectreference)_ | ServerClaimRef is a reference to a ServerClaim object that claims this server. |  | Optional: \{\} <br />Optional: \{\} <br /> |
+| `bmcRef` _[LocalObjectReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#localobjectreference-v1-core)_ | BMCRef is a reference to the BMC object associated with this server. |  | Optional: \{\} <br /> |
+| `bmc` _[BMCAccess](#bmcaccess)_ | BMC contains the access details for the BMC. |  | Optional: \{\} <br /> |
+| `bootConfigurationRef` _[ObjectReference](#objectreference)_ | BootConfigurationRef is a reference to a BootConfiguration object that specifies<br />the boot configuration for this server. |  | Optional: \{\} <br /> |
+| `bootOrder` _[BootOrder](#bootorder) array_ | BootOrder specifies the boot order of the server. |  | Optional: \{\} <br /> |
+| `taints` _[Taint](#taint) array_ | Taints control which ServerClaims can be bound to this server. |  | Optional: \{\} <br /> |
+| `unclaimable` _boolean_ | Unclaimable, when true, prevents new ServerClaims from being bound to<br />this Server. Already-bound claims are unaffected. | false | Optional: \{\} <br /> |
 
 
 #### ServerState
@@ -811,18 +811,18 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `manufacturer` _string_ | Manufacturer is the name of the server manufacturer. |  |  |
+| `manufacturer` _string_ | Manufacturer is the name of the server manufacturer. |  | Optional: \{\} <br /> |
 | `biosVersion` _string_ | BIOSVersion is the version of the server's BIOS. |  |  |
-| `model` _string_ | Model is the model of the server. |  |  |
-| `sku` _string_ | SKU is the stock keeping unit identifier for the server. |  |  |
-| `serialNumber` _string_ | SerialNumber is the serial number of the server. |  |  |
-| `powerState` _[ServerPowerState](#serverpowerstate)_ | PowerState represents the current power state of the server. |  |  |
-| `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the current state of the server's indicator LED. |  |  |
-| `state` _[ServerState](#serverstate)_ | State represents the current state of the server. |  |  |
-| `totalSystemMemory` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | TotalSystemMemory is the total amount of memory in bytes available on the server. |  |  |
-| `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  |  |
-| `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  |  |
-| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the server's current state. |  |  |
+| `model` _string_ | Model is the model of the server. |  | Optional: \{\} <br /> |
+| `sku` _string_ | SKU is the stock keeping unit identifier for the server. |  | Optional: \{\} <br /> |
+| `serialNumber` _string_ | SerialNumber is the serial number of the server. |  | Optional: \{\} <br /> |
+| `powerState` _[ServerPowerState](#serverpowerstate)_ | PowerState represents the current power state of the server. |  | Optional: \{\} <br /> |
+| `indicatorLED` _[IndicatorLED](#indicatorled)_ | IndicatorLED specifies the current state of the server's indicator LED. |  | Optional: \{\} <br /> |
+| `state` _[ServerState](#serverstate)_ | State represents the current state of the server. |  | Optional: \{\} <br /> |
+| `totalSystemMemory` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | TotalSystemMemory is the total amount of memory in bytes available on the server. |  | Optional: \{\} <br /> |
+| `processors` _[Processor](#processor) array_ | Processors is a list of Processors associated with the server. |  | Optional: \{\} <br /> |
+| `storages` _[Storage](#storage) array_ | Storages is a list of storages associated with the server. |  | Optional: \{\} <br /> |
+| `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#condition-v1-meta) array_ | Conditions represents the latest available observations of the server's current state. |  | Optional: \{\} <br /> |
 
 
 #### Storage
@@ -838,10 +838,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage device. |  |  |
-| `state` _[StorageState](#storagestate)_ | State specifies the state of the storage device. |  |  |
-| `volumes` _[StorageVolume](#storagevolume) array_ | Volumes is a collection of volumes associated with this storage. |  |  |
-| `drives` _[StorageDrive](#storagedrive) array_ | Drives is a collection of drives associated with this storage. |  |  |
+| `name` _string_ | Name is the name of the storage device. |  | Optional: \{\} <br /> |
+| `state` _[StorageState](#storagestate)_ | State specifies the state of the storage device. |  | Optional: \{\} <br /> |
+| `volumes` _[StorageVolume](#storagevolume) array_ | Volumes is a collection of volumes associated with this storage. |  | Optional: \{\} <br /> |
+| `drives` _[StorageDrive](#storagedrive) array_ | Drives is a collection of drives associated with this storage. |  | Optional: \{\} <br /> |
 
 
 #### StorageDrive
@@ -857,13 +857,13 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage drive. |  |  |
-| `mediaType` _string_ | MediaType specifies the media type of the storage device. |  |  |
-| `type` _string_ | Type specifies the type of the storage device. |  |  |
-| `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  |  |
-| `vendor` _string_ | Vendor specifies the vendor of the storage device. |  |  |
-| `model` _string_ | Model specifies the model of the storage device. |  |  |
-| `state` _[StorageState](#storagestate)_ | State specifies the state of the storage device. |  |  |
+| `name` _string_ | Name is the name of the storage drive. |  | Optional: \{\} <br /> |
+| `mediaType` _string_ | MediaType specifies the media type of the storage device. |  | Optional: \{\} <br /> |
+| `type` _string_ | Type specifies the type of the storage device. |  | Optional: \{\} <br /> |
+| `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  | Optional: \{\} <br /> |
+| `vendor` _string_ | Vendor specifies the vendor of the storage device. |  | Optional: \{\} <br /> |
+| `model` _string_ | Model specifies the model of the storage device. |  | Optional: \{\} <br /> |
+| `state` _[StorageState](#storagestate)_ | State specifies the state of the storage device. |  | Optional: \{\} <br /> |
 
 
 #### StorageState
@@ -899,11 +899,11 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `name` _string_ | Name is the name of the storage volume. |  |  |
-| `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  |  |
-| `state` _[StorageState](#storagestate)_ | Status specifies the status of the volume. |  |  |
-| `raidType` _string_ | RAIDType specifies the RAID type of the associated Volume. |  |  |
-| `volumeUsage` _string_ | VolumeUsage specifies the volume usage type for the Volume. |  |  |
+| `name` _string_ | Name is the name of the storage volume. |  | Optional: \{\} <br /> |
+| `capacity` _[Quantity](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.36/#quantity-resource-api)_ | Capacity specifies the size of the storage device in bytes. |  | Optional: \{\} <br /> |
+| `state` _[StorageState](#storagestate)_ | Status specifies the status of the volume. |  | Optional: \{\} <br /> |
+| `raidType` _string_ | RAIDType specifies the RAID type of the associated Volume. |  | Optional: \{\} <br /> |
+| `volumeUsage` _string_ | VolumeUsage specifies the volume usage type for the Volume. |  | Optional: \{\} <br /> |
 
 
 #### Taint
@@ -921,9 +921,9 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `key` _string_ | Key is the taint key to be applied to a server. |  | MinLength: 1 <br /> |
-| `value` _string_ | Value is the taint value corresponding to the taint key. |  |  |
-| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the effect of the taint on ServerClaims that do not<br />tolerate the taint. | NoBind | Enum: [NoBind Evict] <br /> |
+| `key` _string_ | Key is the taint key to be applied to a server. |  | MinLength: 1 <br />Required: \{\} <br /> |
+| `value` _string_ | Value is the taint value corresponding to the taint key. |  | Optional: \{\} <br /> |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the effect of the taint on ServerClaims that do not<br />tolerate the taint. | NoBind | Enum: [NoBind Evict] <br />Optional: \{\} <br /> |
 
 
 #### TaintEffect
@@ -961,10 +961,10 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
-| `key` _string_ | Key is the taint key that the toleration applies to. |  | MinLength: 1 <br /> |
-| `operator` _[TolerationOperator](#tolerationoperator)_ | Operator represents the key's relationship to the value. |  | Enum: [Equal Exists] <br /> |
-| `value` _string_ | Value is the taint value the toleration matches to. |  |  |
-| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the taint effect to tolerate. |  | Enum: [NoBind Evict] <br /> |
+| `key` _string_ | Key is the taint key that the toleration applies to. |  | MinLength: 1 <br />Required: \{\} <br /> |
+| `operator` _[TolerationOperator](#tolerationoperator)_ | Operator represents the key's relationship to the value. |  | Enum: [Equal Exists] <br />Optional: \{\} <br /> |
+| `value` _string_ | Value is the taint value the toleration matches to. |  | Optional: \{\} <br /> |
+| `effect` _[TaintEffect](#tainteffect)_ | Effect indicates the taint effect to tolerate. |  | Enum: [NoBind Evict] <br />Optional: \{\} <br /> |
 
 
 #### TolerationOperator

@@ -19,7 +19,7 @@ import (
 //
 // ServerClaim is the Schema for the serverclaims API
 type ServerClaimApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ServerClaimSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ServerClaimStatusApplyConfiguration `json:"status,omitempty"`

@@ -18,16 +18,20 @@ type ServerReadinessRuleSpecApplyConfiguration struct {
 	// Conditions contains a list of the Server conditions that defines the specific
 	// criteria that must be met for taints to be managed on the target Server.
 	// The presence or status of these conditions directly triggers the application or removal of Server taints.
+	//
 	Conditions []ConditionRequirementApplyConfiguration `json:"conditions,omitempty"`
 	// EnforcementMode specifies how the controller maintains the desired state.
 	// enforcementMode is one of BootstrapOnly, Continuous.
 	// "BootstrapOnly" applies the configuration once during initial setup.
 	// "Continuous" ensures the state is monitored and corrected throughout the resource lifecycle.
+	//
 	EnforcementMode *apiv1alpha1.EnforcementMode `json:"enforcementMode,omitempty"`
 	// Taint defines the specific Taint (Key, Value, and Effect) to be managed
 	// on Servers that meet the defined condition criteria.
+	//
 	Taint *TaintApplyConfiguration `json:"taint,omitempty"`
 	// ServerSelector limits the scope of this rule to a specific subset of Servers.
+	//
 	ServerSelector *v1.LabelSelectorApplyConfiguration `json:"serverSelector,omitempty"`
 }
 

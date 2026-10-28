@@ -12,7 +12,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: bmcs.metal.ironcore.dev
 spec:
   conversion:
@@ -306,7 +306,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: bmcsecrets.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -387,7 +387,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: endpoints.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -465,7 +465,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: serverbootconfigurations.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -635,7 +635,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: serverclaims.metal.ironcore.dev
 spec:
   conversion:
@@ -866,7 +866,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: serverreadinessrules.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev
@@ -1131,7 +1131,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: metal-operator-system/metal-operator-serving-cert
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: servers.metal.ironcore.dev
 spec:
   group: metal.ironcore.dev

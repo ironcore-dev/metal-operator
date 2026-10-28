@@ -19,7 +19,7 @@ import (
 //
 // Server is the Schema for the servers API
 type ServerApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ServerSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ServerStatusApplyConfiguration `json:"status,omitempty"`

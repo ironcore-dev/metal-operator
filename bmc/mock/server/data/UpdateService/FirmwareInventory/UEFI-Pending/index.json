@@ -1,0 +1,13 @@
+{
+    "@odata.type": "#SoftwareInventory.v1_10_1.SoftwareInventory",
+    "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory/UEFI-Pending",
+    "Id": "UEFI-Pending",
+    "Name": "UEFI Firmware (Pending)",
+    "Status": {
+        "State": "StandbyOffline",
+        "Health": "OK"
+    },
+    "Updateable": true,
+    "Manufacturer": "Lenovo",
+    "Version": "UEFI-staged"
+}

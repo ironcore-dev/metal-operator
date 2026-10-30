@@ -58,6 +58,15 @@ const (
 	dellJobStepsFailFilePath = "data/Managers/BMC/Oem/Dell/Jobs/repository/steps-fail.json"
 	dellJobURI               = "/redfish/v1/Managers/BMC/Oem/Dell/Jobs/repository"
 
+	// Fixed file paths for Lenovo OEM repository-based firmware update task simulation.
+	lenovoRepoTaskFilePath        = "data/TaskService/Tasks/lenovo-repo/index.json"
+	lenovoRepoStepsFilePath       = "data/TaskService/Tasks/lenovo-repo/steps.json"
+	lenovoRepoStepsFailFilePath   = "data/TaskService/Tasks/lenovo-repo/steps-fail.json"
+	lenovoRepoTaskMonitorURI      = "/redfish/v1/TaskService/TaskMonitors/lenovo-repo"
+	lenovoRepoTaskMonitorFilePath = "data/TaskService/TaskMonitors/lenovo-repo/index.json"
+	firmwareInventoryFilePath     = "data/UpdateService/FirmwareInventory/index.json"
+	lenovoPendingSlotSuffix       = "-Pending"
+
 	// Firmware version JSON field names updated on upgrade task completion.
 	// The target resource path is resolved dynamically via FirmwareInventory RelatedItem links.
 	biosVersionField = "BiosVersion"
@@ -76,6 +85,36 @@ const (
 	dellRepoUpdatePending
 	dellRepoUpdateApplied
 )
+
+// lenovoFirmwareInventoryIDs are the FirmwareInventory members added by
+// WithLenovoFirmwareInventory. UEFI-Pending starts out staged to model firmware
+// staged by the BIOSVersion flow, which the repository update must ignore.
+var lenovoFirmwareInventoryIDs = []string{"HPM-FPGA", "HPM-FPGA-Pending", "UEFI-Pending", "PCIeDevice_slot14_0xb40000.Bundle"}
+
+// lenovoRepoComponent is a component updated by a successful Lenovo repository update.
+type lenovoRepoComponent struct {
+	ID       string // FirmwareInventory ID of the active slot
+	Category string
+	Method   string
+	SWID     string
+	// HasPendingSlot is false for components (e.g. network adapters) whose
+	// staged firmware is not visible in the FirmwareInventory until the host reboots.
+	HasPendingSlot bool
+}
+
+// lenovoRepoUpdatedComponents are the components staged when a Lenovo
+// repository update task completes successfully. Modelled after a run
+// recorded on an SR650 V4 (XCC 28L-2.00).
+var lenovoRepoUpdatedComponents = []lenovoRepoComponent{
+	{ID: "HPM-FPGA", Category: "FPGA", Method: "Core", SWID: "FPGA-IHFG-10", HasPendingSlot: true},
+	{ID: "PCIeDevice_slot14_0xb40000.Bundle", Category: "DEVICE", Method: "OOB", SWID: "14E4-1750-17AA-4103"},
+}
+
+// getAliases maps a requested resource file path to the file path actually
+// served, e.g. a task monitor that returns its task.
+var getAliases = map[string]string{
+	lenovoRepoTaskMonitorFilePath: lenovoRepoTaskFilePath,
+}
 
 // noRebootSettings and noRebootBMCSettings are populated at init time by
 // scanning the embedded attribute registries for entries where ResetRequired == false.
@@ -197,23 +236,65 @@ func WithSystemOverride(systemID string, fields map[string]any) Option {
 	return WithResourceOverride(fmt.Sprintf("Systems/%s/index.json", systemID), fields)
 }
 
+// WithLenovoFirmwareInventory adds Lenovo XCC style FirmwareInventory entries
+// (an active slot "X" plus its "X-Pending" slot) used by the Lenovo
+// repository update simulation. A successful UpdateFromRepository task stages
+// firmware in the "-Pending" slots (StandbyOffline with a Version); a host
+// power-on or reset activates it (Disabled with an empty Version). Without
+// this option the shared FirmwareInventory is left untouched.
+func WithLenovoFirmwareInventory() Option {
+	return func(s *MockServer) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		s.lenovoInventory = true
+		s.addLenovoFirmwareInventoryLocked()
+	}
+}
+
+// addLenovoFirmwareInventoryLocked adds lenovoFirmwareInventoryIDs to the
+// FirmwareInventory collection. The caller must hold s.mu.
+func (s *MockServer) addLenovoFirmwareInventoryLocked() {
+	collection, err := s.loadResourceLocked(firmwareInventoryFilePath)
+	if err != nil {
+		s.log.Error(err, "Failed to load FirmwareInventory collection")
+		return
+	}
+	members, _ := collection["Members"].([]any)
+	for _, id := range lenovoFirmwareInventoryIDs {
+		odataID := "/redfish/v1/UpdateService/FirmwareInventory/" + id
+		if !slices.ContainsFunc(members, func(m any) bool {
+			mm, ok := m.(map[string]any)
+			return ok && mm["@odata.id"] == odataID
+		}) {
+			members = append(members, map[string]any{"@odata.id": odataID})
+		}
+	}
+	collection["Members"] = members
+	collection["Members@odata.count"] = len(members)
+	s.overrides[firmwareInventoryFilePath] = collection
+}
+
 type MockServer struct {
-	log               logr.Logger
-	addr              string
-	handler           http.Handler
-	mu                sync.RWMutex
-	overrides         map[string]any
-	etags             map[string]string     // file path → current ETag value
-	upgradeGen        int64                 // incremented on each SimpleUpdate to cancel stale goroutines
-	dellJobGen        int64                 // incremented on each Dell repository install to cancel stale goroutines
-	dellRepoState     dellRepoUpdateState   // GetRepoBasedUpdateList pending-package simulation state (see handleDellGetRepoBasedUpdateList)
-	upgradedResources map[string]string     // odata.id URI → file path for resources updated by the last upgrade
-	accounts          map[string]string     // username → password (authentication store)
-	authEnabled       bool                  // when true, all non-service-root requests require Basic Auth
-	unavailable       bool                  // when true, all requests return 503 Service Unavailable
-	actionHandlers    []actionHandler       // ordered POST action dispatch table (first match wins)
-	onCreate          map[string]memberHook // collection URL suffix → hook called after a member is added
-	onDelete          map[string]memberHook // collection URL suffix → hook called before a member is removed
+	log                  logr.Logger
+	addr                 string
+	handler              http.Handler
+	mu                   sync.RWMutex
+	overrides            map[string]any
+	etags                map[string]string     // file path → current ETag value
+	upgradeGen           int64                 // incremented on each SimpleUpdate to cancel stale goroutines
+	dellJobGen           int64                 // incremented on each Dell repository install to cancel stale goroutines
+	dellRepoState        dellRepoUpdateState   // GetRepoBasedUpdateList pending-package simulation state (see handleDellGetRepoBasedUpdateList)
+	lenovoRepoGen        int64                 // incremented on each Lenovo repository update to cancel stale goroutines
+	lenovoInventory      bool                  // when true, Lenovo FirmwareInventory slots are present (see WithLenovoFirmwareInventory)
+	lenovoRepoDetail     []map[string]any      // FinishedList returned by GetRepoUpdateDetail (see handleLenovoGetRepoUpdateDetail)
+	lenovoStagedFirmware map[string]string     // FirmwareInventory ID → staged version for components without a "-Pending" slot
+	upgradedResources    map[string]string     // odata.id URI → file path for resources updated by the last upgrade
+	accounts             map[string]string     // username → password (authentication store)
+	authEnabled          bool                  // when true, all non-service-root requests require Basic Auth
+	unavailable          bool                  // when true, all requests return 503 Service Unavailable
+	actionHandlers       []actionHandler       // ordered POST action dispatch table (first match wins)
+	onCreate             map[string]memberHook // collection URL suffix → hook called after a member is added
+	onDelete             map[string]memberHook // collection URL suffix → hook called before a member is removed
 }
 
 // loadAccountsFromEmbedded seeds the authentication store by reading the
@@ -333,6 +414,14 @@ func NewMockServer(log logr.Logger, addr string, opts ...Option) *MockServer {
 			handle:  s.handleDellGetRepoBasedUpdateList,
 		},
 		{
+			matches: hasSuffix("/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository"),
+			handle:  s.handleLenovoUpdateFromRepository,
+		},
+		{
+			matches: hasSuffix("/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"),
+			handle:  s.handleLenovoGetRepoUpdateDetail,
+		},
+		{
 			matches: hasSuffix("/Actions/ManagerAccount.ChangePassword"),
 			handle:  s.handleChangePassword,
 		},
@@ -394,6 +483,9 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 	filePath := resolvePath(r.URL.Path)
+	if target, ok := getAliases[filePath]; ok {
+		filePath = target
+	}
 
 	s.mu.RLock()
 	cached, hasOverride := s.overrides[filePath]
@@ -887,6 +979,214 @@ func (s *MockServer) handleDellGetRepoBasedUpdateList(w http.ResponseWriter, r *
 	})
 }
 
+// handleLenovoUpdateFromRepository simulates the Lenovo XCC
+// LenovoUpdateService.UpdateFromRepository OEM action. Like the real XCC it
+// answers with a Location header pointing to a task monitor and the task
+// object in the body, and progresses the task asynchronously. A RepoURI
+// containing "fail" selects the failing progression (Exception/Warning),
+// mirroring the ImageURI "fail" convention used by handleSimpleUpdate. On
+// success, GetRepoUpdateDetail reports lenovoRepoUpdatedComponents and, when
+// the Lenovo FirmwareInventory is enabled (see WithLenovoFirmwareInventory),
+// their firmware is staged until the next host power-on or reset. The RepoURI
+// is used as the new firmware version.
+func (s *MockServer) handleLenovoUpdateFromRepository(w http.ResponseWriter, r *http.Request, body []byte) {
+	var req struct {
+		RepoURI string `json:"RepoURI"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "malformed UpdateFromRepository JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if req.RepoURI == "" {
+		http.Error(w, "RepoURI is required", http.StatusBadRequest)
+		return
+	}
+
+	stepsPath := lenovoRepoStepsFilePath
+	if strings.Contains(req.RepoURI, "fail") {
+		stepsPath = lenovoRepoStepsFailFilePath
+	}
+
+	stepsData, err := dataFS.ReadFile(stepsPath)
+	if err != nil {
+		http.Error(w, "steps not found", http.StatusInternalServerError)
+		return
+	}
+	var steps []map[string]any
+	if err := json.Unmarshal(stepsData, &steps); err != nil || len(steps) == 0 {
+		http.Error(w, "corrupt steps JSON", http.StatusInternalServerError)
+		return
+	}
+
+	// Reload the embedded template so fields of a previous run (e.g. Messages) do not leak.
+	raw, err := dataFS.ReadFile(lenovoRepoTaskFilePath)
+	if err != nil {
+		http.Error(w, "task not found", http.StatusInternalServerError)
+		return
+	}
+	var taskBase map[string]any
+	if err := json.Unmarshal(raw, &taskBase); err != nil {
+		http.Error(w, "corrupt task JSON", http.StatusInternalServerError)
+		return
+	}
+	mergeJSON(taskBase, steps[0])
+
+	s.mu.Lock()
+	s.lenovoRepoGen++
+	gen := s.lenovoRepoGen
+	s.overrides[lenovoRepoTaskFilePath] = taskBase
+	s.lenovoRepoDetail = nil
+	response := deepCopy(taskBase)
+	s.mu.Unlock()
+
+	go s.advanceResourceSteps(&s.lenovoRepoGen, gen, lenovoRepoTaskFilePath, steps, func(finalStep map[string]any) {
+		if state, _ := finalStep["TaskState"].(string); state != "Completed" {
+			return
+		}
+		// Built before staging: the detail reports the versions active when the run started.
+		s.lenovoRepoDetail = s.lenovoRepoUpdateDetailLocked()
+		if s.lenovoInventory {
+			s.stageLenovoFirmwareLocked(req.RepoURI)
+		}
+	})
+
+	w.Header().Set("Location", lenovoRepoTaskMonitorURI)
+	s.writeJSON(w, http.StatusAccepted, response)
+}
+
+// lenovoRepoUpdateDetailLocked returns the GetRepoUpdateDetail FinishedList
+// for lenovoRepoUpdatedComponents. As observed on a real XCC, devices[].version
+// is the version active before the run and ret is 2 for packages applied and
+// waiting for a host reboot. The caller must hold s.mu.
+func (s *MockServer) lenovoRepoUpdateDetailLocked() []map[string]any {
+	list := make([]map[string]any, 0, len(lenovoRepoUpdatedComponents))
+	for _, c := range lenovoRepoUpdatedComponents {
+		activeVersion := ""
+		if active, err := s.loadResourceLocked(lenovoFirmwareInventoryFilePath(c.ID)); err == nil {
+			activeVersion, _ = active["Version"].(string)
+		}
+		list = append(list, map[string]any{
+			"category": c.Category,
+			"method":   c.Method,
+			"payload":  "payloads/" + strings.ToLower(c.ID) + "_anyos_comp.uxz",
+			"reboot":   "reboot",
+			"ret":      2,
+			"devices": []map[string]any{{
+				"name":      c.ID,
+				"location":  c.ID,
+				"oob":       true,
+				"partnum":   "",
+				"serialnum": "",
+				"swid":      c.SWID,
+				"version":   activeVersion,
+			}},
+		})
+	}
+	return list
+}
+
+// handleLenovoGetRepoUpdateDetail simulates the Lenovo XCC
+// LenovoUpdateService.GetRepoUpdateDetail OEM action. It reports the
+// components of the last successful UpdateFromRepository task, and an empty
+// FinishedList before any update, while a task is running, or after a failed
+// task. Like observed on a real XCC, BundleErrorCode is 2 when packages were
+// applied that wait for a host reboot.
+func (s *MockServer) handleLenovoGetRepoUpdateDetail(w http.ResponseWriter, _ *http.Request, _ []byte) {
+	s.mu.RLock()
+	finished := make([]any, 0, len(s.lenovoRepoDetail))
+	for _, c := range s.lenovoRepoDetail {
+		finished = append(finished, deepCopy(c))
+	}
+	s.mu.RUnlock()
+
+	bundleErrorCode := 0
+	if len(finished) > 0 {
+		bundleErrorCode = 2
+	}
+	s.writeJSON(w, http.StatusOK, map[string]any{
+		"BundleErrorCode": bundleErrorCode,
+		"FinishedList":    finished,
+	})
+}
+
+// lenovoFirmwareInventoryFilePath returns the data file path of the FirmwareInventory member id.
+func lenovoFirmwareInventoryFilePath(id string) string {
+	return resolvePath("/redfish/v1/UpdateService/FirmwareInventory/" + id)
+}
+
+// stageLenovoFirmwareLocked stages version for lenovoRepoUpdatedComponents:
+// components with a "-Pending" slot get it marked as staged, the others are
+// remembered and only change their version on activation. The caller must hold s.mu.
+func (s *MockServer) stageLenovoFirmwareLocked(version string) {
+	for _, c := range lenovoRepoUpdatedComponents {
+		if !c.HasPendingSlot {
+			if s.lenovoStagedFirmware == nil {
+				s.lenovoStagedFirmware = make(map[string]string)
+			}
+			s.lenovoStagedFirmware[c.ID] = version
+			s.log.Info("Staged firmware without pending slot", "id", c.ID, "version", version)
+			continue
+		}
+		filePath := lenovoFirmwareInventoryFilePath(c.ID + lenovoPendingSlotSuffix)
+		slot, err := s.loadResourceLocked(filePath)
+		if err != nil {
+			s.log.Error(err, "Failed to load pending firmware slot", "id", c.ID)
+			continue
+		}
+		slot["Version"] = version
+		slot["Status"] = map[string]any{"State": "StandbyOffline", "Health": "OK"}
+		s.overrides[filePath] = slot
+		s.log.Info("Staged firmware", "id", c.ID, "version", version)
+	}
+}
+
+// activateLenovoPendingFirmware simulates a host reboot activating staged
+// firmware: the Version of every staged "-Pending" slot is moved to its active
+// slot (if present) and the "-Pending" slot becomes Disabled with an empty
+// Version. Firmware staged for components without a "-Pending" slot is written
+// to their active slot.
+func (s *MockServer) activateLenovoPendingFirmware() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.lenovoInventory {
+		return
+	}
+	for _, id := range lenovoFirmwareInventoryIDs {
+		if !strings.HasSuffix(id, lenovoPendingSlotSuffix) {
+			continue
+		}
+		pendingPath := lenovoFirmwareInventoryFilePath(id)
+		slot, err := s.loadResourceLocked(pendingPath)
+		if err != nil {
+			continue
+		}
+		version, _ := slot["Version"].(string)
+		if version == "" {
+			continue
+		}
+		s.setLenovoActiveVersionLocked(strings.TrimSuffix(id, lenovoPendingSlotSuffix), version)
+		slot["Version"] = ""
+		slot["Status"] = map[string]any{"State": "Disabled", "Health": "OK"}
+		s.overrides[pendingPath] = slot
+		s.log.Info("Activated staged firmware", "id", id, "version", version)
+	}
+	for id, version := range s.lenovoStagedFirmware {
+		s.setLenovoActiveVersionLocked(id, version)
+		s.log.Info("Activated staged firmware", "id", id, "version", version)
+	}
+	s.lenovoStagedFirmware = nil
+}
+
+// setLenovoActiveVersionLocked sets the Version of the FirmwareInventory member id
+// if it exists. The caller must hold s.mu.
+func (s *MockServer) setLenovoActiveVersionLocked(id, version string) {
+	activePath := lenovoFirmwareInventoryFilePath(id)
+	if active, err := s.loadResourceLocked(activePath); err == nil {
+		active["Version"] = version
+		s.overrides[activePath] = active
+	}
+}
+
 // applyFirmwareVersionsLocked follows each FirmwareInventory target's
 // RelatedItem links to discover which System or Manager resource to update,
 // then writes the new imageURI into the appropriate version field.
@@ -1061,6 +1361,8 @@ func (s *MockServer) doPowerOff(systemPath string) {
 
 func (s *MockServer) doPowerOn(systemPath, basePath string) {
 	time.Sleep(50 * time.Millisecond)
+	s.activateLenovoPendingFirmware()
+
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
 		base["PowerState"] = PowerOnState
@@ -1084,6 +1386,8 @@ func (s *MockServer) doPowerReset(systemPath, basePath string) {
 	s.mu.Unlock()
 
 	time.Sleep(50 * time.Millisecond)
+
+	s.activateLenovoPendingFirmware()
 
 	s.mu.Lock()
 	if base, ok := s.overrides[systemPath].(map[string]any); ok {
@@ -1305,6 +1609,29 @@ func (s *MockServer) ResetDellRepositoryUpdate() {
 	s.dellJobGen++ // invalidate any running doDellJobSteps goroutine
 	s.dellRepoState = dellRepoUpdateUnchecked
 	s.resetResourceFromEmbeddedLocked(dellJobFilePath)
+}
+
+// ResetLenovoRepositoryUpdate resets the Lenovo repository-update simulation:
+// the task JSON, any in-flight task goroutine, the GetRepoUpdateDetail result,
+// firmware staged for components without a "-Pending" slot,
+// and the Lenovo FirmwareInventory
+// slots added by WithLenovoFirmwareInventory (back to their embedded state).
+//
+// Call this in AfterEach to ensure a clean slate between Lenovo
+// repository-update-related tests.
+func (s *MockServer) ResetLenovoRepositoryUpdate() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.lenovoRepoGen++ // invalidate any running task goroutine
+	s.lenovoRepoDetail = nil
+	s.lenovoStagedFirmware = nil
+	s.resetResourceFromEmbeddedLocked(lenovoRepoTaskFilePath)
+	if !s.lenovoInventory {
+		return
+	}
+	for _, id := range lenovoFirmwareInventoryIDs {
+		s.resetResourceFromEmbeddedLocked(resolvePath("/redfish/v1/UpdateService/FirmwareInventory/" + id))
+	}
 }
 
 // resetResourceFromEmbeddedLocked replaces the override for filePath with the

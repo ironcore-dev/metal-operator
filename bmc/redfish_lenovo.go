@@ -219,7 +219,7 @@ type FirmwareUpdaterLenovo interface {
 
 // LenovoRepositoryUpdateDetail is the response of the XCC
 // LenovoUpdateService.GetRepoUpdateDetail OEM action. It only describes the
-// last repository update run on the XCC
+// last repository update run on the XCC.
 type LenovoRepositoryUpdateDetail struct {
 	// BundleErrorCode is the undocumented XCC result code of the whole run.
 	// Non-zero values were observed on successful runs.

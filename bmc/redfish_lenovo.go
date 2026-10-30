@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -197,4 +199,245 @@ func (r *LenovoRedfishBMC) lenovoMatchesComponentFilter(fw *schemas.SoftwareInve
 
 func (r *LenovoRedfishBMC) lenovoCheckPending(fw *schemas.SoftwareInventory) bool {
 	return strings.Contains(strings.ToUpper(fw.ID), "-PENDING")
+}
+
+// --- Repository-based firmware update (FirmwareUpdaterLenovo) ---
+
+// FirmwareUpdaterLenovo is a Lenovo-only interface for the XCC OEM
+// repository-based firmware update. It is intentionally not part of the BMC
+// union interface. Callers discover support via a type assertion:
+// updater, ok := bmcClient.(bmc.FirmwareUpdaterLenovo).
+//
+// The repository is expected to contain no XCC/BMC or UEFI packages: those
+// components are managed by the BMCVersion and BIOSVersion controllers.
+type FirmwareUpdaterLenovo interface {
+	InstallFirmwareFromRepository(ctx context.Context, parameters *LenovoRepositoryUpdateParameters) (taskURI string, isFatal bool, err error)
+	GetRepositoryUpdateTask(ctx context.Context, taskURI string) (*schemas.Task, error)
+	GetPendingFirmwareComponents(ctx context.Context) ([]string, error)
+	GetRepositoryUpdateDetail(ctx context.Context) (*LenovoRepositoryUpdateDetail, error)
+}
+
+// LenovoRepositoryUpdateDetail is the response of the XCC
+// LenovoUpdateService.GetRepoUpdateDetail OEM action. It only describes the
+// last repository update run on the XCC.
+type LenovoRepositoryUpdateDetail struct {
+	// BundleErrorCode is the undocumented XCC result code of the whole run.
+	// Non-zero values were observed on successful runs.
+	BundleErrorCode int                               `json:"BundleErrorCode"`
+	FinishedList    []LenovoRepositoryUpdateComponent `json:"FinishedList"`
+}
+
+// LenovoRepositoryUpdateComponent is one update package processed by a repository update.
+type LenovoRepositoryUpdateComponent struct {
+	// Category is the package category, e.g. "LXPM", "DEVICE", "DISK" or "FPGA".
+	Category string `json:"category"`
+	// Method is the update method, e.g. "Core" or "OOB".
+	Method string `json:"method"`
+	// Payload is the path of the package inside the repository.
+	Payload string `json:"payload"`
+	// Reboot is "reboot" if a host reboot is needed to activate the package, "noreboot" otherwise.
+	Reboot string `json:"reboot"`
+	// Ret is the undocumented XCC result code of the package update. It must
+	// not be treated as an error code: 2 was observed for a successfully applied
+	// package that needed a reboot, 0 for a package that was already installed.
+	Ret     int                            `json:"ret"`
+	Devices []LenovoRepositoryUpdateDevice `json:"devices"`
+}
+
+// LenovoRepositoryUpdateDevice is a device updated by a repository update package.
+type LenovoRepositoryUpdateDevice struct {
+	Name         string `json:"name"`
+	Location     string `json:"location"`
+	PartNumber   string `json:"partnum"`
+	SerialNumber string `json:"serialnum"`
+	SoftwareID   string `json:"swid"`
+	// Version is the firmware version that was active on the device when the
+	// run started, not the version of the package.
+	Version string `json:"version"`
+	OOB     bool   `json:"oob"`
+}
+
+// LenovoRepositoryUpdateParameters are the parameters for the XCC
+// LenovoUpdateService.UpdateFromRepository OEM action.
+type LenovoRepositoryUpdateParameters struct {
+	// RepoURI is the HTTPS URI of the repository zip archive.
+	RepoURI string
+}
+
+// FirmwareUpdaterLenovo is not part of the BMC union; assert separately from bmc.go.
+var _ FirmwareUpdaterLenovo = (*LenovoRedfishBMC)(nil)
+
+const (
+	lenovoUpdateFromRepositoryPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository"
+	lenovoGetRepoUpdateDetailPath  = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"
+	lenovoPendingSlotSuffix        = "-PENDING"
+	lenovoTaskServicePathPrefix    = "/redfish/v1/TaskService/"
+)
+
+// lenovoPendingExcludedPrefixes lists (upper-case) firmware inventory ID
+// prefixes of components that are not handled by the repository update.
+var lenovoPendingExcludedPrefixes = []string{"BMC", "XCC", "UEFI"}
+
+type lenovoRepositoryUpdateRequestBody struct {
+	RepoURI string `json:"RepoURI"`
+}
+
+// lenovoExtractRepositoryTaskURI prefers the task's @odata.id from the response
+// body (/redfish/v1/TaskService/Tasks/<id>) over the Location header
+// (/redfish/v1/TaskService/TaskMonitors/<id>).
+func lenovoExtractRepositoryTaskURI(response *http.Response) (string, error) {
+	rawBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+	if len(rawBody) > 0 {
+		var task struct {
+			ODataID string `json:"@odata.id"`
+		}
+		if err := json.Unmarshal(rawBody, &task); err == nil && task.ODataID != "" {
+			return lenovoNormalizeTaskURI(task.ODataID)
+		}
+	}
+	if location := response.Header.Get("Location"); location != "" {
+		return lenovoNormalizeTaskURI(location)
+	}
+	return "", fmt.Errorf("missing task URI in response: no @odata.id in body and no Location header")
+}
+
+// lenovoNormalizeTaskURI turns an absolute URL into its path (gofish prefixes
+// every request with the BMC endpoint) and rejects URIs outside the TaskService.
+func lenovoNormalizeTaskURI(rawURI string) (string, error) {
+	parsed, err := url.Parse(rawURI)
+	if err != nil {
+		return "", fmt.Errorf("invalid task URI %q: %w", rawURI, err)
+	}
+	cleaned := path.Clean(parsed.Path)
+	if !strings.HasPrefix(cleaned, lenovoTaskServicePathPrefix) {
+		return "", fmt.Errorf("task URI %q is not a TaskService resource", rawURI)
+	}
+	return (&url.URL{Path: cleaned, RawQuery: parsed.RawQuery}).RequestURI(), nil
+}
+
+func lenovoBuildRepositoryUpdateRequestBody(parameters *LenovoRepositoryUpdateParameters) *lenovoRepositoryUpdateRequestBody {
+	return &lenovoRepositoryUpdateRequestBody{
+		RepoURI: parameters.RepoURI,
+	}
+}
+
+// InstallFirmwareFromRepository starts an update from the repository given in
+// parameters and returns the URI of the resulting task
+// (/redfish/v1/TaskService/Tasks/<id>). isFatal is true once the request may
+// have reached the XCC, because retrying could start a second update.
+func (r *LenovoRedfishBMC) InstallFirmwareFromRepository(ctx context.Context, parameters *LenovoRepositoryUpdateParameters) (string, bool, error) {
+	if parameters == nil || parameters.RepoURI == "" {
+		return "", false, fmt.Errorf("repository URI must not be empty")
+	}
+	client := r.client.GetService().GetClient()
+
+	resp, err := client.Post(lenovoUpdateFromRepositoryPath, lenovoBuildRepositoryUpdateRequestBody(parameters))
+	if err != nil {
+		// Any error after POST is treated as fatal: the request may have reached
+		// the XCC and started executing (including dropped-response errors), so
+		// retrying risks triggering a second update.
+		return "", true, fmt.Errorf("failed to issue repository firmware update: %w", err)
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+		rawBody, _ := io.ReadAll(resp.Body)
+		return "", true, fmt.Errorf("failed to start repository firmware update: %s, statusCode %d", string(rawBody), resp.StatusCode)
+	}
+
+	taskURI, err := lenovoExtractRepositoryTaskURI(resp)
+	if err != nil {
+		return "", true, fmt.Errorf("failed to extract task URI from repository firmware update response: %w", err)
+	}
+
+	return taskURI, false, nil
+}
+
+// GetRepositoryUpdateTask returns the task started by
+// InstallFirmwareFromRepository. A completed task means the packages were
+// applied; packages that need a host reboot are only staged until then. The
+// XCC may restart while the task is running (e.g. when it updates itself), so
+// errors returned here can be transient and should be retried.
+func (r *LenovoRedfishBMC) GetRepositoryUpdateTask(ctx context.Context, taskURI string) (*schemas.Task, error) {
+	return getUpgradeTask(ctx, r.RedfishBaseBMC, taskURI, r.lenovoParseTaskDetails)
+}
+
+// GetRepositoryUpdateDetail returns the packages processed by the last
+// repository update run on the XCC, regardless of who started it (runs started
+// by LXCA show up here too). Read it right after the own task has completed and
+// check that the payloads belong to the own repository.
+//
+// BundleErrorCode and the per-package ret codes are not documented by Lenovo
+// and are returned without interpretation. Observed on an SR650 V4 (XCC 28L-2.00):
+// ret 2 for a package that was applied and activated by the next host reboot,
+// ret 0 for packages whose version already matched the installed one.
+func (r *LenovoRedfishBMC) GetRepositoryUpdateDetail(_ context.Context) (*LenovoRepositoryUpdateDetail, error) {
+	client := r.client.GetService().GetClient()
+
+	resp, err := client.Post(lenovoGetRepoUpdateDetailPath, map[string]any{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get repository update detail: %w", err)
+	}
+	defer resp.Body.Close() // nolint: errcheck
+
+	rawBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read GetRepoUpdateDetail response body: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get repository update detail: %s, statusCode %d", string(rawBody), resp.StatusCode)
+	}
+
+	detail := &LenovoRepositoryUpdateDetail{}
+	if err := json.Unmarshal(rawBody, detail); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal GetRepoUpdateDetail response: %w", err)
+	}
+	return detail, nil
+}
+
+// GetPendingFirmwareComponents returns the IDs of FirmwareInventory "-Pending"
+// slots holding staged firmware that waits for activation by a host reboot.
+// XCC/BMC and UEFI slots are ignored. Components without a "-Pending" slot
+// (e.g. network adapters, "PCIeDevice_*.Bundle") keep reporting their old
+// version until the reboot, so their staged updates are not visible here;
+// use GetRepositoryUpdateDetail for those.
+func (r *LenovoRedfishBMC) GetPendingFirmwareComponents(ctx context.Context) ([]string, error) {
+	updateService, err := r.client.GetService().UpdateService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UpdateService: %w", err)
+	}
+	firmwareInventory, err := updateService.FirmwareInventory()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get FirmwareInventory: %w", err)
+	}
+
+	var pending []string
+	for _, fw := range firmwareInventory {
+		if !lenovoIsStagedRepositoryFirmware(fw) {
+			continue
+		}
+		pending = append(pending, fw.ID)
+	}
+	return pending, nil
+}
+
+// lenovoIsStagedRepositoryFirmware reports whether fw is an XCC "-Pending" slot
+// holding staged firmware. The slot exists for every component; after
+// activation (host reboot) it is Disabled with an empty Version. Any other
+// state with a Version is treated as staged, even if the Version equals the
+// active one. XCC/BMC and UEFI slots are excluded.
+func lenovoIsStagedRepositoryFirmware(fw *schemas.SoftwareInventory) bool {
+	id := strings.ToUpper(fw.ID)
+	if !strings.HasSuffix(id, lenovoPendingSlotSuffix) {
+		return false
+	}
+	for _, prefix := range lenovoPendingExcludedPrefixes {
+		if strings.HasPrefix(id, prefix) {
+			return false
+		}
+	}
+	return fw.Status.State != schemas.DisabledState && strings.TrimSpace(fw.Version) != ""
 }

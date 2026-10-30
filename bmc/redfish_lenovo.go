@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -269,6 +271,7 @@ const (
 	lenovoUpdateFromRepositoryPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository"
 	lenovoGetRepoUpdateDetailPath  = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"
 	lenovoPendingSlotSuffix        = "-PENDING"
+	lenovoTaskServicePathPrefix    = "/redfish/v1/TaskService/"
 )
 
 // lenovoPendingExcludedPrefixes lists (upper-case) firmware inventory ID
@@ -292,13 +295,27 @@ func lenovoExtractRepositoryTaskURI(response *http.Response) (string, error) {
 			ODataID string `json:"@odata.id"`
 		}
 		if err := json.Unmarshal(rawBody, &task); err == nil && task.ODataID != "" {
-			return task.ODataID, nil
+			return lenovoNormalizeTaskURI(task.ODataID)
 		}
 	}
 	if location := response.Header.Get("Location"); location != "" {
-		return location, nil
+		return lenovoNormalizeTaskURI(location)
 	}
 	return "", fmt.Errorf("missing task URI in response: no @odata.id in body and no Location header")
+}
+
+// lenovoNormalizeTaskURI turns an absolute URL into its path (gofish prefixes
+// every request with the BMC endpoint) and rejects URIs outside the TaskService.
+func lenovoNormalizeTaskURI(rawURI string) (string, error) {
+	parsed, err := url.Parse(rawURI)
+	if err != nil {
+		return "", fmt.Errorf("invalid task URI %q: %w", rawURI, err)
+	}
+	cleaned := path.Clean(parsed.Path)
+	if !strings.HasPrefix(cleaned, lenovoTaskServicePathPrefix) {
+		return "", fmt.Errorf("task URI %q is not a TaskService resource", rawURI)
+	}
+	return (&url.URL{Path: cleaned, RawQuery: parsed.RawQuery}).RequestURI(), nil
 }
 
 func lenovoBuildRepositoryUpdateRequestBody(parameters *LenovoRepositoryUpdateParameters) *lenovoRepositoryUpdateRequestBody {

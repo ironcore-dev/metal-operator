@@ -125,6 +125,31 @@ var _ = Describe("Lenovo OEM", func() {
 			_, err := lenovoExtractRepositoryTaskURI(newResponse("", ""))
 			Expect(err).To(HaveOccurred())
 		})
+
+		DescribeTable("should normalize the task URI",
+			func(body, location, expected string) {
+				uri, err := lenovoExtractRepositoryTaskURI(newResponse(body, location))
+				Expect(err).NotTo(HaveOccurred())
+				Expect(uri).To(Equal(expected))
+			},
+			Entry("absolute @odata.id",
+				`{"@odata.id":"https://10.0.0.1/redfish/v1/TaskService/Tasks/7"}`, "", "/redfish/v1/TaskService/Tasks/7"),
+			Entry("absolute Location header",
+				"", "https://10.0.0.1:443/redfish/v1/TaskService/TaskMonitors/7", "/redfish/v1/TaskService/TaskMonitors/7"),
+			Entry("query is kept",
+				"", "/redfish/v1/TaskService/TaskMonitors/7?a=b", "/redfish/v1/TaskService/TaskMonitors/7?a=b"),
+		)
+
+		DescribeTable("should reject task URIs outside the TaskService",
+			func(body, location string) {
+				_, err := lenovoExtractRepositoryTaskURI(newResponse(body, location))
+				Expect(err).To(HaveOccurred())
+			},
+			Entry("other resource in body", `{"@odata.id":"/redfish/v1/Systems/1"}`, ""),
+			Entry("other resource in Location header", "", "https://10.0.0.1/redfish/v1/Managers/1"),
+			Entry("path traversal", "", "/redfish/v1/TaskService/../Systems/1"),
+			Entry("TaskService root", "", "/redfish/v1/TaskService"),
+		)
 	})
 
 	Describe("InstallFirmwareFromRepository", func() {

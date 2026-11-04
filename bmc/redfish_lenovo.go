@@ -268,15 +268,49 @@ type LenovoRepositoryUpdateParameters struct {
 var _ FirmwareUpdaterLenovo = (*LenovoRedfishBMC)(nil)
 
 const (
-	lenovoUpdateFromRepositoryPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository"
-	lenovoGetRepoUpdateDetailPath  = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"
-	lenovoPendingSlotSuffix        = "-PENDING"
-	lenovoTaskServicePathPrefix    = "/redfish/v1/TaskService/"
+	lenovoPendingSlotSuffix     = "-PENDING"
+	lenovoTaskServicePathPrefix = "/redfish/v1/TaskService/"
 )
 
 // lenovoPendingExcludedPrefixes lists (upper-case) firmware inventory ID
 // prefixes of components that are not handled by the repository update.
 var lenovoPendingExcludedPrefixes = []string{"BMC", "XCC", "UEFI"}
+
+// lenovoUpdateServiceOEMActions describes the Lenovo-specific OEM actions
+// exposed by the UpdateService. URLs are extracted dynamically from the
+// UpdateService schema to avoid hardcoded paths that may change across XCC versions.
+type lenovoUpdateServiceOEMActions struct {
+	UpdateFromRepository struct {
+		Target string `json:"target"`
+	} `json:"#LenovoUpdateService.UpdateFromRepository"`
+
+	GetRepoUpdateDetail struct {
+		Target string `json:"target"`
+	} `json:"#LenovoUpdateService.GetRepoUpdateDetail"`
+}
+
+// lenovoExtractOEMActionURLs retrieves the Lenovo OEM action URLs from the UpdateService.
+// Returns the actions structure without validation - callers should check if the specific
+// action they need is present before using it.
+func lenovoExtractOEMActionURLs(base *RedfishBaseBMC) (*lenovoUpdateServiceOEMActions, error) {
+	service := base.client.GetService()
+	updateService, err := service.UpdateService()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UpdateService: %w", err)
+	}
+
+	var updateServiceWithOEM struct {
+		Actions struct {
+			Oem lenovoUpdateServiceOEMActions `json:"Oem"`
+		} `json:"Actions"`
+	}
+
+	if err := json.Unmarshal(updateService.RawData, &updateServiceWithOEM); err != nil {
+		return nil, fmt.Errorf("failed to parse UpdateService OEM actions: %w", err)
+	}
+
+	return &updateServiceWithOEM.Actions.Oem, nil
+}
 
 type lenovoRepositoryUpdateRequestBody struct {
 	RepoURI string `json:"RepoURI"`
@@ -332,9 +366,19 @@ func (r *LenovoRedfishBMC) InstallFirmwareFromRepository(ctx context.Context, pa
 	if parameters == nil || parameters.RepoURI == "" {
 		return "", false, fmt.Errorf("repository URI must not be empty")
 	}
+
+	oemActions, err := lenovoExtractOEMActionURLs(r.RedfishBaseBMC)
+	if err != nil {
+		return "", false, fmt.Errorf("failed to extract Lenovo OEM action URLs: %w", err)
+	}
+
+	if oemActions.UpdateFromRepository.Target == "" {
+		return "", false, fmt.Errorf("UpdateFromRepository action not found in UpdateService OEM schema")
+	}
+
 	client := r.client.GetService().GetClient()
 
-	resp, err := client.Post(lenovoUpdateFromRepositoryPath, lenovoBuildRepositoryUpdateRequestBody(parameters))
+	resp, err := client.Post(oemActions.UpdateFromRepository.Target, lenovoBuildRepositoryUpdateRequestBody(parameters))
 	if err != nil {
 		// Any error after POST is treated as fatal: the request may have reached
 		// the XCC and started executing (including dropped-response errors), so
@@ -374,10 +418,19 @@ func (r *LenovoRedfishBMC) GetRepositoryUpdateTask(ctx context.Context, taskURI 
 // and are returned without interpretation. Observed on an SR650 V4 (XCC 28L-2.00):
 // ret 2 for a package that was applied and activated by the next host reboot,
 // ret 0 for packages whose version already matched the installed one.
-func (r *LenovoRedfishBMC) GetRepositoryUpdateDetail(_ context.Context) (*LenovoRepositoryUpdateDetail, error) {
+func (r *LenovoRedfishBMC) GetRepositoryUpdateDetail(ctx context.Context) (*LenovoRepositoryUpdateDetail, error) {
+	oemActions, err := lenovoExtractOEMActionURLs(r.RedfishBaseBMC)
+	if err != nil {
+		return nil, fmt.Errorf("failed to extract Lenovo OEM action URLs: %w", err)
+	}
+
+	if oemActions.GetRepoUpdateDetail.Target == "" {
+		return nil, fmt.Errorf("GetRepoUpdateDetail action not found in UpdateService OEM schema")
+	}
+
 	client := r.client.GetService().GetClient()
 
-	resp, err := client.Post(lenovoGetRepoUpdateDetailPath, map[string]any{})
+	resp, err := client.Post(oemActions.GetRepoUpdateDetail.Target, map[string]any{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get repository update detail: %w", err)
 	}

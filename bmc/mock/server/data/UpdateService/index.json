@@ -33,6 +33,14 @@
         "#UpdateService.SimpleUpdate": {
             "target": "/redfish/v1/UpdateService/Actions/SimpleUpdate",
             "@Redfish.ActionInfo": "/redfish/v1/UpdateService/SimpleUpdateActionInfo"
+        },
+        "Oem": {
+            "#LenovoUpdateService.UpdateFromRepository": {
+                "target": "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository"
+            },
+            "#LenovoUpdateService.GetRepoUpdateDetail": {
+                "target": "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"
+            }
         }
     },
     "@odata.id": "/redfish/v1/UpdateService",

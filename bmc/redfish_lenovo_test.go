@@ -36,6 +36,26 @@ func lenovoServiceRootJSON() []byte {
 	return b
 }
 
+// lenovoUpdateServiceJSON returns an UpdateService with Lenovo OEM actions.
+func lenovoUpdateServiceJSON() []byte {
+	b, _ := json.Marshal(map[string]any{
+		"@odata.id": "/redfish/v1/UpdateService",
+		"Id":        "UpdateService",
+		"Name":      "Update Service",
+		"Actions": map[string]any{
+			"Oem": map[string]any{
+				"#LenovoUpdateService.UpdateFromRepository": map[string]any{
+					"target": lenovoRepoActionPath,
+				},
+				"#LenovoUpdateService.GetRepoUpdateDetail": map[string]any{
+					"target": "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail",
+				},
+			},
+		},
+	})
+	return b
+}
+
 // lenovoFirmwareSlot describes a FirmwareInventory member served by newLenovoInventoryMux.
 // Version is `any` so that a nil value is served as JSON null, as the XCC does for some slots.
 type lenovoFirmwareSlot struct {
@@ -60,6 +80,16 @@ func newLenovoInventoryMux(slots []lenovoFirmwareSlot) *http.ServeMux {
 			"@odata.id":         "/redfish/v1/UpdateService",
 			"Id":                "UpdateService",
 			"FirmwareInventory": map[string]string{"@odata.id": "/redfish/v1/UpdateService/FirmwareInventory"},
+			"Actions": map[string]any{
+				"Oem": map[string]any{
+					"#LenovoUpdateService.UpdateFromRepository": map[string]any{
+						"target": lenovoRepoActionPath,
+					},
+					"#LenovoUpdateService.GetRepoUpdateDetail": map[string]any{
+						"target": "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail",
+					},
+				},
+			},
 		})
 	})
 	members := make([]map[string]string, 0, len(slots))
@@ -158,6 +188,10 @@ var _ = Describe("Lenovo OEM", func() {
 			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoUpdateServiceJSON()) //nolint:errcheck
 			})
 			mux.HandleFunc(lenovoRepoActionPath, handler)
 			return mux
@@ -263,6 +297,118 @@ var _ = Describe("Lenovo OEM", func() {
 			Entry("nil parameters", nil),
 			Entry("empty RepoURI", &LenovoRepositoryUpdateParameters{}),
 		)
+
+		It("should use the dynamically extracted URL instead of hardcoded path", func() {
+			const customPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.UpdateFromRepository.Custom"
+			var calledPath string
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return a custom path to prove we use the dynamic URL
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.UpdateFromRepository": map[string]any{
+								"target": customPath,
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+			mux.HandleFunc(customPath, func(w http.ResponseWriter, r *http.Request) {
+				calledPath = r.URL.Path
+				w.Header().Set("Location", "/redfish/v1/TaskService/TaskMonitors/99")
+				w.WriteHeader(http.StatusAccepted)
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			taskURI, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(isFatal).To(BeFalse())
+			Expect(taskURI).To(Equal("/redfish/v1/TaskService/TaskMonitors/99"))
+			Expect(calledPath).To(Equal(customPath), "should call the custom path from UpdateService, not a hardcoded one")
+		})
+
+		It("should fail if UpdateFromRepository action is missing", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return UpdateService without UpdateFromRepository action
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.GetRepoUpdateDetail": map[string]any{
+								"target": "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail",
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			_, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("UpdateFromRepository action not found"))
+			Expect(isFatal).To(BeFalse())
+		})
+
+		It("should work even if GetRepoUpdateDetail action is missing", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return UpdateService with only UpdateFromRepository action
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.UpdateFromRepository": map[string]any{
+								"target": lenovoRepoActionPath,
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+			mux.HandleFunc(lenovoRepoActionPath, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Location", "/redfish/v1/TaskService/TaskMonitors/88")
+				w.WriteHeader(http.StatusAccepted)
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			taskURI, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(isFatal).To(BeFalse())
+			Expect(taskURI).To(Equal("/redfish/v1/TaskService/TaskMonitors/88"))
+		})
 	})
 
 	Describe("GetRepositoryUpdateTask", func() {
@@ -337,6 +483,10 @@ var _ = Describe("Lenovo OEM", func() {
 			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoUpdateServiceJSON()) //nolint:errcheck
 			})
 			mux.HandleFunc(detailPath, handler)
 			return mux
@@ -439,6 +589,116 @@ var _ = Describe("Lenovo OEM", func() {
 			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
 			_, err := lenovo.GetRepositoryUpdateDetail(context.Background())
 			Expect(err).To(HaveOccurred())
+		})
+
+		It("should use the dynamically extracted URL instead of hardcoded path", func() {
+			const customDetailPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail.Custom"
+			var calledPath string
+
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return a custom path to prove we use the dynamic URL
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.GetRepoUpdateDetail": map[string]any{
+								"target": customDetailPath,
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+			mux.HandleFunc(customDetailPath, func(w http.ResponseWriter, r *http.Request) {
+				calledPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"BundleErrorCode": 0, "FinishedList": []}`)) //nolint:errcheck
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			detail, err := lenovo.GetRepositoryUpdateDetail(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(detail).NotTo(BeNil())
+			Expect(calledPath).To(Equal(customDetailPath), "should call the custom path from UpdateService, not a hardcoded one")
+		})
+
+		It("should fail if GetRepoUpdateDetail action is missing", func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return UpdateService without GetRepoUpdateDetail action
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.UpdateFromRepository": map[string]any{
+								"target": lenovoRepoActionPath,
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			_, err := lenovo.GetRepositoryUpdateDetail(context.Background())
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("GetRepoUpdateDetail action not found"))
+		})
+
+		It("should work even if UpdateFromRepository action is missing", func() {
+			const detailPath = "/redfish/v1/UpdateService/Actions/Oem/LenovoUpdateService.GetRepoUpdateDetail"
+			mux := http.NewServeMux()
+			mux.HandleFunc("/redfish/v1/", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write(lenovoServiceRootJSON()) //nolint:errcheck
+			})
+			mux.HandleFunc("/redfish/v1/UpdateService", func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				// Return UpdateService with only GetRepoUpdateDetail action
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/UpdateService",
+					"Id":        "UpdateService",
+					"Actions": map[string]any{
+						"Oem": map[string]any{
+							"#LenovoUpdateService.GetRepoUpdateDetail": map[string]any{
+								"target": detailPath,
+							},
+						},
+					},
+				})
+				w.Write(b) //nolint:errcheck
+			})
+			mux.HandleFunc(detailPath, func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.Write([]byte(`{"BundleErrorCode": 0, "FinishedList": []}`)) //nolint:errcheck
+			})
+
+			srv := httptest.NewServer(mux)
+			defer srv.Close()
+
+			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
+			detail, err := lenovo.GetRepositoryUpdateDetail(context.Background())
+			Expect(err).NotTo(HaveOccurred())
+			Expect(detail).NotTo(BeNil())
 		})
 	})
 

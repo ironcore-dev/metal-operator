@@ -9,8 +9,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"path"
 	"strings"
 
 	"github.com/stmcginnis/gofish/schemas"
@@ -268,8 +266,7 @@ type LenovoRepositoryUpdateParameters struct {
 var _ FirmwareUpdaterLenovo = (*LenovoRedfishBMC)(nil)
 
 const (
-	lenovoPendingSlotSuffix     = "-PENDING"
-	lenovoTaskServicePathPrefix = "/redfish/v1/TaskService/"
+	lenovoPendingSlotSuffix = "-PENDING"
 )
 
 // lenovoPendingExcludedPrefixes lists (upper-case) firmware inventory ID
@@ -316,42 +313,6 @@ type lenovoRepositoryUpdateRequestBody struct {
 	RepoURI string `json:"RepoURI"`
 }
 
-// lenovoExtractRepositoryTaskURI prefers the task's @odata.id from the response
-// body (/redfish/v1/TaskService/Tasks/<id>) over the Location header
-// (/redfish/v1/TaskService/TaskMonitors/<id>).
-func lenovoExtractRepositoryTaskURI(response *http.Response) (string, error) {
-	rawBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-	if len(rawBody) > 0 {
-		var task struct {
-			ODataID string `json:"@odata.id"`
-		}
-		if err := json.Unmarshal(rawBody, &task); err == nil && task.ODataID != "" {
-			return lenovoNormalizeTaskURI(task.ODataID)
-		}
-	}
-	if location := response.Header.Get("Location"); location != "" {
-		return lenovoNormalizeTaskURI(location)
-	}
-	return "", fmt.Errorf("missing task URI in response: no @odata.id in body and no Location header")
-}
-
-// lenovoNormalizeTaskURI turns an absolute URL into its path (gofish prefixes
-// every request with the BMC endpoint) and rejects URIs outside the TaskService.
-func lenovoNormalizeTaskURI(rawURI string) (string, error) {
-	parsed, err := url.Parse(rawURI)
-	if err != nil {
-		return "", fmt.Errorf("invalid task URI %q: %w", rawURI, err)
-	}
-	cleaned := path.Clean(parsed.Path)
-	if !strings.HasPrefix(cleaned, lenovoTaskServicePathPrefix) {
-		return "", fmt.Errorf("task URI %q is not a TaskService resource", rawURI)
-	}
-	return (&url.URL{Path: cleaned, RawQuery: parsed.RawQuery}).RequestURI(), nil
-}
-
 func lenovoBuildRepositoryUpdateRequestBody(parameters *LenovoRepositoryUpdateParameters) *lenovoRepositoryUpdateRequestBody {
 	return &lenovoRepositoryUpdateRequestBody{
 		RepoURI: parameters.RepoURI,
@@ -392,7 +353,7 @@ func (r *LenovoRedfishBMC) InstallFirmwareFromRepository(ctx context.Context, pa
 		return "", true, fmt.Errorf("failed to start repository firmware update: %s, statusCode %d", string(rawBody), resp.StatusCode)
 	}
 
-	taskURI, err := lenovoExtractRepositoryTaskURI(resp)
+	taskURI, err := r.lenovoExtractTaskMonitorURI(resp)
 	if err != nil {
 		return "", true, fmt.Errorf("failed to extract task URI from repository firmware update response: %w", err)
 	}

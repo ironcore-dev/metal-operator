@@ -6,12 +6,10 @@ package bmc
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"slices"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -122,66 +120,6 @@ var _ = Describe("Lenovo OEM", func() {
 		lenovo = &LenovoRedfishBMC{}
 	})
 
-	Describe("lenovoExtractRepositoryTaskURI", func() {
-		newResponse := func(body, location string) *http.Response {
-			resp := &http.Response{Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}
-			if location != "" {
-				resp.Header.Set("Location", location)
-			}
-			return resp
-		}
-
-		It("should prefer the task @odata.id from the body", func() {
-			uri, err := lenovoExtractRepositoryTaskURI(newResponse(
-				`{"@odata.id":"/redfish/v1/TaskService/Tasks/7","TaskState":"Running"}`,
-				"/redfish/v1/TaskService/TaskMonitors/7"))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(uri).To(Equal("/redfish/v1/TaskService/Tasks/7"))
-		})
-
-		It("should fall back to the Location header", func() {
-			uri, err := lenovoExtractRepositoryTaskURI(newResponse(`{"TaskState":"Running"}`, "/redfish/v1/TaskService/TaskMonitors/7"))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(uri).To(Equal("/redfish/v1/TaskService/TaskMonitors/7"))
-		})
-
-		It("should fall back to the Location header for a non-JSON body", func() {
-			uri, err := lenovoExtractRepositoryTaskURI(newResponse("accepted", "/redfish/v1/TaskService/TaskMonitors/7"))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(uri).To(Equal("/redfish/v1/TaskService/TaskMonitors/7"))
-		})
-
-		It("should fail without body URI and Location header", func() {
-			_, err := lenovoExtractRepositoryTaskURI(newResponse("", ""))
-			Expect(err).To(HaveOccurred())
-		})
-
-		DescribeTable("should normalize the task URI",
-			func(body, location, expected string) {
-				uri, err := lenovoExtractRepositoryTaskURI(newResponse(body, location))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(uri).To(Equal(expected))
-			},
-			Entry("absolute @odata.id",
-				`{"@odata.id":"https://10.0.0.1/redfish/v1/TaskService/Tasks/7"}`, "", "/redfish/v1/TaskService/Tasks/7"),
-			Entry("absolute Location header",
-				"", "https://10.0.0.1:443/redfish/v1/TaskService/TaskMonitors/7", "/redfish/v1/TaskService/TaskMonitors/7"),
-			Entry("query is kept",
-				"", "/redfish/v1/TaskService/TaskMonitors/7?a=b", "/redfish/v1/TaskService/TaskMonitors/7?a=b"),
-		)
-
-		DescribeTable("should reject task URIs outside the TaskService",
-			func(body, location string) {
-				_, err := lenovoExtractRepositoryTaskURI(newResponse(body, location))
-				Expect(err).To(HaveOccurred())
-			},
-			Entry("other resource in body", `{"@odata.id":"/redfish/v1/Systems/1"}`, ""),
-			Entry("other resource in Location header", "", "https://10.0.0.1/redfish/v1/Managers/1"),
-			Entry("path traversal", "", "/redfish/v1/TaskService/../Systems/1"),
-			Entry("TaskService root", "", "/redfish/v1/TaskService"),
-		)
-	})
-
 	Describe("InstallFirmwareFromRepository", func() {
 		newMux := func(handler http.HandlerFunc) *http.ServeMux {
 			mux := http.NewServeMux()
@@ -230,20 +168,6 @@ var _ = Describe("Lenovo OEM", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(isFatal).To(BeFalse())
 			Expect(taskURI).To(Equal("/redfish/v1/TaskService/Tasks/64"))
-		})
-
-		It("should return the task monitor URI from the Location header if the body has none", func() {
-			srv := httptest.NewServer(newMux(func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Location", "/redfish/v1/TaskService/TaskMonitors/12")
-				w.WriteHeader(http.StatusAccepted)
-			}))
-			defer srv.Close()
-
-			lenovo.RedfishBaseBMC = newTestRedfishBMC(srv)
-			taskURI, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(isFatal).To(BeFalse())
-			Expect(taskURI).To(Equal("/redfish/v1/TaskService/TaskMonitors/12"))
 		})
 
 		It("should return a fatal error if no task URI is returned", func() {
@@ -325,8 +249,12 @@ var _ = Describe("Lenovo OEM", func() {
 			})
 			mux.HandleFunc(customPath, func(w http.ResponseWriter, r *http.Request) {
 				calledPath = r.URL.Path
-				w.Header().Set("Location", "/redfish/v1/TaskService/TaskMonitors/99")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusAccepted)
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/TaskService/Tasks/99",
+				})
+				w.Write(b) //nolint:errcheck
 			})
 
 			srv := httptest.NewServer(mux)
@@ -336,7 +264,7 @@ var _ = Describe("Lenovo OEM", func() {
 			taskURI, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(isFatal).To(BeFalse())
-			Expect(taskURI).To(Equal("/redfish/v1/TaskService/TaskMonitors/99"))
+			Expect(taskURI).To(Equal("/redfish/v1/TaskService/Tasks/99"))
 			Expect(calledPath).To(Equal(customPath), "should call the custom path from UpdateService, not a hardcoded one")
 		})
 
@@ -396,8 +324,12 @@ var _ = Describe("Lenovo OEM", func() {
 				w.Write(b) //nolint:errcheck
 			})
 			mux.HandleFunc(lenovoRepoActionPath, func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Location", "/redfish/v1/TaskService/TaskMonitors/88")
+				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusAccepted)
+				b, _ := json.Marshal(map[string]any{
+					"@odata.id": "/redfish/v1/TaskService/Tasks/88",
+				})
+				w.Write(b) //nolint:errcheck
 			})
 
 			srv := httptest.NewServer(mux)
@@ -407,7 +339,7 @@ var _ = Describe("Lenovo OEM", func() {
 			taskURI, isFatal, err := lenovo.InstallFirmwareFromRepository(context.Background(), &LenovoRepositoryUpdateParameters{RepoURI: "https://repo.example.com/fw.zip"})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(isFatal).To(BeFalse())
-			Expect(taskURI).To(Equal("/redfish/v1/TaskService/TaskMonitors/88"))
+			Expect(taskURI).To(Equal("/redfish/v1/TaskService/Tasks/88"))
 		})
 	})
 

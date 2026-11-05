@@ -1,0 +1,10 @@
+{
+    "@odata.type": "#Task.v1_7_3.Task",
+    "@odata.id": "/redfish/v1/TaskService/Tasks/lenovo-repo",
+    "Id": "lenovo-repo",
+    "Name": "Firmware update from repository",
+    "TaskState": "New",
+    "TaskStatus": "OK",
+    "PercentComplete": 0,
+    "Messages": []
+}

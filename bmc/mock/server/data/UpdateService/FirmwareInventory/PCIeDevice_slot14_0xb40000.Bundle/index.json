@@ -1,0 +1,14 @@
+{
+    "@odata.type": "#SoftwareInventory.v1_12_0.SoftwareInventory",
+    "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory/PCIeDevice_slot14_0xb40000.Bundle",
+    "Id": "PCIeDevice_slot14_0xb40000.Bundle",
+    "Name": "Firmware:DEVICE-Broadcom 57508 100GbE QSFP56 2-Port OCP Ethernet Adapter",
+    "Manufacturer": "Broadcom Limited",
+    "SoftwareId": "DEVICE-14E4-1750-17AA-4103-13",
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "Updateable": true,
+    "Version": "232.1.132.8"
+}

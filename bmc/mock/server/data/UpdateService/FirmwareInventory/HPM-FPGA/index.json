@@ -1,0 +1,13 @@
+{
+    "@odata.type": "#SoftwareInventory.v1_10_1.SoftwareInventory",
+    "@odata.id": "/redfish/v1/UpdateService/FirmwareInventory/HPM-FPGA",
+    "Id": "HPM-FPGA",
+    "Name": "HPM FPGA Firmware",
+    "Status": {
+        "State": "Enabled",
+        "Health": "OK"
+    },
+    "Updateable": true,
+    "Manufacturer": "Lenovo",
+    "Version": "1.0.0"
+}

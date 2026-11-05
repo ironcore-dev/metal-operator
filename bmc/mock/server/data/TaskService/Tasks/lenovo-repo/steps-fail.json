@@ -1,0 +1,15 @@
+[
+    {"TaskState": "Running",   "TaskStatus": "OK",      "PercentComplete": 0},
+    {
+        "TaskState": "Exception",
+        "TaskStatus": "Warning",
+        "PercentComplete": 0,
+        "Messages": [
+            {
+                "MessageId": "LenovoFirmwareUpdate.1.0.0.SyncRepoSubstateFailed",
+                "Message": "Failed to sync the repository.",
+                "Severity": "Warning"
+            }
+        ]
+    }
+]

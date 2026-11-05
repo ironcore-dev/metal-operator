@@ -59,13 +59,11 @@ const (
 	dellJobURI               = "/redfish/v1/Managers/BMC/Oem/Dell/Jobs/repository"
 
 	// Fixed file paths for Lenovo OEM repository-based firmware update task simulation.
-	lenovoRepoTaskFilePath        = "data/TaskService/Tasks/lenovo-repo/index.json"
-	lenovoRepoStepsFilePath       = "data/TaskService/Tasks/lenovo-repo/steps.json"
-	lenovoRepoStepsFailFilePath   = "data/TaskService/Tasks/lenovo-repo/steps-fail.json"
-	lenovoRepoTaskMonitorURI      = "/redfish/v1/TaskService/TaskMonitors/lenovo-repo"
-	lenovoRepoTaskMonitorFilePath = "data/TaskService/TaskMonitors/lenovo-repo/index.json"
-	firmwareInventoryFilePath     = "data/UpdateService/FirmwareInventory/index.json"
-	lenovoPendingSlotSuffix       = "-Pending"
+	lenovoRepoTaskFilePath      = "data/TaskService/Tasks/lenovo-repo/index.json"
+	lenovoRepoStepsFilePath     = "data/TaskService/Tasks/lenovo-repo/steps.json"
+	lenovoRepoStepsFailFilePath = "data/TaskService/Tasks/lenovo-repo/steps-fail.json"
+	firmwareInventoryFilePath   = "data/UpdateService/FirmwareInventory/index.json"
+	lenovoPendingSlotSuffix     = "-Pending"
 
 	// Firmware version JSON field names updated on upgrade task completion.
 	// The target resource path is resolved dynamically via FirmwareInventory RelatedItem links.
@@ -108,12 +106,6 @@ type lenovoRepoComponent struct {
 var lenovoRepoUpdatedComponents = []lenovoRepoComponent{
 	{ID: "HPM-FPGA", Category: "FPGA", Method: "Core", SWID: "FPGA-IHFG-10", HasPendingSlot: true},
 	{ID: "PCIeDevice_slot14_0xb40000.Bundle", Category: "DEVICE", Method: "OOB", SWID: "14E4-1750-17AA-4103"},
-}
-
-// getAliases maps a requested resource file path to the file path actually
-// served, e.g. a task monitor that returns its task.
-var getAliases = map[string]string{
-	lenovoRepoTaskMonitorFilePath: lenovoRepoTaskFilePath,
 }
 
 // noRebootSettings and noRebootBMCSettings are populated at init time by
@@ -483,9 +475,6 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *MockServer) handleGet(w http.ResponseWriter, r *http.Request) {
 	filePath := resolvePath(r.URL.Path)
-	if target, ok := getAliases[filePath]; ok {
-		filePath = target
-	}
 
 	s.mu.RLock()
 	cached, hasOverride := s.overrides[filePath]
@@ -980,15 +969,14 @@ func (s *MockServer) handleDellGetRepoBasedUpdateList(w http.ResponseWriter, r *
 }
 
 // handleLenovoUpdateFromRepository simulates the Lenovo XCC
-// LenovoUpdateService.UpdateFromRepository OEM action. Like the real XCC it
-// answers with a Location header pointing to a task monitor and the task
-// object in the body, and progresses the task asynchronously. A RepoURI
-// containing "fail" selects the failing progression (Exception/Warning),
-// mirroring the ImageURI "fail" convention used by handleSimpleUpdate. On
-// success, GetRepoUpdateDetail reports lenovoRepoUpdatedComponents and, when
-// the Lenovo FirmwareInventory is enabled (see WithLenovoFirmwareInventory),
-// their firmware is staged until the next host power-on or reset. The RepoURI
-// is used as the new firmware version.
+// LenovoUpdateService.UpdateFromRepository OEM action. It returns the task
+// object in the response body with @odata.id pointing to the task URI, and
+// progresses the task asynchronously. A RepoURI containing "fail" selects the
+// failing progression (Exception/Warning), mirroring the ImageURI "fail"
+// convention used by handleSimpleUpdate. On success, GetRepoUpdateDetail
+// reports lenovoRepoUpdatedComponents and, when the Lenovo FirmwareInventory is
+// enabled (see WithLenovoFirmwareInventory), their firmware is staged until the
+// next host power-on or reset. The RepoURI is used as the new firmware version.
 func (s *MockServer) handleLenovoUpdateFromRepository(w http.ResponseWriter, r *http.Request, body []byte) {
 	var req struct {
 		RepoURI string `json:"RepoURI"`
@@ -1050,7 +1038,6 @@ func (s *MockServer) handleLenovoUpdateFromRepository(w http.ResponseWriter, r *
 		}
 	})
 
-	w.Header().Set("Location", lenovoRepoTaskMonitorURI)
 	s.writeJSON(w, http.StatusAccepted, response)
 }
 

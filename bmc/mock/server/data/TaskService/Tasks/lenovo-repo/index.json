@@ -6,6 +6,5 @@
     "TaskState": "New",
     "TaskStatus": "OK",
     "PercentComplete": 0,
-    "TaskMonitor": "/redfish/v1/TaskService/TaskMonitors/lenovo-repo",
     "Messages": []
 }

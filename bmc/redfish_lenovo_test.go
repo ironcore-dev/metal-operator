@@ -826,11 +826,6 @@ var _ = Describe("Lenovo OEM", func() {
 			Expect(detail.FinishedList[1].Category).To(Equal("DEVICE"))
 			Expect(detail.FinishedList[1].Devices[0].Version).To(Equal("232.1.132.8"), "version before the run")
 
-			// The task monitor URI returns the same task.
-			task, err := lenovo.GetRepositoryUpdateTask(ctx, "/redfish/v1/TaskService/TaskMonitors/lenovo-repo")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(task.TaskState).To(Equal(schemas.CompletedTaskState))
-
 			Expect(lenovo.PowerOff(ctx, "/redfish/v1/Systems/437XR1138R2")).To(Succeed())
 			Eventually(func(g Gomega) {
 				system, err := lenovo.getSystemFromUri(ctx, "/redfish/v1/Systems/437XR1138R2")

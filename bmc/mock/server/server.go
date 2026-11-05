@@ -840,19 +840,14 @@ func (s *MockServer) advanceResourceSteps(genPtr *int64, gen int64, filePath str
 			mergeJSON(resource, steps[i])
 			s.overrides[filePath] = resource
 		}
+
+		// For the final step, invoke onTerminal before releasing the mutex,
+		// keeping the Completed state and terminal results in the same critical section.
+		if i == len(steps)-1 && onTerminal != nil {
+			onTerminal(steps[len(steps)-1])
+		}
 		s.mu.Unlock()
 	}
-
-	if onTerminal == nil {
-		return
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if *genPtr != gen {
-		return
-	}
-	onTerminal(steps[len(steps)-1])
 }
 
 // handleDellInstallFromRepository simulates Dell's

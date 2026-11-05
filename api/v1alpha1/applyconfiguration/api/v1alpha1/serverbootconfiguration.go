@@ -19,7 +19,7 @@ import (
 //
 // ServerBootConfiguration is the Schema for the serverbootconfigurations API
 type ServerBootConfigurationApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *ServerBootConfigurationSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *ServerBootConfigurationStatusApplyConfiguration `json:"status,omitempty"`

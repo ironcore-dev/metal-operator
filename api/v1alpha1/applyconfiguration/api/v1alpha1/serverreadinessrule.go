@@ -19,7 +19,7 @@ import (
 //
 // ServerReadinessRule is the Schema for the serverreadinessrules API
 type ServerReadinessRuleApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration `json:",inline"`
+	v1.TypeMetaApplyConfiguration `json:""`
 	// metadata is a standard object metadata
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	// spec defines the desired state of ServerReadinessRule

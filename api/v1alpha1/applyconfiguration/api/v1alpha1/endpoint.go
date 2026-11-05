@@ -23,7 +23,7 @@ import (
 // inline via BMC.spec.access (an InlineEndpoint carrying the MAC address and IP)
 // instead of creating a separate Endpoint object.
 type EndpointApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *EndpointSpecApplyConfiguration `json:"spec,omitempty"`
 	Status                           *apiv1alpha1.EndpointStatus     `json:"status,omitempty"`

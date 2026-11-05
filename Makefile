@@ -311,8 +311,8 @@ PROMTOOL ?= $(LOCALBIN)/promtool
 YQ ?= $(LOCALBIN)/yq
 
 ## Tool Versions
-KUSTOMIZE_VERSION ?= v5.8.1
-CONTROLLER_TOOLS_VERSION ?= v0.21.0
+KUSTOMIZE_VERSION ?= v5.8.2
+CONTROLLER_TOOLS_VERSION ?= v0.23.0
 
 #ENVTEST_VERSION is the version of controller-runtime release branch to fetch the envtest setup script (i.e. release-0.20)
 ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller-runtime | awk -F'[v.]' '{printf "release-%d.%d", $$2, $$3}')
@@ -320,14 +320,14 @@ ENVTEST_VERSION ?= $(shell go list -m -f "{{ .Version }}" sigs.k8s.io/controller
 #ENVTEST_K8S_VERSION is the version of Kubernetes to use for setting up ENVTEST binaries (i.e. 1.31)
 ENVTEST_K8S_VERSION ?= $(shell go list -m -f "{{ .Version }}" k8s.io/api | awk -F'[v.]' '{printf "1.%d.%d",$$3, $$2}')
 
-GOLANGCI_LINT_VERSION ?= v2.12
-GOIMPORTS_VERSION ?= v0.38.0
-CRD_REF_DOCS_VERSION ?= v0.2.0
-KUBEBUILDER_VERSION ?= v4.14.0
-ADDLICENSE_VERSION ?= v1.1.1
+GOLANGCI_LINT_VERSION ?= v2.15
+GOIMPORTS_VERSION ?= v0.52.0
+CRD_REF_DOCS_VERSION ?= v0.3.0
+KUBEBUILDER_VERSION ?= v4.16.0
+ADDLICENSE_VERSION ?= v1.2.0
 GINKGO_VERSION ?= $(shell go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2)
-PROMTOOL_VERSION ?= 3.11.3
-YQ_VERSION ?= v4.44.3
+PROMTOOL_VERSION ?= 3.15.1
+YQ_VERSION ?= v4.54.1
 
 .PHONY: ginkgo
 ginkgo: $(GINKGO) ## Download ginkgo locally if necessary.

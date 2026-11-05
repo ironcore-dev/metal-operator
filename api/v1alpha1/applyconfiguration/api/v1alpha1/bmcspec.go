@@ -21,8 +21,10 @@ type BMCSpecApplyConfiguration struct {
 	// Deprecated: The Endpoint resource is deprecated. Specify the network access inline via
 	// access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an
 	// Endpoint object.
+	// Exactly one of endpointRef or access must be set.
 	EndpointRef *v1.LocalObjectReference `json:"endpointRef,omitempty"`
 	// Endpoint specifies inline network access details for the BMC.
+	// Exactly one of endpointRef or access must be set.
 	Endpoint *InlineEndpointApplyConfiguration `json:"access,omitempty"`
 	// BMCSecretRef is a reference to the BMCSecret object that contains the credentials
 	// required to access the BMC.

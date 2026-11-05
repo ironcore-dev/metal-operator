@@ -81,9 +81,13 @@ manager:
   ## Termination grace period seconds
   ##
   terminationGracePeriodSeconds: 10
-  ## Custom Deployment labels
+  ## Health probe (matches --health-probe-bind-address, default :8081)
   ##
-  # labels: {}
+  healthProbe:
+    port: 8081
+    ## Custom Deployment labels
+    ##
+    # labels: {}
 ## Custom Deployment annotations
 ##
 # annotations: {}
@@ -107,7 +111,7 @@ rbac:
   helpers:
     ## Install convenience admin/editor/viewer roles for CRDs
     ##
-    enable: false
+    enabled: false
 ## ServiceAccount configuration
 ##
 serviceAccount:
@@ -129,14 +133,14 @@ serviceAccount:
 ##
 crd:
   # Install CRDs with the chart
-  enable: true
+  enabled: true
   # Keep CRDs when uninstalling
   keep: true
 ## Controller metrics endpoint.
 ## Enable to expose /metrics endpoint
 ##
 metrics:
-  enable: true
+  enabled: true
   # Metrics server port
   port: 8443
   # Enable secure metrics: HTTPS with certs/auth (true) or HTTP (false).
@@ -146,11 +150,11 @@ metrics:
 ## Required for webhook certificates and metrics endpoint certificates.
 ##
 certManager:
-  enable: true
+  enabled: true
 ## Webhook server configuration
 ##
 webhook:
-  enable: true
+  enabled: true
   # Webhook server port
   port: 9443
 ## Prometheus ServiceMonitor for metrics scraping.
@@ -158,6 +162,11 @@ webhook:
 ##
 prometheus:
   enable: false
+## Kubernetes NetworkPolicies restricting pod traffic
+## Disabled by default (no networkPolicy templates applied)
+##
+networkPolicy:
+  enabled: false
 ## Configure the metaldata DaemonSet
 ##
 metaldata:

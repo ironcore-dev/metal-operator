@@ -6,6 +6,12 @@ labels: bug
 assignees: ''
 ---
 
+<!-- BEGIN slop-grenade-hint -->
+> [!IMPORTANT]
+> Please review our [AI contribution policy](https://github.com/ironcore-dev/community/blob/main/docs/ai.md).
+> Low-effort AI requests may be closed or reworked.
+<!-- END slop-grenade-hint -->
+
 **Which component is affected?**
 <!-- Which resource(s) or controller(s) does this bug relate to? e.g. Server, ServerClaim, ServerBootConfiguration, BMC, Endpoint, etc. -->
 

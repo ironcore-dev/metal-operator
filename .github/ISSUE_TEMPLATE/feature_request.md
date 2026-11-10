@@ -6,6 +6,12 @@ labels: enhancement
 assignees: ''
 ---
 
+<!-- BEGIN slop-grenade-hint -->
+> [!IMPORTANT]
+> Please review our [AI contribution policy](https://github.com/ironcore-dev/community/blob/main/docs/ai.md).
+> Low-effort AI requests may be closed or reworked.
+<!-- END slop-grenade-hint -->
+
 **Which component does this relate to?**
 <!-- e.g. Server lifecycle, BMC management, boot configuration, maintenance workflow, BIOS settings, server discovery, API types, etc. -->
 

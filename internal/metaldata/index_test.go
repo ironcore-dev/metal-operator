@@ -9,7 +9,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -158,10 +157,8 @@ var _ = Describe("Index", func() {
 		It("skips them without indexing", func() {
 			deleteServer(server)
 			server = &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:        "server-a",
-					Annotations: map[string]string{metaldata.IPsAnnotation: "not-an-ip"},
-				},
+				Name:        "server-a",
+				Annotations: map[string]string{metaldata.IPsAnnotation: "not-an-ip"},
 			}
 			addServer(server)
 
@@ -173,7 +170,7 @@ var _ = Describe("Index", func() {
 
 func newServer(name string, ips ...string) *metalv1alpha1.Server {
 	server := &metalv1alpha1.Server{
-		ObjectMeta: metav1.ObjectMeta{Name: name},
+		Name: name,
 	}
 	if len(ips) > 0 {
 		server.Annotations = map[string]string{metaldata.IPsAnnotation: strings.Join(ips, ",")}

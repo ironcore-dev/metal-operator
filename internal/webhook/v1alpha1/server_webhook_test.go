@@ -8,7 +8,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
@@ -19,9 +18,7 @@ var _ = Describe("Server Webhook", func() {
 
 	BeforeEach(func() {
 		server = &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
+			GenerateName: "server-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{

@@ -22,10 +22,8 @@ var _ = Describe("ServerClaim API Validation", func() {
 	BeforeEach(func() {
 		By("Creating a new ServerClaim")
 		claim = &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    metav1.NamespaceDefault,
-				GenerateName: "test-",
-			},
+			Namespace:    metav1.NamespaceDefault,
+			GenerateName: "test-",
 		}
 		Expect(k8sClient.Create(ctx, claim)).To(Succeed())
 
@@ -36,10 +34,8 @@ var _ = Describe("ServerClaim API Validation", func() {
 
 		By("Creating a new ServerClaim")
 		claimWithSelector = &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    metav1.NamespaceDefault,
-				GenerateName: "test-",
-			},
+			Namespace:    metav1.NamespaceDefault,
+			GenerateName: "test-",
 		}
 		Expect(k8sClient.Create(ctx, claimWithSelector)).To(Succeed())
 

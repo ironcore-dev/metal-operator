@@ -239,7 +239,7 @@ func removeEndpointOwnerReference(obj metav1.Object) {
 // SetupWithManager sets up the controller with the Manager.
 func (r *EndpointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	mapToEndpoint := func(_ context.Context, obj client.Object) []ctrl.Request {
-		return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: obj.GetName()}}}
+		return []ctrl.Request{{Name: obj.GetName()}}
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).

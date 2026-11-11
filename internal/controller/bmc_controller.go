@@ -14,7 +14,6 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/yaml"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
@@ -629,7 +628,7 @@ func (r *BMCReconciler) enqueueBMCByEndpoint(ctx context.Context, obj client.Obj
 	var reqs []ctrl.Request
 	for _, bmcObj := range bmcList.Items {
 		if bmcObj.Spec.EndpointRef != nil && bmcObj.Spec.EndpointRef.Name == obj.GetName() {
-			reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: bmcObj.Name}})
+			reqs = append(reqs, ctrl.Request{Name: bmcObj.Name})
 		}
 	}
 	return reqs
@@ -645,7 +644,7 @@ func (r *BMCReconciler) enqueueBMCByBMCSecret(ctx context.Context, obj client.Ob
 	var reqs []ctrl.Request
 	for _, bmcObj := range bmcList.Items {
 		if bmcObj.Spec.BMCSecretRef.Name == obj.GetName() {
-			reqs = append(reqs, ctrl.Request{NamespacedName: types.NamespacedName{Name: bmcObj.Name}})
+			reqs = append(reqs, ctrl.Request{Name: bmcObj.Name})
 		}
 	}
 	return reqs
@@ -656,7 +655,7 @@ func (r *BMCReconciler) enqueueBMCByServer(_ context.Context, obj client.Object)
 	if server.Spec.BMCRef == nil {
 		return nil
 	}
-	return []ctrl.Request{{NamespacedName: types.NamespacedName{Name: server.Spec.BMCRef.Name}}}
+	return []ctrl.Request{{Name: server.Spec.BMCRef.Name}}
 }
 
 // SetupWithManager sets up the controller with the Manager.

@@ -30,9 +30,7 @@ var _ = Describe("Server Controller", func() {
 	It("should transition a server to released state and back to available", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
+			GenerateName: "test-server-",
 			Data: map[string][]byte{
 				"username": []byte("foo"),
 				"password": []byte("bar"),
@@ -42,9 +40,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
+			GenerateName: "server-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -69,10 +65,8 @@ var _ = Describe("Server Controller", func() {
 
 		By("creating a server claim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-claim",
-				Namespace: ns.Name,
-			},
+			Name:      "test-claim",
+			Namespace: ns.Name,
 			Spec: metalv1alpha1.ServerClaimSpec{
 				ServerRef: &v1.LocalObjectReference{
 					Name: server.Name,
@@ -119,9 +113,7 @@ var _ = Describe("Server Controller", func() {
 	It("should resume a claimed server with wiped status directly in reserved state", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
+			GenerateName: "test-server-",
 			Data: map[string][]byte{
 				"username": []byte("foo"),
 				"password": []byte("bar"),
@@ -131,10 +123,8 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a claim for the server")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-claim-",
-				Namespace:    ns.Name,
-			},
+			GenerateName: "test-claim-",
+			Namespace:    ns.Name,
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power: metalv1alpha1.PowerOn,
 			},
@@ -143,9 +133,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a Server with a claim ref and wiped status")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
+			GenerateName: "server-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "47947555-7742-3448-3784-823347823835",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -180,9 +168,7 @@ var _ = Describe("Server Controller", func() {
 	It("should initialize a Server from Endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoint object")
 		endpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
+			GenerateName: "test-server-",
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
 				MACAddress: "23:11:8A:33:CF:EA",
@@ -193,25 +179,19 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
+			Name: endpoint.Name,
 		}
 		Eventually(Get(bmc)).Should(Succeed())
 
 		By("Ensuring that the BMCSecret will be removed")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmc.Name,
-			},
+			Name: bmc.Name,
 		}
 		Eventually(Get(bmcSecret)).Should(Succeed())
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("%s-system-0", bmc.Name),
-			},
+			Name: fmt.Sprintf("%s-system-0", bmc.Name),
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("Finalizers", ContainElement(ServerFinalizer)),
@@ -265,9 +245,7 @@ var _ = Describe("Server Controller", func() {
 	It("should initialize a Server with inline BMC configuration", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
+			GenerateName: "test-server-",
 			Data: map[string][]byte{
 				"username": []byte("foo"),
 				"password": []byte("bar"),
@@ -277,9 +255,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
+			GenerateName: "server-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -353,9 +329,7 @@ var _ = Describe("Server Controller", func() {
 	It("should move Server out of reserved state on missing serverClaim and BootConfig", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-server-",
-			},
+			GenerateName: "test-server-",
 			Data: map[string][]byte{
 				"username": []byte("foo"),
 				"password": []byte("bar"),
@@ -365,9 +339,7 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a Server with inline BMC configuration")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-			},
+			GenerateName: "server-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -391,10 +363,8 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating an Ignition secret")
 		ignitionSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				"foo": []byte("bar"),
 			},
@@ -403,10 +373,8 @@ var _ = Describe("Server Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-deleted-serverclaim-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-deleted-serverclaim-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:             metalv1alpha1.PowerOn,
 				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
@@ -418,10 +386,8 @@ var _ = Describe("Server Controller", func() {
 
 		By("Ensuring that the ServerBootConfiguration has been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      claim.Name,
-			},
+			Namespace: ns.Name,
+			Name:      claim.Name,
 		}
 		Eventually(Object(config)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -525,10 +491,8 @@ var _ = Describe("Server Controller", func() {
 
 			By("Creating a ServerClaim for the server")
 			claim := &metalv1alpha1.ServerClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parked-claim",
-					Namespace: ns.Name,
-				},
+				Name:      "parked-claim",
+				Namespace: ns.Name,
 				Spec: metalv1alpha1.ServerClaimSpec{
 					ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				},
@@ -602,10 +566,8 @@ var _ = Describe("Server Controller", func() {
 			})).Should(Succeed())
 
 			claim := &metalv1alpha1.ServerClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "parked-fallback-claim",
-					Namespace: ns.Name,
-				},
+				Name:      "parked-fallback-claim",
+				Namespace: ns.Name,
 				Spec: metalv1alpha1.ServerClaimSpec{
 					ServerRef: &v1.LocalObjectReference{Name: server.Name},
 				},
@@ -869,12 +831,10 @@ var _ = Describe("Server Controller", func() {
 
 			By("Creating the leftover internal discovery boot configuration")
 			discoveryConfig := &metalv1alpha1.ServerBootConfiguration{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "discovery-" + server.Name,
-					Namespace: ns.Name,
-					Annotations: map[string]string{
-						"metal.ironcore.dev/type": "Internal",
-					},
+				Name:      "discovery-" + server.Name,
+				Namespace: ns.Name,
+				Annotations: map[string]string{
+					"metal.ironcore.dev/type": "Internal",
 				},
 				Spec: metalv1alpha1.ServerBootConfigurationSpec{
 					ServerRef: v1.LocalObjectReference{Name: server.Name},
@@ -915,7 +875,7 @@ var _ = Describe("Server Controller", func() {
 func createServerAndSecret(ctx SpecContext) (*metalv1alpha1.Server, *metalv1alpha1.BMCSecret) {
 	By("Creating a BMCSecret")
 	bmcSecret := &metalv1alpha1.BMCSecret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-server-"},
+		GenerateName: "test-server-",
 		Data: map[string][]byte{
 			"username": []byte("foo"),
 			"password": []byte("bar"),
@@ -925,7 +885,7 @@ func createServerAndSecret(ctx SpecContext) (*metalv1alpha1.Server, *metalv1alph
 
 	By("Creating a Server with inline BMC configuration")
 	server := &metalv1alpha1.Server{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "server-"},
+		GenerateName: "server-",
 		Spec: metalv1alpha1.ServerSpec{
 			SystemUUID: "38947555-7742-3448-3784-823347823834",
 			BMC: &metalv1alpha1.BMCAccess{

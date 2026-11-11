@@ -30,9 +30,7 @@ var _ = Describe("BMC Controller", func() {
 	It("should successfully reconcile a BMC resource", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.EndpointSpec{
 				// emulator BMC mac address
 				MACAddress: "23:11:8A:33:CF:EA",
@@ -43,9 +41,7 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Ensuring that the BMC resource has been created for an endpoint")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
+			Name: endpoint.Name,
 		}
 		Eventually(Object(bmc)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -61,9 +57,7 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Ensuring that the Server resource will be created")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -76,9 +70,7 @@ var _ = Describe("BMC Controller", func() {
 		Expect(k8sClient.Delete(ctx, endpoint)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmc.Name,
-			},
+			Name: bmc.Name,
 		}
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, server)).To(Succeed())
@@ -89,9 +81,7 @@ var _ = Describe("BMC Controller", func() {
 	It("should successfully reconcile a BMC resource with inline access information", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -105,10 +95,8 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-				Labels:       bmcLabels,
-			},
+			GenerateName: "test-bmc-",
+			Labels:       bmcLabels,
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -137,9 +125,7 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -160,9 +146,7 @@ var _ = Describe("BMC Controller", func() {
 	It("should successfully reconcile a BMC resource and patch on BMC label changes", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -176,10 +160,8 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-				Labels:       bmcLabels,
-			},
+			GenerateName: "test-bmc-",
+			Labels:       bmcLabels,
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -208,9 +190,7 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Ensuring that the Server resource has been created")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Eventually(Object(server)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -243,9 +223,7 @@ var _ = Describe("BMC Controller", func() {
 	It("should create a DNS record for the BMC if configured", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -259,10 +237,8 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-				Labels:       bmcLabels,
-			},
+			GenerateName: "test-bmc-",
+			Labels:       bmcLabels,
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP("127.0.0.1"),
@@ -282,10 +258,8 @@ var _ = Describe("BMC Controller", func() {
 
 		By("Ensuring that the DNSRecord resource has been created for the bmc")
 		dnsRecord := &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      bmc.Name,
-				Namespace: ns.Name,
-			},
+			Name:      bmc.Name,
+			Namespace: ns.Name,
 		}
 		Eventually(Object(dnsRecord)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -302,9 +276,7 @@ var _ = Describe("BMC Controller", func() {
 			HaveField("Data", HaveKeyWithValue("ttl", "300")),
 		))
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
@@ -321,9 +293,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should deny if the BMC has EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-invalid",
-			},
+			Name: "test-invalid",
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 				Endpoint: &metalv1alpha1.InlineEndpoint{
@@ -338,9 +308,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should deny if the BMC has no EndpointRef and InlineEndpoint spec fields", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: "test-empty",
-			},
+			Name: "test-empty",
 			Spec: metalv1alpha1.BMCSpec{},
 		}
 		Expect(k8sClient.Create(ctx, bmc)).To(HaveOccurred())
@@ -349,9 +317,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should admit if the BMC has an EndpointRef but no InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
@@ -365,9 +331,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should deny if the BMC EndpointRef spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
@@ -388,9 +352,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should admit if the BMC is changing EndpointRef to InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				EndpointRef: &v1.LocalObjectReference{Name: "foo"},
 			},
@@ -412,9 +374,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should admit if the BMC has no EndpointRef but an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -431,9 +391,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should deny if the BMC InlineEndpoint spec field has been removed", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -459,9 +417,7 @@ var _ = Describe("BMC Validation", func() {
 
 	It("should admit if the BMC is changing to an EndpointRef from an InlineEndpoint spec field", func(ctx SpecContext) {
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -492,9 +448,7 @@ var _ = Describe("BMC Reset", func() {
 	It("should reset the BMC", func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -504,9 +458,7 @@ var _ = Describe("BMC Reset", func() {
 
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-",
-			},
+			GenerateName: "test-bmc-",
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -535,9 +487,7 @@ var _ = Describe("BMC Reset", func() {
 			HaveField("Annotations", Not(HaveKey(metalv1alpha1.OperationAnnotation))),
 		))
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Eventually(Get(server)).Should(Succeed())
 		// cleanup
@@ -560,9 +510,7 @@ var _ = Describe("BMC Conditions", func() {
 		mockServers[0].SetUnavailable(true)
 		By("Creating a BMCSecret")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -572,9 +520,7 @@ var _ = Describe("BMC Conditions", func() {
 
 		By("Creating a BMC resource")
 		bmc := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-bmc-reset-",
-			},
+			GenerateName: "test-bmc-reset-",
 			Spec: metalv1alpha1.BMCSpec{
 				Endpoint: &metalv1alpha1.InlineEndpoint{
 					IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -653,9 +599,7 @@ var _ = Describe("BMC Conditions", func() {
 			)),
 		)
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc),
 		}
 		Eventually(Get(server)).Should(Succeed())
 
@@ -671,7 +615,7 @@ var _ = Describe("BMC Conditions", func() {
 // createBMCSecretForSSHTest creates a BMCSecret with known credentials for SSH reset tests.
 func createBMCSecretForSSHTest(ctx SpecContext) *metalv1alpha1.BMCSecret {
 	secret := &metalv1alpha1.BMCSecret{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ssh-"},
+		GenerateName: "test-ssh-",
 		Data: map[string][]byte{
 			metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 			metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -684,7 +628,7 @@ func createBMCSecretForSSHTest(ctx SpecContext) *metalv1alpha1.BMCSecret {
 // createBMCForSSHTest creates a BMC pointing at the mock server for SSH reset tests.
 func createBMCForSSHTest(ctx SpecContext, secret *metalv1alpha1.BMCSecret) *metalv1alpha1.BMC {
 	b := &metalv1alpha1.BMC{
-		ObjectMeta: metav1.ObjectMeta{GenerateName: "test-ssh-bmc-"},
+		GenerateName: "test-ssh-bmc-",
 		Spec: metalv1alpha1.BMCSpec{
 			Endpoint: &metalv1alpha1.InlineEndpoint{
 				IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -773,7 +717,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		Eventually(Object(bmc)).Should(HaveField("Status.LastResetTime", Not(BeNil())))
 
 		mockServers[0].SetUnavailable(false)
-		server := &metalv1alpha1.Server{ObjectMeta: metav1.ObjectMeta{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}}
+		server := &metalv1alpha1.Server{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		_ = k8sClient.Delete(ctx, server)
@@ -812,7 +756,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		))))
 
 		mockServers[0].SetUnavailable(false)
-		server := &metalv1alpha1.Server{ObjectMeta: metav1.ObjectMeta{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}}
+		server := &metalv1alpha1.Server{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		_ = k8sClient.Delete(ctx, server)
@@ -868,7 +812,7 @@ var _ = Describe("BMC SSH Reset", func() {
 		mu.Unlock()
 
 		mockServers[0].SetUnavailable(false)
-		server := &metalv1alpha1.Server{ObjectMeta: metav1.ObjectMeta{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}}
+		server := &metalv1alpha1.Server{Name: bmcutils.GetServerNameFromBMCandIndex(0, bmc)}
 		Expect(k8sClient.Delete(ctx, bmc)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		_ = k8sClient.Delete(ctx, server)

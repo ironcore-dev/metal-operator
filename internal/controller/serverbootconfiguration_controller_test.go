@@ -8,7 +8,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -20,11 +19,9 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a Server object")
 		server = &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-severbootconfig-",
-				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
-				},
+			GenerateName: "test-severbootconfig-",
+			Annotations: map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 			},
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
@@ -41,10 +38,8 @@ var _ = Describe("ServerBootConfiguration Controller", func() {
 	It("should successfully add the boot configuration ref to server", func(ctx SpecContext) {
 		By("Creating a server boot configuration")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      server.Name,
-			},
+			Namespace: ns.Name,
+			Name:      server.Name,
 			Spec: metalv1alpha1.ServerBootConfigurationSpec{
 				ServerRef: v1.LocalObjectReference{Name: server.Name},
 				Image:     "foo:latest",

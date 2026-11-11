@@ -19,7 +19,7 @@ import (
 //
 // BMC is the Schema for the bmcs API
 type BMCApplyConfiguration struct {
-	v1.TypeMetaApplyConfiguration    `json:",inline"`
+	v1.TypeMetaApplyConfiguration    `json:""`
 	*v1.ObjectMetaApplyConfiguration `json:"metadata,omitempty"`
 	Spec                             *BMCSpecApplyConfiguration   `json:"spec,omitempty"`
 	Status                           *BMCStatusApplyConfiguration `json:"status,omitempty"`

@@ -23,7 +23,6 @@ const (
 // +kubebuilder:validation:XValidation:rule="has(self.access) != has(self.endpointRef)",message="exactly one of access or endpointRef needs to be set"
 type BMCSpec struct {
 	// BMCUUID is the unique identifier for the BMC as defined in Redfish API.
-	// +kubebuilder:validation:Optional
 	// +optional
 	BMCUUID string `json:"bmcUUID,omitempty"`
 
@@ -32,14 +31,14 @@ type BMCSpec struct {
 	// Deprecated: The Endpoint resource is deprecated. Specify the network access inline via
 	// access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an
 	// Endpoint object.
+	// Exactly one of endpointRef or access must be set.
 	// +optional
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="endpointRef is immutable"
 	EndpointRef *v1.LocalObjectReference `json:"endpointRef"`
 
 	// Endpoint specifies inline network access details for the BMC.
+	// Exactly one of endpointRef or access must be set.
 	// +optional
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="access is immutable"
 	Endpoint *InlineEndpoint `json:"access,omitempty"`
 

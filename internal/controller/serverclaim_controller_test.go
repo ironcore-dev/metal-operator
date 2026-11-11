@@ -26,9 +26,7 @@ var _ = Describe("ServerClaim Controller", func() {
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -38,9 +36,7 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-claim-",
-			},
+			GenerateName: "test-claim-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -71,10 +67,8 @@ var _ = Describe("ServerClaim Controller", func() {
 	It("should successfully claim a server in available state", func(ctx SpecContext) {
 		By("Creating an Ignition secret")
 		ignitionSecret := &v1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				"foo": []byte("bar"),
 			},
@@ -83,10 +77,8 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:             metalv1alpha1.PowerOn,
 				ServerRef:         &v1.LocalObjectReference{Name: server.Name},
@@ -98,10 +90,8 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Ensuring that the ServerBootConfiguration has been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      claim.Name,
-			},
+			Namespace: ns.Name,
+			Name:      claim.Name,
 		}
 		Eventually(Object(config)).Should(SatisfyAll(
 			HaveField("OwnerReferences", ContainElement(metav1.OwnerReference{
@@ -151,10 +141,8 @@ var _ = Describe("ServerClaim Controller", func() {
 	It("should allow deletion of ServerClaim without a Server", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: "non-existent-server"},
@@ -173,10 +161,8 @@ var _ = Describe("ServerClaim Controller", func() {
 	It("should stand down and not revert power while the bound server is parked", func(ctx SpecContext) {
 		By("Creating a ServerClaim with PowerOn")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      "parked-stand-down-claim",
-			},
+			Namespace: ns.Name,
+			Name:      "parked-stand-down-claim",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -190,10 +176,8 @@ var _ = Describe("ServerClaim Controller", func() {
 
 		By("Patching the boot configuration to a Ready state so the claim binds and powers on")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      claim.Name,
-			},
+			Namespace: ns.Name,
+			Name:      claim.Name,
 		}
 		Eventually(UpdateStatus(config, func() {
 			config.Status.State = metalv1alpha1.ServerBootConfigurationStateReady

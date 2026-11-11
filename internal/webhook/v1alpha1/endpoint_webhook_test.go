@@ -6,7 +6,6 @@ package v1alpha1
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -38,9 +37,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		It("should deny creation if an Endpoint has a duplicate MAC address", func(ctx SpecContext) {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("1.1.1.1"),
 					MACAddress: "foo",
@@ -50,9 +47,7 @@ var _ = Describe("Endpoint Webhook", func() {
 
 			By("Creating an Endpoint with existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("2.2.2.2"),
 					MACAddress: "foo",
@@ -64,9 +59,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		It("should allow creation if an Endpoint has a unique MAC address", func(ctx SpecContext) {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("1.1.1.1"),
 					MACAddress: "foo",
@@ -76,9 +69,7 @@ var _ = Describe("Endpoint Webhook", func() {
 
 			By("Creating an Endpoint with non-existing MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("2.2.2.2"),
 					MACAddress: "bar",
@@ -90,9 +81,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		It("should deny update of an Endpoint with existing MAC address", func() {
 			By("Creating an Endpoint")
 			endpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("1.1.1.1"),
 					MACAddress: "foo",
@@ -102,9 +91,7 @@ var _ = Describe("Endpoint Webhook", func() {
 
 			By("Creating an Endpoint with different MAC address")
 			existingEndpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("2.2.2.2"),
 					MACAddress: "bar",
@@ -121,9 +108,7 @@ var _ = Describe("Endpoint Webhook", func() {
 		It("should allow updating an IP address of the same Endpoint", func() {
 			By("Creating an Endpoint")
 			existingEndpoint := &metalv1alpha1.Endpoint{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "test-",
-				},
+				GenerateName: "test-",
 				Spec: metalv1alpha1.EndpointSpec{
 					IP:         metalv1alpha1.MustParseIP("1.1.1.1"),
 					MACAddress: "foo",

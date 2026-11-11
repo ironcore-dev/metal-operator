@@ -18,11 +18,9 @@ var _ = Describe("ServerReadinessRuleServer Controller", func() {
 		It("should add and remove the taint then the server matches", func(ctx SpecContext) {
 			By("creating a server")
 			server := &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "server-",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
+				GenerateName: "server-",
+				Labels: map[string]string{
+					"foo": "bar",
 				},
 			}
 			Expect(k8sClient.Create(ctx, server)).Should(Succeed())
@@ -30,9 +28,7 @@ var _ = Describe("ServerReadinessRuleServer Controller", func() {
 
 			By("creating a server readiness rule")
 			rule := &metalv1alpha1.ServerReadinessRule{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "rule-",
-				},
+				GenerateName: "rule-",
 				Spec: metalv1alpha1.ServerReadinessRuleSpec{
 					Conditions: []metalv1alpha1.ConditionRequirement{
 						{
@@ -97,11 +93,9 @@ var _ = Describe("ServerReadinessRuleServer Controller", func() {
 		It("should add and remove the taint then the server matches", func(ctx SpecContext) {
 			By("creating a server")
 			server := &metalv1alpha1.Server{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "server-",
-					Labels: map[string]string{
-						"foo": "bar",
-					},
+				GenerateName: "server-",
+				Labels: map[string]string{
+					"foo": "bar",
 				},
 			}
 			Expect(k8sClient.Create(ctx, server)).Should(Succeed())
@@ -109,9 +103,7 @@ var _ = Describe("ServerReadinessRuleServer Controller", func() {
 
 			By("creating a server readiness rule")
 			rule := &metalv1alpha1.ServerReadinessRule{
-				ObjectMeta: metav1.ObjectMeta{
-					GenerateName: "rule-",
-				},
+				GenerateName: "rule-",
 				Spec: metalv1alpha1.ServerReadinessRuleSpec{
 					Conditions: []metalv1alpha1.ConditionRequirement{
 						{

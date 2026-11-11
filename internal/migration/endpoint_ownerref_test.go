@@ -29,13 +29,13 @@ func TestEndpointOwnerReferenceMigration(t *testing.T) {
 		BlockOwnerDeletion: new(true),
 	}
 	legacyBMC := &metalv1alpha1.BMC{
-		ObjectMeta: metav1.ObjectMeta{Name: "legacy-bmc", OwnerReferences: []metav1.OwnerReference{ownerRef}},
+		Name: "legacy-bmc", OwnerReferences: []metav1.OwnerReference{ownerRef},
 	}
 	legacySecret := &metalv1alpha1.BMCSecret{
-		ObjectMeta: metav1.ObjectMeta{Name: "legacy-secret", OwnerReferences: []metav1.OwnerReference{ownerRef}},
+		Name: "legacy-secret", OwnerReferences: []metav1.OwnerReference{ownerRef},
 	}
 	cleanBMC := &metalv1alpha1.BMC{
-		ObjectMeta: metav1.ObjectMeta{Name: "clean-bmc"},
+		Name: "clean-bmc",
 	}
 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacyBMC, legacySecret, cleanBMC).Build()
@@ -46,9 +46,9 @@ func TestEndpointOwnerReferenceMigration(t *testing.T) {
 	}
 
 	for _, obj := range []client.Object{
-		&metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{Name: "legacy-bmc"}},
-		&metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{Name: "legacy-secret"}},
-		&metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{Name: "clean-bmc"}},
+		&metalv1alpha1.BMC{Name: "legacy-bmc"},
+		&metalv1alpha1.BMCSecret{Name: "legacy-secret"},
+		&metalv1alpha1.BMC{Name: "clean-bmc"},
 	} {
 		if err := c.Get(context.Background(), client.ObjectKeyFromObject(obj), obj); err != nil {
 			t.Fatal(err)

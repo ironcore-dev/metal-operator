@@ -12,7 +12,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -310,7 +309,7 @@ func (r *ServerClaimSchedulerReconciler) enqueueUnboundServerClaims() handler.Ev
 		for _, claim := range claimList.Items {
 			if claim.Spec.ServerRef == nil || claim.Spec.ServerRef.Name == server.Name {
 				req = append(req, reconcile.Request{
-					NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+					Namespace: claim.Namespace, Name: claim.Name,
 				})
 			}
 		}

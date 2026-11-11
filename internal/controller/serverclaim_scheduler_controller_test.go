@@ -28,9 +28,7 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 	BeforeEach(func(ctx SpecContext) {
 		By("Creating a BMCSecret")
 		bmcSecret = &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-",
-			},
+			GenerateName: "test-",
 			Data: map[string][]byte{
 				metalv1alpha1.BMCSecretUsernameKeyName: []byte("foo"),
 				metalv1alpha1.BMCSecretPasswordKeyName: []byte("bar"),
@@ -40,9 +38,7 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a Server")
 		server = &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-claim-",
-			},
+			GenerateName: "test-claim-",
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 				BMC: &metalv1alpha1.BMCAccess{
@@ -81,10 +77,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOff,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -140,10 +134,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power: metalv1alpha1.PowerOff,
 				ServerSelector: &metav1.LabelSelector{
@@ -199,10 +191,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -225,10 +215,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Ensuring that the ServerBootConfiguration has not been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      claim.Name,
-			},
+			Namespace: ns.Name,
+			Name:      claim.Name,
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 
@@ -247,10 +235,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -276,10 +262,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating another ServerClaim")
 		claim2 := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-duplicate-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-duplicate-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -305,10 +289,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Ensuring that the ServerBootConfiguration has not been created")
 		config := &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: ns.Name,
-				Name:      claim2.Name,
-			},
+			Namespace: ns.Name,
+			Name:      claim2.Name,
 		}
 		Eventually(Get(config)).Should(Satisfy(apierrors.IsNotFound))
 
@@ -326,10 +308,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 	It("should not claim a server when labels do not match selector", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -379,10 +359,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim without tolerations")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-taint-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-taint-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -414,10 +392,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim with a matching Exists toleration")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-toleration-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-toleration-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -458,10 +434,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 	It("should not unbind an already-bound claim when the server is cordoned", func(ctx SpecContext) {
 		By("Creating a ServerClaim")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-cordon-bound-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-cordon-bound-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -502,10 +476,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim referencing the cordoned server")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-cordon-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-cordon-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power:     metalv1alpha1.PowerOn,
 				ServerRef: &v1.LocalObjectReference{Name: server.Name},
@@ -556,10 +528,8 @@ var _ = Describe("ServerClaim Scheduler Controller", func() {
 
 		By("Creating a ServerClaim with a matching selector")
 		claim := &metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    ns.Name,
-				GenerateName: "test-cordon-selector-",
-			},
+			Namespace:    ns.Name,
+			GenerateName: "test-cordon-selector-",
 			Spec: metalv1alpha1.ServerClaimSpec{
 				Power: metalv1alpha1.PowerOff,
 				ServerSelector: &metav1.LabelSelector{
@@ -595,13 +565,11 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 
 	makeServer := func(ctx context.Context) {
 		server := metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "server-",
-				Annotations: map[string]string{
-					metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
-				},
-				Labels: map[string]string{"foo": "bar"},
+			GenerateName: "server-",
+			Annotations: map[string]string{
+				metalv1alpha1.OperationAnnotation: metalv1alpha1.OperationAnnotationIgnore,
 			},
+			Labels: map[string]string{"foo": "bar"},
 			Spec: metalv1alpha1.ServerSpec{
 				SystemUUID: "38947555-7742-3448-3784-823347823834",
 			},
@@ -614,10 +582,8 @@ var _ = Describe("Server Claiming", MustPassRepeatedly(5), func() {
 
 	makeClaim := func(ctx context.Context, labelSelector *metav1.LabelSelector) {
 		claim := metalv1alpha1.ServerClaim{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "claim-",
-				Namespace:    ns.Name,
-			},
+			GenerateName: "claim-",
+			Namespace:    ns.Name,
 			Spec: metalv1alpha1.ServerClaimSpec{
 				ServerSelector: labelSelector,
 			},

@@ -98,19 +98,19 @@ var _ = Describe("ServerStateCollector", func() {
 		// Create servers in different states
 		servers := []metalv1alpha1.Server{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server1"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
-				Status:     metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateAvailable},
+				Name:   "server1",
+				Spec:   metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
+				Status: metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateAvailable},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server2"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid2"},
-				Status:     metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateAvailable},
+				Name:   "server2",
+				Spec:   metalv1alpha1.ServerSpec{SystemUUID: "uuid2"},
+				Status: metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateAvailable},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server3"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid3"},
-				Status:     metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateReserved},
+				Name:   "server3",
+				Spec:   metalv1alpha1.ServerSpec{SystemUUID: "uuid3"},
+				Status: metalv1alpha1.ServerStatus{State: metalv1alpha1.ServerStateReserved},
 			},
 		}
 
@@ -171,24 +171,24 @@ var _ = Describe("ServerStateCollector", func() {
 		// Create servers with different power states
 		servers := []metalv1alpha1.Server{
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server1"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
+				Name: "server1",
+				Spec: metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
 				Status: metalv1alpha1.ServerStatus{
 					State:      metalv1alpha1.ServerStateAvailable,
 					PowerState: metalv1alpha1.ServerOnPowerState,
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server2"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid2"},
+				Name: "server2",
+				Spec: metalv1alpha1.ServerSpec{SystemUUID: "uuid2"},
 				Status: metalv1alpha1.ServerStatus{
 					State:      metalv1alpha1.ServerStateAvailable,
 					PowerState: metalv1alpha1.ServerOnPowerState,
 				},
 			},
 			{
-				ObjectMeta: metav1.ObjectMeta{Name: "server3"},
-				Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid3"},
+				Name: "server3",
+				Spec: metalv1alpha1.ServerSpec{SystemUUID: "uuid3"},
 				Status: metalv1alpha1.ServerStatus{
 					State:      metalv1alpha1.ServerStateReserved,
 					PowerState: metalv1alpha1.ServerOffPowerState,
@@ -254,8 +254,8 @@ var _ = Describe("ServerStateCollector", func() {
 	It("should emit condition metrics", func(ctx SpecContext) {
 		// Create server with conditions
 		server := metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{Name: "server1"},
-			Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
+			Name: "server1",
+			Spec: metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
 			Status: metalv1alpha1.ServerStatus{
 				State:      metalv1alpha1.ServerStateAvailable,
 				PowerState: metalv1alpha1.ServerOnPowerState,
@@ -319,9 +319,9 @@ var _ = Describe("ServerStateCollector", func() {
 	It("should emit all enum states with value 0 when server has no state set", func(ctx SpecContext) {
 		// Create server without state set
 		server := metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{Name: "server1"},
-			Spec:       metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
-			Status:     metalv1alpha1.ServerStatus{},
+			Name:   "server1",
+			Spec:   metalv1alpha1.ServerSpec{SystemUUID: "uuid1"},
+			Status: metalv1alpha1.ServerStatus{},
 		}
 
 		Expect(fakeClient.Create(ctx, &server)).To(Succeed())

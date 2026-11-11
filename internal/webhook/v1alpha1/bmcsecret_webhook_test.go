@@ -7,7 +7,6 @@ import (
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
 
@@ -22,10 +21,8 @@ var _ = Describe("BMCSecret Webhook", func() {
 			Client: k8sClient,
 		}
 		BMCSecret = &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace:    "test-namespace",
-				GenerateName: "test-bmc-secret",
-			},
+			Namespace:    "test-namespace",
+			GenerateName: "test-bmc-secret",
 			Data: map[string][]byte{
 				"username": []byte("admin"),
 				"password": []byte("adminpass"),

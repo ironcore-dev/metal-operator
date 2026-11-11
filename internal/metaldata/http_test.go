@@ -11,7 +11,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 )
@@ -269,10 +268,8 @@ func readBody(resp *http.Response) string {
 
 func claim(userDataRef *corev1.LocalObjectReference) *metalv1alpha1.ServerClaim {
 	return &metalv1alpha1.ServerClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: testNamespace,
-			Name:      testClaimName,
-		},
+		Namespace: testNamespace,
+		Name:      testClaimName,
 		Spec: metalv1alpha1.ServerClaimSpec{
 			Power:       metalv1alpha1.PowerOn,
 			Image:       "image",
@@ -283,11 +280,9 @@ func claim(userDataRef *corev1.LocalObjectReference) *metalv1alpha1.ServerClaim 
 
 func userDataSecret(secretType corev1.SecretType, data map[string][]byte) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: testNamespace,
-			Name:      testSecretRef,
-		},
-		Type: secretType,
-		Data: data,
+		Namespace: testNamespace,
+		Name:      testSecretRef,
+		Type:      secretType,
+		Data:      data,
 	}
 }

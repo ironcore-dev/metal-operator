@@ -1,4 +1,7 @@
-{{- if .Values.crd.enable }}
+{{- if and .Values.crd.enabled (not .Values.webhook.enabled) }}
+{{- fail "webhook.enabled must be true for CRD conversion" }}
+{{- end }}
+{{- if .Values.crd.enabled }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -7,7 +10,7 @@ metadata:
     "helm.sh/resource-policy": keep
     {{- end }}
     cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ include "metal-operator.resourceName" (dict "suffix" "serving-cert" "context" $) }}
-    controller-gen.kubebuilder.io/version: v0.21.0
+    controller-gen.kubebuilder.io/version: v0.23.0
   name: bmcs.metal.ironcore.dev
 spec:
   conversion:
@@ -88,8 +91,9 @@ spec:
             description: BMCSpec defines the desired state of BMC
             properties:
               access:
-                description: Endpoint specifies inline network access details for
-                  the BMC.
+                description: |-
+                  Endpoint specifies inline network access details for the BMC.
+                  Exactly one of endpointRef or access must be set.
                 properties:
                   ip:
                     description: IP is the IP address of the BMC.
@@ -147,6 +151,7 @@ spec:
                   Deprecated: The Endpoint resource is deprecated. Specify the network access inline via
                   access (an InlineEndpoint carrying the MAC address and IP) instead of referencing an
                   Endpoint object.
+                  Exactly one of endpointRef or access must be set.
                 properties:
                   name:
                     default: ""

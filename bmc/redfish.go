@@ -824,7 +824,7 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 	result := make([]Storage, 0, len(systemStorage))
 	for _, s := range systemStorage {
 		storage := Storage{
-			Entity: Entity{ID: s.ID, Name: s.Name},
+			ID: s.ID, Name: s.Name,
 		}
 		volumes, err := s.Volumes()
 		if err != nil {
@@ -833,7 +833,7 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 		storage.Volumes = make([]Volume, 0, len(volumes))
 		for _, v := range volumes {
 			storage.Volumes = append(storage.Volumes, Volume{
-				Entity:    Entity{ID: v.ID, Name: v.Name},
+				ID: v.ID, Name: v.Name,
 				SizeBytes: int64(gofish.Deref(v.CapacityBytes)),
 				RAIDType:  v.RAIDType,
 				State:     v.Status.State,
@@ -846,7 +846,7 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 		storage.Drives = make([]Drive, 0, len(drives))
 		for _, d := range drives {
 			storage.Drives = append(storage.Drives, Drive{
-				Entity:    Entity{ID: d.ID, Name: d.Name},
+				ID: d.ID, Name: d.Name,
 				MediaType: string(d.MediaType),
 				Type:      d.DriveFormFactor,
 				SizeBytes: int64(gofish.Deref(d.CapacityBytes)),
@@ -866,13 +866,13 @@ func (r *RedfishBaseBMC) GetStorages(ctx context.Context, systemURI string) ([]S
 		}
 		for _, s := range simpleStorages {
 			storage := Storage{
-				Entity: Entity{ID: s.ID, Name: s.Name},
+				ID: s.ID, Name: s.Name,
 			}
 
 			storage.Drives = make([]Drive, 0, len(s.Devices))
 			for _, d := range s.Devices {
 				storage.Drives = append(storage.Drives, Drive{
-					Entity:    Entity{Name: d.Name},
+					Name:      d.Name,
 					SizeBytes: int64(gofish.Deref(d.CapacityBytes)),
 					Vendor:    d.Manufacturer,
 					Model:     d.Model,
@@ -1343,8 +1343,7 @@ func (r *RedfishBaseBMC) findExistingSubscription(destination string) (*schemas.
 		// (the collection URI is added as a failure entry), so we cannot distinguish between
 		// "collection endpoint unreachable" and "some members failed". Proceed with whatever
 		// was returned; only bail on other error types.
-		var collErr *schemas.CollectionError
-		if !errors.As(err, &collErr) {
+		if _, ok := errors.AsType[*schemas.CollectionError](err); !ok {
 			return nil, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 	}

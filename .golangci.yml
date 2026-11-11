@@ -61,7 +61,7 @@ linters:
       # legacy consumers reference the type until the resource is fully removed.
       - linters:
           - staticcheck
-        text: "SA1019.*metalv1alpha1\\.Endpoint"
+        text: "SA1019.*v1alpha1\\.Endpoint"
       # BMC.spec.endpointRef references the deprecated Endpoint resource. The operator
       # still serves existing BMCs that use it, so legacy consumers reference the field
       # until the Endpoint resource is fully removed.

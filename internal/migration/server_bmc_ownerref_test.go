@@ -23,23 +23,21 @@ func TestServerBMCOwnerReferenceMigration(t *testing.T) {
 	}
 
 	legacy := &metalv1alpha1.Server{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "legacy",
-			Namespace: "default",
-			OwnerReferences: []metav1.OwnerReference{{
-				APIVersion:         metalv1alpha1.GroupVersion.String(),
-				Kind:               "BMC",
-				Name:               "some-bmc",
-				Controller:         new(true),
-				BlockOwnerDeletion: new(true),
-			}},
-		},
+		Name:      "legacy",
+		Namespace: "default",
+		OwnerReferences: []metav1.OwnerReference{{
+			APIVersion:         metalv1alpha1.GroupVersion.String(),
+			Kind:               "BMC",
+			Name:               "some-bmc",
+			Controller:         new(true),
+			BlockOwnerDeletion: new(true),
+		}},
 		Spec: metalv1alpha1.ServerSpec{
 			BMCRef: &corev1.LocalObjectReference{Name: "some-bmc"},
 		},
 	}
 	clean := &metalv1alpha1.Server{
-		ObjectMeta: metav1.ObjectMeta{Name: "clean", Namespace: "default"},
+		Name: "clean", Namespace: "default",
 	}
 
 	c := fake.NewClientBuilder().WithScheme(scheme).WithObjects(legacy, clean).Build()

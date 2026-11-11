@@ -26,7 +26,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/events"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -117,10 +116,8 @@ func (r *ServerReconciler) delete(ctx context.Context, server *metalv1alpha1.Ser
 
 	if server.Spec.BootConfigurationRef != nil {
 		if err := r.Delete(ctx, &metalv1alpha1.ServerBootConfiguration{
-			ObjectMeta: metav1.ObjectMeta{
-				Namespace: server.Spec.BootConfigurationRef.Namespace,
-				Name:      server.Spec.BootConfigurationRef.Name,
-			}}); err != nil && !apierrors.IsNotFound(err) {
+			Namespace: server.Spec.BootConfigurationRef.Namespace,
+			Name:      server.Spec.BootConfigurationRef.Name}); err != nil && !apierrors.IsNotFound(err) {
 			return ctrl.Result{}, fmt.Errorf("failed to delete server bootconfiguration: %w", err)
 		}
 		log.V(1).Info("Deleted server boot configuration")
@@ -967,7 +964,7 @@ func (r *ServerReconciler) enqueueServerByServerBootConfiguration() handler.Even
 		config := obj.(*metalv1alpha1.ServerBootConfiguration)
 		return []ctrl.Request{
 			{
-				NamespacedName: types.NamespacedName{Name: config.Spec.ServerRef.Name},
+				Name: config.Spec.ServerRef.Name,
 			},
 		}
 	})
@@ -981,7 +978,7 @@ func (r *ServerReconciler) enqueueServerByClaim() handler.EventHandler {
 		}
 		return []ctrl.Request{
 			{
-				NamespacedName: types.NamespacedName{Name: claim.Spec.ServerRef.Name},
+				Name: claim.Spec.ServerRef.Name,
 			},
 		}
 	})

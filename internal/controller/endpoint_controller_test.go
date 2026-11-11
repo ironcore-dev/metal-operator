@@ -9,7 +9,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
@@ -24,9 +23,7 @@ var _ = Describe("Endpoints Controller", func() {
 	It("should successfully create a BMC secret and BMC object from endpoint", func(ctx SpecContext) {
 		By("Creating an Endpoints object")
 		endpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{
-				GenerateName: "test-endpoint-",
-			},
+			GenerateName: "test-endpoint-",
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EA",
 				IP:         metalv1alpha1.MustParseIP(MockServerIP),
@@ -41,9 +38,7 @@ var _ = Describe("Endpoints Controller", func() {
 
 		By("Ensuring that the BMC secret has been created")
 		bmcSecret := &metalv1alpha1.BMCSecret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
+			Name: endpoint.Name,
 		}
 		Eventually(Object(bmcSecret)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -54,9 +49,7 @@ var _ = Describe("Endpoints Controller", func() {
 
 		By("Ensuring that the BMC object has been created with BMCUUID set")
 		bmcObj := &metalv1alpha1.BMC{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: endpoint.Name,
-			},
+			Name: endpoint.Name,
 		}
 		Eventually(Object(bmcObj)).Should(SatisfyAll(
 			HaveField("OwnerReferences", BeEmpty()),
@@ -75,9 +68,7 @@ var _ = Describe("Endpoints Controller", func() {
 
 		By("Ensuring that the server object has been created")
 		server := &metalv1alpha1.Server{
-			ObjectMeta: metav1.ObjectMeta{
-				Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
-			},
+			Name: bmcutils.GetServerNameFromBMCandIndex(0, bmcObj),
 		}
 		Eventually(Get(server)).Should(Succeed())
 

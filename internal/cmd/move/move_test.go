@@ -13,7 +13,6 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8sSchema "k8s.io/client-go/kubernetes/scheme"
 )
@@ -24,13 +23,13 @@ var _ = Describe("metalctl move", func() {
 	It("should successfully move metal CRs from a source cluster on a target cluster", func(ctx SpecContext) {
 		// source cluster setup
 		sourceCommonEndpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-common-"},
+			GenerateName: "test-common-",
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EA",
 				IP:         metalv1alpha1.MustParseIP(MockServerIP),
 			}}
 		sourceEndpoint := &metalv1alpha1.Endpoint{
-			ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+			GenerateName: "test-",
 			Spec: metalv1alpha1.EndpointSpec{
 				MACAddress: "23:11:8A:33:CF:EB",
 				IP:         metalv1alpha1.MustParseIP(MockServerIP2),
@@ -44,7 +43,7 @@ var _ = Describe("metalctl move", func() {
 			return clients.Source.Get(ctx, client.ObjectKeyFromObject(sourceEndpoint), sourceEndpoint)
 		}).Should(Succeed())
 
-		sourceBmc := &metalv1alpha1.BMC{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"},
+		sourceBmc := &metalv1alpha1.BMC{GenerateName: "test-",
 			Spec: metalv1alpha1.BMCSpec{EndpointRef: &v1.LocalObjectReference{}}}
 		Expect(controllerutil.SetOwnerReference(sourceEndpoint, sourceBmc, k8sSchema.Scheme)).To(Succeed())
 		Expect(clients.Source.Create(ctx, sourceBmc)).To(Succeed())
@@ -62,7 +61,7 @@ var _ = Describe("metalctl move", func() {
 			return errors.New("waiting for status update")
 		}).Should(Succeed())
 
-		sourceBmcSecret := &metalv1alpha1.BMCSecret{ObjectMeta: metav1.ObjectMeta{GenerateName: "test-"}}
+		sourceBmcSecret := &metalv1alpha1.BMCSecret{GenerateName: "test-"}
 		Expect(controllerutil.SetOwnerReference(sourceBmc, sourceBmcSecret, k8sSchema.Scheme)).To(Succeed())
 		Expect(clients.Source.Create(ctx, sourceBmcSecret)).To(Succeed())
 

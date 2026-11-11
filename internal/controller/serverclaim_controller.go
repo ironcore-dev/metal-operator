@@ -15,9 +15,7 @@ import (
 	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -94,10 +92,8 @@ func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, cl
 	}
 
 	config := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      claim.Name,
-			Namespace: claim.Namespace,
-		},
+		Name:      claim.Name,
+		Namespace: claim.Namespace,
 	}
 	if err := r.Delete(ctx, config); err != nil {
 		if !apierrors.IsNotFound(err) {
@@ -229,7 +225,7 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 		req := make([]reconcile.Request, 0, len(claimList.Items))
 		for _, claim := range claimList.Items {
 			req = append(req, reconcile.Request{
-				NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+				Namespace: claim.Namespace, Name: claim.Name,
 			})
 		}
 		return req

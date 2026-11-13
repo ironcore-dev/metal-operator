@@ -402,7 +402,22 @@ func (r *ServerReconciler) ensureServerPoweredOff(ctx context.Context, bmcClient
 
 	// Don't block here: updateServerStatus refreshes the power state on every
 	// reconcile, so we'll pick up the transition on the next resync.
-	if err := bmcClient.PowerOff(ctx, server.Spec.SystemURI); err != nil {
+	// When EnforcePowerOff is enabled and a previous graceful attempt has been
+	// pending longer than PowerPollingTimeout, escalate to a forced power-off.
+	powerOff := bmcClient.PowerOff
+	if r.EnforcePowerOff {
+		gracefulTimeout := r.BMCOptions.PowerPollingTimeout
+		if gracefulTimeout == 0 {
+			gracefulTimeout = bmc.DefaultPowerPollingTimeout
+		}
+		if cond := meta.FindStatusCondition(server.Status.Conditions, ConditionWaitingForPowerOff); cond != nil &&
+			cond.Status == metav1.ConditionTrue &&
+			time.Since(cond.LastTransitionTime.Time) > gracefulTimeout {
+			log.V(1).Info("Graceful power-off timed out, forcing power off")
+			powerOff = bmcClient.ForcePowerOff
+		}
+	}
+	if err := powerOff(ctx, server.Spec.SystemURI); err != nil {
 		return false, fmt.Errorf("failed to power off server: %w", err)
 	}
 

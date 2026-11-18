@@ -11,6 +11,32 @@ import (
 	"k8s.io/apimachinery/pkg/util/runtime"
 )
 
+type LocalObjectReference struct {
+	Name string `json:"name"`
+}
+
+type TypedLocalObjectReference struct {
+	// APIGroup is the group for the resource being referenced.
+	APIGroup *string
+	// Kind is the type of resource being referenced
+	Kind string
+	// Name is the name of resource being referenced
+	Name string
+}
+
+// LocalObjectKeyReference is a reference to a specific 'key' within a resource, typically
+// either a secret or config map.
+type LocalObjectKeyReference struct {
+	// Name of the referent.
+	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+	Name string `json:"name,omitempty"`
+	// The key of the entry in the resource field to be used.
+	// Some instances of this field may be defaulted, in others it may be
+	// required.
+	// +optional
+	Key string `json:"key,omitempty"`
+}
+
 // ObjectReference is the namespaced name reference to an object.
 type ObjectReference struct {
 	// Namespace is the namespace of the referenced object.

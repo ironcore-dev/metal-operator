@@ -80,4 +80,46 @@ resources:
   kind: ServerReadinessRule
   path: github.com/ironcore-dev/metal-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ironcore.dev
+  group: metal
+  kind: Records
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: Artifact
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ironcore.dev
+  group: metal
+  kind: Bundle
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: ironcore.dev
+  group: metal
+  kind: Exposure
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: ironcore.dev
+  group: metal
+  kind: GlobalExposure
+  path: github.com/ironcore-dev/metal-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"

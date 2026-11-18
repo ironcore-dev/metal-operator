@@ -28,9 +28,15 @@ type ServerClaimSpecApplyConfiguration struct {
 	// UserDataRef references a Secret in the same namespace as this ServerClaim
 	// containing user-data exposed to the claimed server via the metaldata
 	// service. The referenced Secret must be of type metal.ironcore.dev/user-data.
-	UserDataRef *v1.LocalObjectReference `json:"userDataRef,omitempty"`
+	UserDataRef *LocalObjectKeyReferenceApplyConfiguration `json:"userDataRef,omitempty"`
 	// Image specifies the boot image to be used for the server.
 	Image *string `json:"image,omitempty"`
+	// Cmdline overrides the kernel command line of the image.
+	// Only applicable for direct images.
+	Cmdline *string `json:"cmdline,omitempty"`
+	// Args overrides the args of the image.
+	// Only applicable for direct images.
+	Args *string `json:"args,omitempty"`
 	// Tolerations allow a ServerClaim to bind to a Server with matching taints.
 	Tolerations []TolerationApplyConfiguration `json:"tolerations,omitempty"`
 }
@@ -76,8 +82,8 @@ func (b *ServerClaimSpecApplyConfiguration) WithIgnitionSecretRef(value v1.Local
 // WithUserDataRef sets the UserDataRef field in the declarative configuration to the given value
 // and returns the receiver, so that objects can be built by chaining "With" function invocations.
 // If called multiple times, the UserDataRef field is set to the value of the last call.
-func (b *ServerClaimSpecApplyConfiguration) WithUserDataRef(value v1.LocalObjectReference) *ServerClaimSpecApplyConfiguration {
-	b.UserDataRef = &value
+func (b *ServerClaimSpecApplyConfiguration) WithUserDataRef(value *LocalObjectKeyReferenceApplyConfiguration) *ServerClaimSpecApplyConfiguration {
+	b.UserDataRef = value
 	return b
 }
 
@@ -86,6 +92,22 @@ func (b *ServerClaimSpecApplyConfiguration) WithUserDataRef(value v1.LocalObject
 // If called multiple times, the Image field is set to the value of the last call.
 func (b *ServerClaimSpecApplyConfiguration) WithImage(value string) *ServerClaimSpecApplyConfiguration {
 	b.Image = &value
+	return b
+}
+
+// WithCmdline sets the Cmdline field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Cmdline field is set to the value of the last call.
+func (b *ServerClaimSpecApplyConfiguration) WithCmdline(value string) *ServerClaimSpecApplyConfiguration {
+	b.Cmdline = &value
+	return b
+}
+
+// WithArgs sets the Args field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Args field is set to the value of the last call.
+func (b *ServerClaimSpecApplyConfiguration) WithArgs(value string) *ServerClaimSpecApplyConfiguration {
+	b.Args = &value
 	return b
 }
 

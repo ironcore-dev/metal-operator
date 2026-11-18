@@ -79,6 +79,9 @@ spec:
           spec:
             description: ServerSpec defines the desired state of a Server.
             properties:
+              architecture:
+                description: Architecture is the architecture of the server.
+                type: string
               bmc:
                 description: BMC contains the access details for the BMC.
                 properties:
@@ -154,6 +157,9 @@ spec:
                 - name
                 - namespace
                 type: object
+              bootMode:
+                description: BootMode is a specific boot mode to use for the server.
+                type: string
               bootOrder:
                 description: BootOrder specifies the boot order of the server.
                 items:
@@ -210,6 +216,12 @@ spec:
                 - name
                 - namespace
                 type: object
+              supportedBootModes:
+                description: SupportedBootModes specifies the boot modes supported
+                  by the server.
+                items:
+                  type: string
+                type: array
               systemURI:
                 description: SystemURI is the unique URI for the server resource in
                   REDFISH API.
@@ -253,6 +265,8 @@ spec:
                   this Server. Already-bound claims are unaffected.
                 type: boolean
             required:
+            - architecture
+            - supportedBootModes
             - systemUUID
             type: object
           status:

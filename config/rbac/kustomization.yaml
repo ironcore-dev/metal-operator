@@ -44,3 +44,22 @@ resources:
   - serverreadinessrule_editor_role.yaml
   - serverreadinessrule_viewer_role.yaml
 
+# For each CRD, "Admin", "Editor" and "Viewer" roles are scaffolded by
+# default, aiding admins in cluster management. Those roles are
+# not used by the metal-operator itself. You can comment the following lines
+# if you do not want those helpers be installed with your Project.
+- globalexposure_admin_role.yaml
+- globalexposure_editor_role.yaml
+- globalexposure_viewer_role.yaml
+- exposure_admin_role.yaml
+- exposure_editor_role.yaml
+- exposure_viewer_role.yaml
+- bundle_admin_role.yaml
+- bundle_editor_role.yaml
+- bundle_viewer_role.yaml
+- artifact_admin_role.yaml
+- artifact_editor_role.yaml
+- artifact_viewer_role.yaml
+- records_admin_role.yaml
+- records_editor_role.yaml
+- records_viewer_role.yaml

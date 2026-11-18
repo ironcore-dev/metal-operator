@@ -89,11 +89,28 @@ const (
 	ServerReclaimPolicyRetain  ServerReclaimPolicy = "Retain"
 )
 
+type BootMode string
+
+const (
+	BootModeEFI  BootMode = "EFI"
+	BootModeISO  BootMode = "ISO"
+	BootModeIPXE BootMode = "IPXE"
+)
+
 // ServerSpec defines the desired state of a Server.
 type ServerSpec struct {
 	// SystemUUID is the unique identifier for the server.
 	// +required
 	SystemUUID string `json:"systemUUID"`
+
+	// Architecture is the architecture of the server.
+	Architecture string `json:"architecture"`
+
+	// BootMode is a specific boot mode to use for the server.
+	BootMode *BootMode `json:"bootMode,omitempty"`
+
+	// SupportedBootModes specifies the boot modes supported by the server.
+	SupportedBootModes []BootMode `json:"supportedBootModes"`
 
 	// SystemURI is the unique URI for the server resource in REDFISH API.
 	SystemURI string `json:"systemURI,omitempty"`

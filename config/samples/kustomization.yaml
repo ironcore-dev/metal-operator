@@ -7,4 +7,9 @@ resources:
 - metal_v1alpha1_serverbootconfiguration.yaml
 - metal_v1alpha1_serverclaim.yaml
 - metal_v1alpha1_serverreadinessrule.yaml
+- metal_v1alpha1_records.yaml
+- metal_v1alpha1_artifact.yaml
+- metal_v1alpha1_bundle.yaml
+- metal_v1alpha1_exposure.yaml
+- metal_v1alpha1_globalexposure.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

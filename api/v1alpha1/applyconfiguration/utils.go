@@ -31,6 +31,14 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.BMCStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("BootOrder"):
 		return &apiv1alpha1.BootOrderApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Bundle"):
+		return &apiv1alpha1.BundleApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BundleFile"):
+		return &apiv1alpha1.BundleFileApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BundleSpec"):
+		return &apiv1alpha1.BundleSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("BundleStatus"):
+		return &apiv1alpha1.BundleStatusApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConditionRequirement"):
 		return &apiv1alpha1.ConditionRequirementApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ConsoleProtocol"):
@@ -39,16 +47,26 @@ func ForKind(kind schema.GroupVersionKind) interface{} {
 		return &apiv1alpha1.EndpointApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("EndpointSpec"):
 		return &apiv1alpha1.EndpointSpecApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Image"):
+		return &apiv1alpha1.ImageApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ImmutableObjectReference"):
 		return &apiv1alpha1.ImmutableObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("InlineEndpoint"):
 		return &apiv1alpha1.InlineEndpointApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LocalObjectKeyReference"):
+		return &apiv1alpha1.LocalObjectKeyReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("LocalObjectReference"):
+		return &apiv1alpha1.LocalObjectReferenceApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Marker"):
+		return &apiv1alpha1.MarkerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ObjectReference"):
 		return &apiv1alpha1.ObjectReferenceApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Processor"):
 		return &apiv1alpha1.ProcessorApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Protocol"):
 		return &apiv1alpha1.ProtocolApplyConfiguration{}
+	case v1alpha1.SchemeGroupVersion.WithKind("Records"):
+		return &apiv1alpha1.RecordsApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("Server"):
 		return &apiv1alpha1.ServerApplyConfiguration{}
 	case v1alpha1.SchemeGroupVersion.WithKind("ServerBootConfiguration"):

@@ -472,6 +472,20 @@ func main() { // nolint: gocyclo
 		setupLog.Error(err, "Failed to create controller", "controller", "serverreadinessruleserver")
 		os.Exit(1)
 	}
+	if err := (&controller.ArtifactReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "artifact")
+		os.Exit(1)
+	}
+	if err := (&controller.GlobalExposureReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "Failed to create controller", "controller", "globalexposure")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	// nolint:goconst

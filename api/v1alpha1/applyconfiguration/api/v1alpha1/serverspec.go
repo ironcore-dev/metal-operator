@@ -17,6 +17,12 @@ import (
 type ServerSpecApplyConfiguration struct {
 	// SystemUUID is the unique identifier for the server.
 	SystemUUID *string `json:"systemUUID,omitempty"`
+	// Architecture is the architecture of the server.
+	Architecture *string `json:"architecture,omitempty"`
+	// BootMode is a specific boot mode to use for the server.
+	BootMode *apiv1alpha1.BootMode `json:"bootMode,omitempty"`
+	// SupportedBootModes specifies the boot modes supported by the server.
+	SupportedBootModes []apiv1alpha1.BootMode `json:"supportedBootModes,omitempty"`
 	// SystemURI is the unique URI for the server resource in REDFISH API.
 	SystemURI *string `json:"systemURI,omitempty"`
 	// IndicatorLED specifies the desired state of the server's indicator LED.
@@ -56,6 +62,32 @@ func ServerSpec() *ServerSpecApplyConfiguration {
 // If called multiple times, the SystemUUID field is set to the value of the last call.
 func (b *ServerSpecApplyConfiguration) WithSystemUUID(value string) *ServerSpecApplyConfiguration {
 	b.SystemUUID = &value
+	return b
+}
+
+// WithArchitecture sets the Architecture field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the Architecture field is set to the value of the last call.
+func (b *ServerSpecApplyConfiguration) WithArchitecture(value string) *ServerSpecApplyConfiguration {
+	b.Architecture = &value
+	return b
+}
+
+// WithBootMode sets the BootMode field in the declarative configuration to the given value
+// and returns the receiver, so that objects can be built by chaining "With" function invocations.
+// If called multiple times, the BootMode field is set to the value of the last call.
+func (b *ServerSpecApplyConfiguration) WithBootMode(value apiv1alpha1.BootMode) *ServerSpecApplyConfiguration {
+	b.BootMode = &value
+	return b
+}
+
+// WithSupportedBootModes adds the given value to the SupportedBootModes field in the declarative configuration
+// and returns the receiver, so that objects can be build by chaining "With" function invocations.
+// If called multiple times, values provided by each call will be appended to the SupportedBootModes field.
+func (b *ServerSpecApplyConfiguration) WithSupportedBootModes(values ...apiv1alpha1.BootMode) *ServerSpecApplyConfiguration {
+	for i := range values {
+		b.SupportedBootModes = append(b.SupportedBootModes, values[i])
+	}
 	return b
 }
 

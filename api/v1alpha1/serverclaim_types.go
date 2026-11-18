@@ -9,6 +9,12 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 )
 
+const (
+	// DefaultUserDataKey is the default user data key
+	DefaultUserDataKey    = "userdata"
+	DefaultNetworkDataKey = "networkdata"
+)
+
 // ServerClaimSpec defines the desired state of ServerClaim.
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverRef) || has(self.serverRef)", message="serverRef is required once set"
 // +kubebuilder:validation:XValidation:rule="!has(oldSelf.serverSelector) || has(self.serverSelector)", message="serverSelector is required once set"
@@ -38,11 +44,19 @@ type ServerClaimSpec struct {
 	// containing user-data exposed to the claimed server via the metaldata
 	// service. The referenced Secret must be of type metal.ironcore.dev/user-data.
 	// +optional
-	UserDataRef *v1.LocalObjectReference `json:"userDataRef,omitempty"`
+	UserDataRef *LocalObjectKeyReference `json:"userDataRef,omitempty"`
 
 	// Image specifies the boot image to be used for the server.
 	// +required
 	Image string `json:"image"`
+
+	// Cmdline overrides the kernel command line of the image.
+	// Only applicable for direct images.
+	Cmdline string `json:"cmdline,omitempty"`
+
+	// Args overrides the args of the image.
+	// Only applicable for direct images.
+	Args string `json:"args,omitempty"`
 
 	// Tolerations allow a ServerClaim to bind to a Server with matching taints.
 	// +optional

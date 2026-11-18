@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/ironcore-dev/controller-utils/conditionutils"
+	"github.com/ironcore-dev/metal-operator/internal/boot"
+	"github.com/ironcore-dev/metal-operator/internal/deploy"
+	"github.com/ironcore-dev/metal-operator/internal/drivers/redfish"
+	"github.com/ironcore-dev/metal-operator/internal/image"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 
@@ -45,6 +49,7 @@ const (
 	eventuallyTimeout    = 5 * time.Second
 	consistentlyDuration = 300 * time.Millisecond
 	MockServerIP         = "127.0.0.1"
+	localRegistry        = "localhost:50000"
 )
 
 var (
@@ -96,6 +101,9 @@ var _ = BeforeSuite(func() {
 	DeferCleanup(testEnv.Stop)
 
 	Expect(metalv1alpha1.AddToScheme(scheme.Scheme)).NotTo(HaveOccurred())
+
+	err = metalv1alpha1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	// +kubebuilder:scaffold:scheme
 
@@ -219,10 +227,47 @@ func SetupTest(redfishMockServers []netip.AddrPort) *corev1.Namespace {
 			},
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
+		repoProvider := image.NewRepositoryProvider(image.WithInsecureRegistries(localRegistry))
+
+		targetProviderResolver := boot.NewTargetProviderResolver(
+			metalv1alpha1.BootModeISO,
+			map[metalv1alpha1.BootMode]boot.TargetProvider{
+				metalv1alpha1.BootModeISO:  deploy.NewArtifactISOTargetProvider(k8sManager.GetClient()),
+				metalv1alpha1.BootModeEFI:  deploy.NewArtifactUKITargetProvider(k8sManager.GetClient()),
+				metalv1alpha1.BootModeIPXE: deploy.NewArtifactIPXETargetProvider(k8sManager.GetClient()),
+			},
+		)
+
+		bmcClientPool := redfish.NewPool()
+		Expect(k8sManager.Add(bmcClientPool)).To(Succeed())
+
+		redfishDrv := redfish.New(k8sManager.GetClient(), bmcClientPool)
+
+		directDeployer := deploy.NewDirectDeployer(deploy.DirectDeployerOptions{
+			NetworkProvider:        nil,
+			TargetProviderResolver: targetProviderResolver,
+			TargetControl:          boot.AsTargetControl(redfishDrv.Boot),
+			PowerControl:           redfishDrv.Power,
+			ConfigDriveProvider:    nil,
+			ConfigDriveControl:     boot.AsConfigDriveControl(redfishDrv.ConfigDrive),
+		})
+
+		diskDeployer := deploy.NewDiskDeployer(deploy.DiskDeployerOptions{
+			NetworkProvider: nil,
+			TargetControl:   boot.AsTargetControl(redfishDrv.Boot),
+			PowerControl:    redfishDrv.Power,
+			AgentDeployer:   directDeployer.WithCanEmbedConfigDrive(),
+			AgentProvider:   bootletAgentProvider,
+		})
+
 		Expect((&ServerClaimReconciler{
 			Client:                  k8sManager.GetClient(),
 			Scheme:                  k8sManager.GetScheme(),
 			MaxConcurrentReconciles: 5,
+			RepositoryProvider:      repoProvider,
+			PowerControl:            redfishDrv.Power,
+			DirectDeployer:          directDeployer,
+			DiskDeployer:            diskDeployer,
 		}).SetupWithManager(k8sManager)).To(Succeed())
 
 		Expect((&ServerClaimSchedulerReconciler{

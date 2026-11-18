@@ -152,6 +152,8 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCState
       default: Pending
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootMode
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootOrder
   map:
     fields:
@@ -164,6 +166,64 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: priority
       type:
         scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Bundle
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+    - name: spec
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleSpec
+    - name: status
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleStatus
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleFile
+  map:
+    fields:
+    - name: contentType
+      type:
+        scalar: string
+    - name: digest
+      type:
+        namedType: com.github.opencontainers.go-digest.Digest
+    - name: path
+      type:
+        scalar: string
+    - name: size
+      type:
+        scalar: numeric
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleSpec
+  map:
+    fields:
+    - name: entry
+      type:
+        scalar: string
+    - name: files
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleFile
+          elementRelationship: associative
+          keys:
+          - path
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.BundleStatus
+  map:
+    fields:
+    - name: conditions
+      type:
+        list:
+          elementType:
+            namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Condition
+          elementRelationship: associative
+          keys:
+          - type
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ConditionRequirement
   map:
     fields:
@@ -225,6 +285,17 @@ var schemaYAML = typed.YAMLObject(`types:
         elementRelationship: separable
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.EnforcementMode
   scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Image
+  map:
+    fields:
+    - name: kind
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageKind
+    - name: ref
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImageKind
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
   map:
     fields:
@@ -245,6 +316,32 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: macAddress
       type:
         scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.LocalObjectKeyReference
+  map:
+    fields:
+    - name: key
+      type:
+        scalar: string
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.LocalObjectReference
+  map:
+    fields:
+    - name: name
+      type:
+        scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Marker
+  map:
+    fields:
+    - name: name
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.MarkerName
+    - name: time
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.Time
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.MarkerName
+  scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
   map:
     fields:
@@ -304,6 +401,50 @@ var schemaYAML = typed.YAMLObject(`types:
   scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ProtocolScheme
   scalar: string
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Records
+  map:
+    fields:
+    - name: agentTokenSecretRef
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LocalObjectReference
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: image
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Image
+    - name: kind
+      type:
+        scalar: string
+    - name: markers
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Marker
+          elementRelationship: associative
+          keys:
+          - name
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ObjectMeta
+- name: com.github.ironcore-dev.metal-operator.api.v1alpha1.RecordsList
+  map:
+    fields:
+    - name: apiVersion
+      type:
+        scalar: string
+    - name: items
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.Records
+          elementRelationship: atomic
+    - name: kind
+      type:
+        scalar: string
+    - name: metadata
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.Server
   map:
     fields:
@@ -387,6 +528,12 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimSpec
   map:
     fields:
+    - name: args
+      type:
+        scalar: string
+    - name: cmdline
+      type:
+        scalar: string
     - name: ignitionSecretRef
       type:
         namedType: io.k8s.api.core.v1.LocalObjectReference
@@ -410,7 +557,7 @@ var schemaYAML = typed.YAMLObject(`types:
           elementRelationship: atomic
     - name: userDataRef
       type:
-        namedType: io.k8s.api.core.v1.LocalObjectReference
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.LocalObjectKeyReference
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerClaimStatus
   map:
     fields:
@@ -473,6 +620,9 @@ var schemaYAML = typed.YAMLObject(`types:
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.ServerSpec
   map:
     fields:
+    - name: architecture
+      type:
+        scalar: string
     - name: bmc
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BMCAccess
@@ -482,6 +632,9 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: bootConfigurationRef
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ObjectReference
+    - name: bootMode
+      type:
+        namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootMode
     - name: bootOrder
       type:
         list:
@@ -498,6 +651,12 @@ var schemaYAML = typed.YAMLObject(`types:
     - name: serverClaimRef
       type:
         namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.ImmutableObjectReference
+    - name: supportedBootModes
+      type:
+        list:
+          elementType:
+            namedType: com.github.ironcore-dev.metal-operator.api.v1alpha1.BootMode
+          elementRelationship: atomic
     - name: systemURI
       type:
         scalar: string
@@ -661,6 +820,8 @@ var schemaYAML = typed.YAMLObject(`types:
         scalar: string
 - name: com.github.ironcore-dev.metal-operator.api.v1alpha1.TolerationOperator
   scalar: string
+- name: com.github.opencontainers.go-digest.Digest
+  scalar: string
 - name: io.k8s.api.core.v1.LocalObjectReference
   map:
     fields:
@@ -748,6 +909,24 @@ var schemaYAML = typed.YAMLObject(`types:
           elementType:
             scalar: string
           elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ListMeta
+  map:
+    fields:
+    - name: continue
+      type:
+        scalar: string
+    - name: remainingItemCount
+      type:
+        scalar: numeric
+    - name: resourceVersion
+      type:
+        scalar: string
+    - name: selfLink
+      type:
+        scalar: string
+    - name: shardInfo
+      type:
+        namedType: io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.ManagedFieldsEntry
   map:
     fields:
@@ -859,6 +1038,12 @@ var schemaYAML = typed.YAMLObject(`types:
       type:
         namedType: io.k8s.apimachinery.pkg.types.UID
     elementRelationship: atomic
+- name: io.k8s.apimachinery.pkg.apis.meta.v1.ShardInfo
+  map:
+    fields:
+    - name: selector
+      type:
+        scalar: string
 - name: io.k8s.apimachinery.pkg.apis.meta.v1.Time
   scalar: untyped
 - name: io.k8s.apimachinery.pkg.types.UID

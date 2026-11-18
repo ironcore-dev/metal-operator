@@ -4,20 +4,24 @@
 package controller
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 
+	metalv1alpha1ac "github.com/ironcore-dev/metal-operator/api/v1alpha1/applyconfiguration/api/v1alpha1"
+	"github.com/ironcore-dev/metal-operator/internal/boot"
+	"github.com/ironcore-dev/metal-operator/internal/deploy"
+	"github.com/ironcore-dev/metal-operator/internal/image"
+	corev1 "k8s.io/api/core/v1"
+	metav1ac "k8s.io/client-go/applyconfigurations/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/ironcore-dev/controller-utils/clientutils"
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -33,6 +37,12 @@ type ServerClaimReconciler struct {
 	client.Client
 	Scheme                  *runtime.Scheme
 	MaxConcurrentReconciles int
+
+	RepositoryProvider image.RepositoryProvider
+	PowerControl       boot.PowerControl
+
+	DirectDeployer *deploy.DirectDeployer
+	DiskDeployer   *deploy.DiskDeployer
 }
 
 // +kubebuilder:rbac:groups=metal.ironcore.dev,resources=serverclaims,verbs=get;list;watch;update;patch
@@ -66,139 +76,222 @@ func (r *ServerClaimReconciler) delete(ctx context.Context, claim *metalv1alpha1
 		log.V(1).Info("Deleted ServerClaim")
 		return ctrl.Result{}, nil
 	}
-
-	if err := r.cleanupAndShutdownServer(ctx, claim); err != nil {
-		return ctrl.Result{}, err
-	}
-	if _, err := clientutils.PatchEnsureNoFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil {
-		return ctrl.Result{}, err
-	}
-	log.V(1).Info("Ensured that the finalizer has been removed")
-
 	log.V(1).Info("Deleted ServerClaim")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) cleanupAndShutdownServer(ctx context.Context, claim *metalv1alpha1.ServerClaim) error {
-	log := ctrl.LoggerFrom(ctx)
-	if claim.Spec.ServerRef == nil {
-		return nil
+func (r *ServerClaimReconciler) getRecords(
+	ctx context.Context,
+	claim *metalv1alpha1.ServerClaim,
+) (*metalv1alpha1.Records, error) {
+	records := &metalv1alpha1.Records{}
+	if _, err := ctrl.CreateOrUpdate(ctx, r.Client, records, func() error {
+		return ctrl.SetControllerReference(claim, records, r.Scheme)
+	}); err != nil {
+		return nil, err
 	}
+	return records, nil
+}
 
-	server := &metalv1alpha1.Server{}
-	if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to get server: %w", err)
-		}
-		log.V(1).Info("Server not found", "Server", claim.Spec.ServerRef.Name)
+func (r *ServerClaimReconciler) applyRecords(
+	ctx context.Context,
+	claim *metalv1alpha1.ServerClaim,
+	recordsAc *metalv1alpha1ac.RecordsApplyConfiguration,
+) error {
+	recordsAc = recordsAc.
+		WithNamespace(claim.Namespace).
+		WithName(claim.Name).
+		WithOwnerReferences(
+			metav1ac.OwnerReference().
+				WithAPIVersion(metalv1alpha1.SchemeGroupVersion.String()).
+				WithKind("ServerClaim").
+				WithName(claim.Name).
+				WithUID(claim.UID).
+				WithController(true))
+	if err := r.Apply(ctx, recordsAc, fieldOwner, client.ForceOwnership); err != nil {
+		return fmt.Errorf("applying records: %w", err)
 	}
-
-	config := &metalv1alpha1.ServerBootConfiguration{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      claim.Name,
-			Namespace: claim.Namespace,
-		},
-	}
-	if err := r.Delete(ctx, config); err != nil {
-		if !apierrors.IsNotFound(err) {
-			return fmt.Errorf("failed to delete serverbootconfig: %w", err)
-		}
-		log.V(1).Info("ServerBootConfiguration already deleted", "ServerBootConfiguration", config.Name)
-		return nil
-	}
-	log.V(1).Info("Deleted ServerBootConfiguration", "ServerBootConfiguration", config.Name)
 	return nil
 }
 
-// Reconciliation flow of a bound ServerClaim:
-// - Handle reconciliation ignore
-// - Ensure finalizer is set on claim
-// - Wait until the scheduler has bound and marked the claim bound
-// - Apply Boot configuration once the server is reserved
-// - Ensure the power state
-func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
-	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("Reconciling ServerClaim")
-	if shouldIgnoreReconciliation(claim) {
-		log.V(1).Info("Skipped ServerClaim reconciliation")
-		return ctrl.Result{}, nil
+func (r *ServerClaimReconciler) resolveImage(
+	ctx context.Context,
+	server *metalv1alpha1.Server,
+	claim *metalv1alpha1.ServerClaim,
+	records *deploy.Records,
+) error {
+	log := logf.FromContext(ctx)
+
+	img := claim.Spec.Image
+	repo, err := r.RepositoryProvider.RepositoryFor(img)
+	if err != nil {
+		return fmt.Errorf("getting repository for %q: %w", img, err)
 	}
 
-	if claim.Spec.ServerRef != nil {
-		server := &metalv1alpha1.Server{}
-		if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err == nil {
-			if isServerParkingOrParked(server) {
-				log.V(1).Info("Bound server is parked, standing down", "Server", server.Name)
-				return ctrl.Result{}, nil
-			}
-		} else if !apierrors.IsNotFound(err) {
-			return ctrl.Result{}, fmt.Errorf("failed to get server for parked check: %w", err)
+	imageRef, imageKind, err := image.Resolve(ctx, repo, img, server.Spec.Architecture)
+	if err != nil {
+		return fmt.Errorf("resolving image ref of %q: %w", img, err)
+	}
+
+	log.V(1).Info("Resolved image", "image", img, "imageRef", imageRef, "imageKind", imageKind)
+
+	log.V(5).Info("Setting image")
+	return records.SetImage(ctx, metalv1alpha1.Image{
+		Ref:  imageRef,
+		Kind: imageKind,
+	})
+}
+
+func (r *ServerClaimReconciler) reconcile(ctx context.Context, claim *metalv1alpha1.ServerClaim) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	server := &metalv1alpha1.Server{}
+	serverKey := client.ObjectKey{Name: claim.Spec.ServerRef.Name}
+	if err := r.Get(ctx, serverKey, server); err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting server: %w", err)
+	}
+
+	records, err := deploy.RecordsFor(ctx, r.Client, claim)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("getting records: %w", err)
+	}
+
+	if records.Image() == nil {
+		if err := r.resolveImage(ctx, server, claim, records); err != nil {
+			return ctrl.Result{}, fmt.Errorf("resolving image: %w", err)
 		}
 	}
 
-	if modified, err := clientutils.PatchEnsureFinalizer(ctx, r.Client, claim, serverClaimFinalizer); err != nil || modified {
-		return ctrl.Result{}, err
+	if claim.Spec.Power == metalv1alpha1.PowerOff {
+		res, err := r.PowerControl.ApplyPower(ctx, server, false, func() error {
+			log.V(1).Info("Issued server shutdown")
+			return nil
+		})
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("applying power: %w", err)
+		}
+		if res.Pending {
+			return res.AsReconcileResult(), nil
+		}
 	}
 
-	if claim.Spec.ServerRef == nil {
-		log.V(1).Info("ServerClaim is not scheduled to a Server yet")
-		return ctrl.Result{}, nil
+	switch kind := records.Image().Kind; kind {
+	case metalv1alpha1.ImageKindDirect:
+		return r.reconcileDirect(ctx, server, claim, records)
+	case metalv1alpha1.ImageKindDisk:
+		return r.reconcileDisk(ctx, server, claim, records)
+	default:
+		return ctrl.Result{}, reconcile.TerminalError(fmt.Errorf("unknown image kind %q", kind))
+	}
+}
+
+func (r *ServerClaimReconciler) getUserData(ctx context.Context, namespace string, ref *metalv1alpha1.LocalObjectKeyReference) ([]byte, error) {
+	secret := &corev1.Secret{}
+	secretKey := client.ObjectKey{Namespace: namespace, Name: ref.Name}
+	if err := r.Get(ctx, secretKey, secret); err != nil {
+		return nil, fmt.Errorf("getting secret %s: %w", ref.Name, err)
 	}
 
-	server := &metalv1alpha1.Server{}
-	if err := r.Get(ctx, client.ObjectKey{Name: claim.Spec.ServerRef.Name}, server); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	key := cmp.Or(ref.Key, metalv1alpha1.DefaultUserDataKey)
+	userData, ok := secret.Data[key]
+	if !ok {
+		return nil, fmt.Errorf("secret %q does not contain key %q", secret.Name, key)
+	}
+	return userData, nil
+}
+
+func (r *ServerClaimReconciler) reconcileDirect(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim, records *deploy.Records) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	var userData []byte
+	if ref := claim.Spec.UserDataRef; ref != nil {
+		retrievedUserData, err := r.getUserData(ctx, claim.Namespace, ref)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting user data: %w", err)
+		}
+
+		userData = retrievedUserData
 	}
 
-	if claim.Status.Phase != metalv1alpha1.PhaseBound {
-		log.V(1).Info("ServerClaim is not bound yet, waiting for scheduler")
-		return ctrl.Result{}, nil
+	res, err := r.DirectDeployer.Deploy(ctx, server, records, deploy.DirectConfig{
+		Metadata: boot.ServerClaimMetadata{
+			Namespace: claim.Namespace,
+			Name:      claim.Name,
+			UID:       claim.UID,
+		},
+		ImageRef: records.Image().Ref,
+		UserData: userData,
+		Hostname: claim.Name,
+		Cmdline:  claim.Spec.Cmdline,
+		Args:     claim.Spec.Args,
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("deploy direct: %w", err)
+	}
+	if res.Pending {
+		return res.AsReconcileResult(), nil
 	}
 
-	if ref := server.Spec.ServerClaimRef; ref == nil || ref.Name != claim.Name || ref.Namespace != claim.Namespace {
-		log.V(1).Info("Server is not claimed by this ServerClaim yet, waiting for scheduler", "Server", server.Name)
-		return ctrl.Result{}, nil
+	res, err = r.PowerControl.ApplyPower(ctx, server, true, func() error {
+		log.V(1).Info("Issued server power-on")
+		return nil
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("setting power: %w", err)
 	}
-
-	if server.Status.State != metalv1alpha1.ServerStateReserved {
-		log.V(1).Info("Server is not in reserved state", "Server", server.Name, "ServerState", server.Status.State)
-		return ctrl.Result{}, nil
+	if res.Pending {
+		return res.AsReconcileResult(), nil
 	}
-
-	if err := r.applyBootConfiguration(ctx, server, claim); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to apply boot configuration: %w", err)
+	if err := records.UpdateMarkers(ctx, deploy.AddMarker(metalv1alpha1.MarkerBooted)); err != nil {
+		return ctrl.Result{}, fmt.Errorf("updating markers: %w", err)
 	}
-
-	log.V(1).Info("Reconciled ServerClaim")
 	return ctrl.Result{}, nil
 }
 
-func (r *ServerClaimReconciler) applyBootConfiguration(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim) error {
-	log := ctrl.LoggerFrom(ctx)
-	config := &metalv1alpha1.ServerBootConfiguration{}
-	config.Name = claim.Name
-	config.Namespace = claim.Namespace
-	opResult, err := controllerutil.CreateOrPatch(ctx, r.Client, config, func() error {
-		metalv1alpha1.PropagateWatchFilterLabel(config, claim)
-		// TODO: we might want to add a finalizer on the ignition secret
-		config.Spec.ServerRef = *claim.Spec.ServerRef
-		config.Spec.Image = claim.Spec.Image
-		config.Spec.IgnitionSecretRef = claim.Spec.IgnitionSecretRef
-		return ctrl.SetControllerReference(claim, config, r.Scheme)
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create or patch ServerBootConfiguration: %w", err)
-	}
-	if opResult != controllerutil.OperationResultNone {
-		log.V(1).Info("Created or patched ServerBootConfiguration", "ServerBootConfiguration", config.Name, "Operation", opResult)
+func (r *ServerClaimReconciler) reconcileDisk(ctx context.Context, server *metalv1alpha1.Server, claim *metalv1alpha1.ServerClaim, records *deploy.Records) (ctrl.Result, error) {
+	log := logf.FromContext(ctx)
+
+	var userData []byte
+	if ref := claim.Spec.UserDataRef; ref != nil {
+		retrievedUserData, err := r.getUserData(ctx, claim.Namespace, ref)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("getting user data: %w", err)
+		}
+
+		userData = retrievedUserData
 	}
 
-	serverBase := server.DeepCopy()
-	server.Spec.BootConfigurationRef = &metalv1alpha1.ObjectReference{
-		Namespace: config.Namespace,
-		Name:      config.Name,
+	res, err := r.DiskDeployer.Deploy(ctx, server, records, deploy.DiskConfig{
+		Metadata: boot.ServerClaimMetadata{
+			Namespace: claim.Namespace,
+			Name:      claim.Name,
+			UID:       claim.UID,
+		},
+		ImageRef: records.Image().Ref,
+		Hostname: claim.Name,
+		UserData: userData,
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("deploy disk: %w", err)
 	}
-	return r.Patch(ctx, server, client.MergeFrom(serverBase))
+	if res.Pending {
+		return res.AsReconcileResult(), nil
+	}
+
+	res, err = r.PowerControl.ApplyPower(ctx, server, true, func() error {
+		log.V(1).Info("Issued server power-on")
+		return nil
+	})
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("setting power: %w", err)
+	}
+	if res.Pending {
+		return res.AsReconcileResult(), nil
+	}
+	if err := records.UpdateMarkers(ctx, deploy.AddMarker(metalv1alpha1.MarkerBooted)); err != nil {
+		return ctrl.Result{}, fmt.Errorf("updating markers: %w", err)
+	}
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -210,7 +303,7 @@ func (r *ServerClaimReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&metalv1alpha1.ServerClaim{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			return object.(*metalv1alpha1.ServerClaim).Spec.ServerRef != nil
 		}))).
-		Owns(&metalv1alpha1.ServerBootConfiguration{}).
+		Owns(&metalv1alpha1.Records{}).
 		Watches(&metalv1alpha1.Server{}, r.enqueueServerClaimByRefs()).
 		Complete(r)
 }
@@ -229,7 +322,8 @@ func (r *ServerClaimReconciler) enqueueServerClaimByRefs() handler.EventHandler 
 		req := make([]reconcile.Request, 0, len(claimList.Items))
 		for _, claim := range claimList.Items {
 			req = append(req, reconcile.Request{
-				NamespacedName: types.NamespacedName{Namespace: claim.Namespace, Name: claim.Name},
+				Namespace: claim.Namespace,
+				Name:      claim.Name,
 			})
 		}
 		return req

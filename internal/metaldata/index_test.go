@@ -12,7 +12,6 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
-	"github.com/ironcore-dev/metal-operator/internal/metaldata"
 )
 
 var _ = Describe("Index", func() {
@@ -158,7 +157,7 @@ var _ = Describe("Index", func() {
 			deleteServer(server)
 			server = &metalv1alpha1.Server{
 				Name:        "server-a",
-				Annotations: map[string]string{metaldata.IPsAnnotation: "not-an-ip"},
+				Annotations: map[string]string{metalv1alpha1.IPsAnnotation: "not-an-ip"},
 			}
 			addServer(server)
 
@@ -173,7 +172,7 @@ func newServer(name string, ips ...string) *metalv1alpha1.Server {
 		Name: name,
 	}
 	if len(ips) > 0 {
-		server.Annotations = map[string]string{metaldata.IPsAnnotation: strings.Join(ips, ",")}
+		server.Annotations = map[string]string{metalv1alpha1.IPsAnnotation: strings.Join(ips, ",")}
 	}
 	return server
 }

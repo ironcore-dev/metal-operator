@@ -108,6 +108,10 @@ const (
 	// Redfish reset fails with a 5xx error. On the next reconcile the controller detects this
 	// annotation and performs the SSH reset directly.
 	ForceSSHResetBMC = "force-ssh-reset-bmc"
+
+	// IPsAnnotation is the annotation on a Server carrying the comma-separated
+	// list of IP addresses.
+	IPsAnnotation = "metal.ironcore.dev/ips"
 )
 
 var AnnotationToRedfishMapping = map[string]schemas.ResetType{

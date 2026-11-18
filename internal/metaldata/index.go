@@ -28,10 +28,6 @@ type Index struct {
 	staticMetadata map[string]string
 }
 
-// IPsAnnotation is the annotation on a Server carrying the comma-separated
-// list of IP addresses the metaldata service keys its IP lookups on.
-const IPsAnnotation = "metal.ironcore.dev/ips"
-
 func NewIndex(log logr.Logger, staticMetadata map[string]string) *Index {
 	return &Index{
 		log:            log,
@@ -125,7 +121,7 @@ func (idx *Index) syncLocked(server *metalv1alpha1.Server) {
 	// taken from the IPsAnnotation. If none is set, the server is not
 	// addressable via IP lookups.
 	var addrs []netip.Addr
-	if raw, ok := server.Annotations[IPsAnnotation]; ok {
+	if raw, ok := server.Annotations[metalv1alpha1.IPsAnnotation]; ok {
 		for a := range strings.SplitSeq(raw, ",") {
 			addr, err := netip.ParseAddr(strings.TrimSpace(a))
 			if err != nil {

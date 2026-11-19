@@ -370,10 +370,10 @@ func (r *BMCUserReconciler) bmcConnectionTest(ctx context.Context, secret *metal
 		return false, fmt.Errorf("failed to create BMC client: %w", err)
 	}
 	defer bmcClient.Logout()
-	// With BasicAuth, ConnectContext only stores credentials without making an
+	// With BasicAuth (no session cache), ConnectContext only stores credentials without making an
 	// authenticated request (it skips CreateSession). Probe an authenticated
 	// endpoint here so that invalid/rotated credentials are detected.
-	if r.BMCOptions.BasicAuth {
+	if r.BMCOptions.SessionCache == nil {
 		if _, err := bmcClient.GetAccountService(); err != nil {
 			var httpErr *schemas.Error
 			if errors.As(err, &httpErr) && (httpErr.HTTPReturnedStatusCode == 401 || httpErr.HTTPReturnedStatusCode == 403) {

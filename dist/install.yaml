@@ -876,6 +876,8 @@ spec:
     kind: ServerReadinessRule
     listKind: ServerReadinessRuleList
     plural: serverreadinessrules
+    shortNames:
+    - srr
     singular: serverreadinessrule
   scope: Cluster
   versions:

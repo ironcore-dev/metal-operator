@@ -116,7 +116,7 @@ type ServerReadinessRuleStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
+// +kubebuilder:resource:scope=Cluster,shortName=srr
 
 // ServerReadinessRule is the Schema for the serverreadinessrules API
 type ServerReadinessRule struct {

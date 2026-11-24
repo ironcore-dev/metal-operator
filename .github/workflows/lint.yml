@@ -3,6 +3,8 @@ name: Lint
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   lint:
     name: Run linter
@@ -17,6 +19,6 @@ jobs:
           go-version-file: go.mod
 
       - name: Run linter
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.15

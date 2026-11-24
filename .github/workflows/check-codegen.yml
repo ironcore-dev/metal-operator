@@ -3,6 +3,8 @@ name: Check Codegen
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   check-codegen:
     name: Run code generation checks

@@ -4,6 +4,8 @@ on:
   pull_request:
     types: [assigned, opened, synchronize, reopened]
 
+permissions: {}
+
 jobs:
   test:
     name: Run tests

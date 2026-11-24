@@ -3,6 +3,8 @@ name: Lint
 on:
   pull_request:
 
+permissions: {}
+
 jobs:
   lint:
     name: Run linter

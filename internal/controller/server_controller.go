@@ -798,9 +798,10 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 	}
 	biosVersion, err := bmcClient.GetBiosVersion(ctx, server.Spec.SystemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get BIOS version for Server: %w", err)
+		log.Info("Could not retrieve BIOS version, keeping existing value", "error", err)
+	} else {
+		server.Status.BIOSVersion = biosVersion
 	}
-	server.Status.BIOSVersion = biosVersion
 	server.Status.PowerState = metalv1alpha1.ServerPowerState(systemInfo.PowerState)
 	server.Status.SerialNumber = systemInfo.SerialNumber
 	server.Status.SKU = systemInfo.SKU
@@ -810,54 +811,56 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 
 	processors, err := bmcClient.GetProcessors(ctx, server.Spec.SystemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get processors for Server: %w", err)
-	}
-	server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(processors))
-	for _, processor := range processors {
-		server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
-			ID:             processor.ID,
-			Type:           processor.Type,
-			Architecture:   processor.Architecture,
-			InstructionSet: processor.InstructionSet,
-			Manufacturer:   processor.Manufacturer,
-			Model:          processor.Model,
-			MaxSpeedMHz:    processor.MaxSpeedMHz,
-			TotalCores:     processor.TotalCores,
-			TotalThreads:   processor.TotalThreads,
-		})
+		log.Info("Could not retrieve processor inventory, keeping existing value", "error", err)
+	} else {
+		server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(processors))
+		for _, processor := range processors {
+			server.Status.Processors = append(server.Status.Processors, metalv1alpha1.Processor{
+				ID:             processor.ID,
+				Type:           processor.Type,
+				Architecture:   processor.Architecture,
+				InstructionSet: processor.InstructionSet,
+				Manufacturer:   processor.Manufacturer,
+				Model:          processor.Model,
+				MaxSpeedMHz:    processor.MaxSpeedMHz,
+				TotalCores:     processor.TotalCores,
+				TotalThreads:   processor.TotalThreads,
+			})
+		}
 	}
 	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemURI)
 	if err != nil {
-		return fmt.Errorf("failed to get storages for Server: %w", err)
-	}
-	server.Status.Storages = nil
-	for _, storage := range storages {
-		metalStorage := metalv1alpha1.Storage{
-			Name:  storage.Name,
-			State: metalv1alpha1.StorageState(storage.State),
+		log.Info("Could not retrieve storage inventory, keeping existing value", "error", err)
+	} else {
+		server.Status.Storages = nil
+		for _, storage := range storages {
+			metalStorage := metalv1alpha1.Storage{
+				Name:  storage.Name,
+				State: metalv1alpha1.StorageState(storage.State),
+			}
+			for _, drive := range storage.Drives {
+				metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
+					Name:      drive.Name,
+					Model:     drive.Model,
+					Vendor:    drive.Vendor,
+					Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
+					Type:      string(drive.Type),
+					State:     metalv1alpha1.StorageState(drive.State),
+					MediaType: drive.MediaType,
+				})
+			}
+			metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
+			for _, volume := range storage.Volumes {
+				metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
+					Name:        volume.Name,
+					Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
+					State:       metalv1alpha1.StorageState(volume.State),
+					RAIDType:    string(volume.RAIDType),
+					VolumeUsage: volume.VolumeUsage,
+				})
+			}
+			server.Status.Storages = append(server.Status.Storages, metalStorage)
 		}
-		for _, drive := range storage.Drives {
-			metalStorage.Drives = append(metalStorage.Drives, metalv1alpha1.StorageDrive{
-				Name:      drive.Name,
-				Model:     drive.Model,
-				Vendor:    drive.Vendor,
-				Capacity:  resource.NewQuantity(drive.SizeBytes, resource.BinarySI),
-				Type:      string(drive.Type),
-				State:     metalv1alpha1.StorageState(drive.State),
-				MediaType: drive.MediaType,
-			})
-		}
-		metalStorage.Volumes = make([]metalv1alpha1.StorageVolume, 0, len(storage.Volumes))
-		for _, volume := range storage.Volumes {
-			metalStorage.Volumes = append(metalStorage.Volumes, metalv1alpha1.StorageVolume{
-				Name:        volume.Name,
-				Capacity:    resource.NewQuantity(volume.SizeBytes, resource.BinarySI),
-				State:       metalv1alpha1.StorageState(volume.State),
-				RAIDType:    string(volume.RAIDType),
-				VolumeUsage: volume.VolumeUsage,
-			})
-		}
-		server.Status.Storages = append(server.Status.Storages, metalStorage)
 	}
 
 	if err := r.Status().Patch(ctx, server, client.MergeFrom(serverBase)); err != nil {

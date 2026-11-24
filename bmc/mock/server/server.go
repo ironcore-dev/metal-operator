@@ -211,6 +211,7 @@ type MockServer struct {
 	accounts          map[string]string     // username → password (authentication store)
 	authEnabled       bool                  // when true, all non-service-root requests require Basic Auth
 	unavailable       bool                  // when true, all requests return 503 Service Unavailable
+	storageError      bool                  // when true, Storage endpoint GET requests return 400
 	actionHandlers    []actionHandler       // ordered POST action dispatch table (first match wins)
 	onCreate          map[string]memberHook // collection URL suffix → hook called after a member is added
 	onDelete          map[string]memberHook // collection URL suffix → hook called before a member is removed
@@ -360,9 +361,14 @@ func (s *MockServer) redfishHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.mu.RLock()
 	unavailable := s.unavailable
+	storageError := s.storageError
 	s.mu.RUnlock()
 	if unavailable {
 		http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	if storageError && strings.Contains(r.URL.Path, "/Storage") {
+		http.Error(w, `{"error":{"code":"iLO.2.37.ResourceNotReadyRetry","message":"The resource is not ready."}}`, http.StatusBadRequest)
 		return
 	}
 
@@ -1526,6 +1532,16 @@ func (s *MockServer) SetUnavailable(unavailable bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.unavailable = unavailable
+}
+
+// SetStorageError toggles simulated storage-not-ready mode. When true, GET requests to
+// any path containing "/Storage" return HTTP 400 with an iLO ResourceNotReadyRetry body,
+// reproducing the failure seen on iLO 2.37 nodes where the Storage endpoint is not ready
+// after a reset.
+func (s *MockServer) SetStorageError(storageError bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.storageError = storageError
 }
 
 // Authenticate returns true if username/password match the stored account credentials.

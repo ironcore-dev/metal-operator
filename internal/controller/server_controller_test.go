@@ -1551,6 +1551,34 @@ passwd:
 			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
 			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
 		})
+		It("should resume from Parked state even when the Storage endpoint returns an error", func(ctx SpecContext) {
+			server, bmcSecret := createServerAndSecret(ctx)
+
+			By("Driving the Server to available state and parking it")
+			Eventually(UpdateStatus(server, func() {
+				server.Status.State = metalv1alpha1.ServerStateAvailable
+			})).Should(Succeed())
+			park(server)
+			Eventually(Object(server)).Should(HaveField("Status.State", metalv1alpha1.ServerStateParked))
+
+			By("Injecting a Storage endpoint error (iLO ResourceNotReadyRetry)")
+			mockServers[0].SetStorageError(true)
+			DeferCleanup(func() { mockServers[0].SetStorageError(false) })
+
+			By("Requesting unpark to resume")
+			Eventually(Update(server, func() {
+				metav1.SetMetaDataAnnotation(&server.ObjectMeta, metalv1alpha1.OperationAnnotation, metalv1alpha1.OperationAnnotationUnpark)
+			})).Should(Succeed())
+
+			By("Ensuring the server resumes despite the Storage error")
+			Eventually(Object(server)).Should(SatisfyAll(
+				HaveField("Status.State", metalv1alpha1.ServerStateAvailable),
+				HaveField("Annotations", Not(HaveKey(metalv1alpha1.PreParkStateAnnotation))),
+			))
+
+			Expect(k8sClient.Delete(ctx, server)).Should(Succeed())
+			Expect(k8sClient.Delete(ctx, bmcSecret)).To(Succeed())
+		})
 	})
 
 	Describe("Operation annotations", func() {

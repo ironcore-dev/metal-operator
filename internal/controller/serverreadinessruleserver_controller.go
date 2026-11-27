@@ -5,8 +5,11 @@ package controller
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
+	"strings"
 
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -23,7 +26,26 @@ import (
 
 const (
 	serverReadinessRuleBootstrapCompletedAnnotationPrefix = "readiness.metal.ironcore.dev/bootstrap-completed-"
+
+	// maxAnnotationNameLength is the limit for the name part of an annotation key (after the "/").
+	maxAnnotationNameLength            = 63
+	bootstrapCompletedNamePrefixLength = len("bootstrap-completed-")
+	bootstrapCompletedHashLength       = 8
 )
+
+// bootstrapCompletedAnnotationKey returns the annotation key recording that a BootstrapOnly rule completed.
+// Rule names too long to fit the annotation name limit are truncated and suffixed with a hash of the full name.
+func bootstrapCompletedAnnotationKey(ruleName string) string {
+	maxRuleNameLength := maxAnnotationNameLength - bootstrapCompletedNamePrefixLength
+	if len(ruleName) <= maxRuleNameLength {
+		return serverReadinessRuleBootstrapCompletedAnnotationPrefix + ruleName
+	}
+
+	sum := sha256.Sum256([]byte(ruleName))
+	suffix := "-" + hex.EncodeToString(sum[:])[:bootstrapCompletedHashLength]
+	truncated := strings.TrimRight(ruleName[:maxRuleNameLength-len(suffix)], "-.")
+	return serverReadinessRuleBootstrapCompletedAnnotationPrefix + truncated + suffix
+}
 
 type ServerReadinessRuleServerReconciler struct {
 	client.Client
@@ -122,10 +144,11 @@ func addTaint(server *metalv1alpha1.Server, toAdd metalv1alpha1.Taint) (modified
 }
 
 func setBootstrapCompleted(server *metalv1alpha1.Server, ruleName string) (modified bool) {
-	if _, ok := server.Annotations[serverReadinessRuleBootstrapCompletedAnnotationPrefix+ruleName]; ok {
+	key := bootstrapCompletedAnnotationKey(ruleName)
+	if _, ok := server.Annotations[key]; ok {
 		return false
 	}
-	metav1.SetMetaDataAnnotation(&server.ObjectMeta, serverReadinessRuleBootstrapCompletedAnnotationPrefix+ruleName, "true")
+	metav1.SetMetaDataAnnotation(&server.ObjectMeta, key, "true")
 	return true
 }
 
@@ -158,7 +181,7 @@ func (r *ServerReadinessRuleServerReconciler) compileServerReadinessRuleRequirem
 }
 
 func (r *ServerReadinessRuleServerReconciler) isServerReadinessRuleBootstrapCompleted(server *metalv1alpha1.Server, ruleName string) bool {
-	_, ok := server.Annotations[serverReadinessRuleBootstrapCompletedAnnotationPrefix+ruleName]
+	_, ok := server.Annotations[bootstrapCompletedAnnotationKey(ruleName)]
 	return ok
 }
 

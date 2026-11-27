@@ -4,12 +4,38 @@
 package controller
 
 import (
+	"strings"
+
 	metalv1alpha1 "github.com/ironcore-dev/metal-operator/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 	. "sigs.k8s.io/controller-runtime/pkg/envtest/komega"
 )
+
+var _ = Describe("bootstrapCompletedAnnotationKey", func() {
+	It("keeps the legacy key for short rule names", func() {
+		Expect(bootstrapCompletedAnnotationKey("my-rule")).To(Equal("readiness.metal.ironcore.dev/bootstrap-completed-my-rule"))
+		maxName := strings.Repeat("a", 43)
+		Expect(bootstrapCompletedAnnotationKey(maxName)).To(Equal(serverReadinessRuleBootstrapCompletedAnnotationPrefix + maxName))
+	})
+
+	It("produces a valid, deterministic and unique key for long rule names", func() {
+		longA := "metal-settings-hpe-proliant-dl380-gen11-cc-ironcore-9467b291"
+		longB := "metal-settings-hpe-proliant-dl380-gen11-cc-ironcore-9467b292"
+		keyA := bootstrapCompletedAnnotationKey(longA)
+
+		Expect(validation.IsQualifiedName(keyA)).To(BeEmpty())
+		Expect(bootstrapCompletedAnnotationKey(longA)).To(Equal(keyA))
+		Expect(bootstrapCompletedAnnotationKey(longB)).NotTo(Equal(keyA))
+	})
+
+	It("does not end the truncated part with a separator", func() {
+		name := strings.Repeat("a", 33) + "-" + strings.Repeat("b", 30)
+		Expect(validation.IsQualifiedName(bootstrapCompletedAnnotationKey(name))).To(BeEmpty())
+	})
+})
 
 var _ = Describe("ServerReadinessRuleServer Controller", func() {
 	SetupTest(nil)
@@ -145,7 +171,7 @@ var _ = Describe("ServerReadinessRuleServer Controller", func() {
 
 			By("waiting for the server to loose the taint and have the annotation")
 			Eventually(Object(server)).Should(SatisfyAll(
-				HaveField("Annotations", HaveKeyWithValue(serverReadinessRuleBootstrapCompletedAnnotationPrefix+rule.Name, "true")),
+				HaveField("Annotations", HaveKeyWithValue(bootstrapCompletedAnnotationKey(rule.Name), "true")),
 				HaveField("Spec.Taints", BeEmpty()),
 			))
 

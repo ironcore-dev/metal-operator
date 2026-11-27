@@ -5,10 +5,10 @@ version: 'v0.0.3'
 workflows:
     '.github/workflows/auto_update.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
     '.github/workflows/check-codegen.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
     '.github/workflows/clean-cache.yml':
         - 'actions/checkout@v7.0.1'
     '.github/workflows/create-release-branch.yml':
@@ -18,7 +18,7 @@ workflows:
         - 'imranismail/setup-kustomize@v3.0.0'
     '.github/workflows/lint.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'golangci/golangci-lint-action@v9.3.0'
     '.github/workflows/publish-chart.yml':
         - 'actions/checkout@v7.0.1'
@@ -40,14 +40,14 @@ workflows:
         - 'release-drafter/release-drafter@v7.11.0'
     '.github/workflows/test-chart.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
         - 'azure/setup-helm@v5.1.0'
     '.github/workflows/test-e2e.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
     '.github/workflows/test.yml':
         - 'actions/checkout@v7.0.1'
-        - 'actions/setup-go@v7.0.0'
+        - 'actions/setup-go@v7.1.0'
 dependencies:
     'actions/checkout@v7.0.1':
         ref: 'v7.0.1'
@@ -64,9 +64,9 @@ dependencies:
         commit: 'sha1-368f82528645a54fb793d4d04e342629a3f51346'
         owner_id: 44036562
         repo_id: 438112499
-    'actions/setup-go@v7.0.0':
-        ref: 'v7.0.0'
-        commit: 'sha1-b7ad1dad31e06c5925ef5d2fc7ad053ef454303e'
+    'actions/setup-go@v7.1.0':
+        ref: 'v7.1.0'
+        commit: 'sha1-d8cbb8045d7f43706b9177cceb36c1f91a6644d5'
         owner_id: 44036562
         repo_id: 192624594
     'actions/setup-node@v7.1.0':

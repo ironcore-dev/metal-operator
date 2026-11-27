@@ -809,9 +809,12 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 	server.Status.Model = systemInfo.Model
 	server.Status.TotalSystemMemory = &systemInfo.TotalSystemMemory
 
+	var inventoryErrs []string
+
 	processors, err := bmcClient.GetProcessors(ctx, server.Spec.SystemURI)
 	if err != nil {
 		log.Info("Could not retrieve processor inventory, keeping existing value", "error", err)
+		inventoryErrs = append(inventoryErrs, fmt.Sprintf("processors: %v", err))
 	} else {
 		server.Status.Processors = make([]metalv1alpha1.Processor, 0, len(processors))
 		for _, processor := range processors {
@@ -831,6 +834,7 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 	storages, err := bmcClient.GetStorages(ctx, server.Spec.SystemURI)
 	if err != nil {
 		log.Info("Could not retrieve storage inventory, keeping existing value", "error", err)
+		inventoryErrs = append(inventoryErrs, fmt.Sprintf("storages: %v", err))
 	} else {
 		server.Status.Storages = nil
 		for _, storage := range storages {
@@ -860,6 +864,30 @@ func (r *ServerReconciler) updateServerStatusFromSystemInfo(ctx context.Context,
 				})
 			}
 			server.Status.Storages = append(server.Status.Storages, metalStorage)
+		}
+	}
+
+	if len(inventoryErrs) > 0 {
+		if err := r.Conditions.UpdateSlice(
+			&server.Status.Conditions,
+			ConditionInventoryAvailable,
+			conditionutils.UpdateStatus(metav1.ConditionFalse),
+			conditionutils.UpdateReason(ReasonInventoryPartial),
+			conditionutils.UpdateMessage(strings.Join(inventoryErrs, "; ")),
+			conditionutils.UpdateObserved(server),
+		); err != nil {
+			return fmt.Errorf("failed to update InventoryAvailable condition: %w", err)
+		}
+	} else {
+		if err := r.Conditions.UpdateSlice(
+			&server.Status.Conditions,
+			ConditionInventoryAvailable,
+			conditionutils.UpdateStatus(metav1.ConditionTrue),
+			conditionutils.UpdateReason(ReasonInventoryComplete),
+			conditionutils.UpdateMessage("All inventory data retrieved successfully"),
+			conditionutils.UpdateObserved(server),
+		); err != nil {
+			return fmt.Errorf("failed to update InventoryAvailable condition: %w", err)
 		}
 	}
 

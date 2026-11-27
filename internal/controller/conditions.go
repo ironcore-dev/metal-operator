@@ -14,6 +14,9 @@ const (
 	// ConditionWaitingForPowerOff is set while the server is waiting for the BMC
 	// to confirm it is powered off before the claim can be released.
 	ConditionWaitingForPowerOff = "WaitingForPowerOff"
+	// ConditionInventoryAvailable indicates whether the full hardware inventory
+	// (BIOS version, processors, storage) could be retrieved from the BMC.
+	ConditionInventoryAvailable = "InventoryAvailable"
 )
 
 // Shared reason strings used across multiple controllers.
@@ -38,4 +41,8 @@ const (
 	ReasonPowerOffConfirmed = "PowerOffConfirmed"
 	// ReasonResetComplete indicates a BMC reset has completed successfully.
 	ReasonResetComplete = "ResetComplete"
+	// ReasonInventoryPartial indicates that one or more inventory fetches failed non-fatally.
+	ReasonInventoryPartial = "PartialInventory"
+	// ReasonInventoryComplete indicates all inventory fetches succeeded.
+	ReasonInventoryComplete = "Complete"
 )
